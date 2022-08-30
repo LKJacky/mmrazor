@@ -4,16 +4,14 @@ import torch
 import torch.nn as nn
 from torch.nn.common_types import _size_2_t
 
-from mmrazor.models.architectures.dynamic_op.default_dynamic_ops import \
-    ChannelDynamicOP
-from mmrazor.models.mutables.mutable_channel.mutable_channel_unit import \
-    MutableChannelUnit
-from mmrazor.models.mutables.mutable_channel.mutable_mask import MutableMask
+from mmrazor.models.architectures.dynamic_op.bricks import DynamicConv2d
+from mmrazor.models.mutables.mutable_channel import MutableChannelGroup
+from mmrazor.models.mutables.mutable_channel import SimpleMutableChannel
 from mmrazor.registry import MODELS
 
 
 @MODELS.register_module()
-class MutableImportance(MutableMask):
+class MutableImportance(SimpleMutableChannel):
 
     def __init__(self, num_channels: int, **kwargs):
         super().__init__(num_channels, **kwargs)
@@ -21,7 +19,7 @@ class MutableImportance(MutableMask):
         self.importance.requires_grad_()
 
 
-class ImportanceConv2d(nn.Conv2d, ChannelDynamicOP):
+class ImportanceConv2d(DynamicConv2d):
 
     def __init__(self,
                  in_channels: int,
@@ -89,17 +87,9 @@ class ImportanceConv2d(nn.Conv2d, ChannelDynamicOP):
     def to_static_op(self) -> nn.Module:
         pass
 
-    @property
-    def mutable_in(self):
-        return super().mutable_in
-
-    @property
-    def mutable_out(self):
-        return super().mutable_out
-
 
 @MODELS.register_module()
-class ImpUnit(MutableChannelUnit):
+class ImpUnit(MutableChannelGroup):
 
     def __init__(self,
                  num_channels,
