@@ -90,11 +90,12 @@ class OneShotMutableChannelUnit(SequentialMutableChannelUnit):
     @current_choice.setter
     def current_choice(self, choice: Union[int, float]):
         """Set current choice."""
-        assert choice in self.candidate_choices
-        int_choice = self._get_valid_int_choice(choice)
-        choice_ = int_choice if self.is_num_mode else self._num2ratio(
-            int_choice)
-        self.mutable_channel.current_choice = choice_
+        if choice not in self.candidate_choices:
+            logger = MMLogger.get_current_instance()
+            logger.warn('choice outside of candidate_choices')
+        SequentialMutableChannelGroup.current_choice.fset(  # type: ignore
+            self,  # type: ignore
+            choice)  # type: ignore
 
     def sample_choice(self) -> Union[int, float]:
         """Sample a valid choice."""
