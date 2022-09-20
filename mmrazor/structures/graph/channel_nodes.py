@@ -133,7 +133,12 @@ class PassChannelNode(ChannelNode):
         if len(self.prev_nodes) > 0:
             return self.prev_nodes[0].out_channels
         else:
-            return 0
+            from mmengine import MMLogger
+            logger = MMLogger.get_current_instance()
+            logger.info(
+                (f'{self.name} node has no prev nodes, so we cannot determine '
+                 'the number of input channels, it is set to 3 by default.'))
+            return 3
 
     @property
     def out_channels(self) -> int:
