@@ -10,6 +10,8 @@ from mmrazor.models.mutables.mutable_channel import (
     L1MutableChannelUnit, MutableChannelUnit, SequentialMutableChannelUnit)
 from mmrazor.models.mutables.mutable_channel.units.channel_unit import (  # noqa
     Channel, ChannelUnit)
+from mmrazor.models.mutators.channel_mutator.channel_mutator import \
+    is_dynamic_op_for_fx_tracer
 from mmrazor.structures.graph import ModuleGraph as ModuleGraph
 from .....data.models import LineModel
 from .....test_core.test_graph.test_graph import TestGraph
@@ -101,11 +103,29 @@ class TestMutableChannelUnit(TestCase):
         y = model(x)
         self.assertSequenceEqual(y.shape, [2, 1000])
 
+    def _test_a_model_from_fx_tracer(self, model):
+        model.eval()
+        model = model.to(DEVICE)
+        graph = ModuleGraph.init_from_fx_tracer(
+            model,
+            fx_tracer=dict(
+                type='RazorFxTracer',
+                is_extra_leaf_module=is_dynamic_op_for_fx_tracer,
+                concrete_args=dict(mode='tensor')))
+        self._test_a_graph(model, graph)
+
     def _test_a_model_from_backward_tracer(self, model):
         model.eval()
         model = model.to(DEVICE)
         graph = ModuleGraph.init_from_backward_tracer(model)
         self._test_a_graph(model, graph)
+
+    def test_with_fx_tracer(self):
+        test_models = TestGraph.fx_passed_models()
+        for model_data in test_models:
+            with self.subTest(model=model_data):
+                model = model_data()
+                self._test_a_model_from_fx_tracer(model)
 
     def test_with_backward_tracer(self):
         test_models = TestGraph.backward_tracer_passed_models()

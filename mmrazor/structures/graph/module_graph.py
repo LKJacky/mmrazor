@@ -11,6 +11,8 @@ import torch.nn as nn
 from torch.nn import Module
 
 from mmrazor.models.task_modules.tracer.backward_tracer import BackwardTracer
+from mmrazor.models.task_modules.tracer.fx_tracer import (FxBaseNode,
+                                                          RazorFxTracer)
 from mmrazor.models.task_modules.tracer.loss_calculator import \
     ImageClassifierPseudoLoss
 from mmrazor.models.task_modules.tracer.path import (Path, PathConcatNode,
@@ -235,7 +237,18 @@ class ModuleGraph(BaseGraph[MODULENODE]):
     def init_from_fx_tracer(model: Module,
                             fx_tracer={'type': 'RazorFxTracer'}):
         """init module graph using torch fx tracer."""
-        pass
+        if isinstance(fx_tracer, dict):
+            tracer: RazorFxTracer = TASK_UTILS.build(fx_tracer)
+        else:
+            tracer = fx_tracer
+
+        base_graph = tracer.trace(model)
+
+        converter = FxTracerToGraphConverter(base_graph, model)
+
+        converter.graph._model = model
+        converter.graph.refresh_module_name()
+        return converter.graph
 
     @staticmethod
     def init_from_model(model: Module):
@@ -494,3 +507,75 @@ class PathToGraphConverter(GraphConverter):
         """Connext the node and the nodes in nexts."""
         for next in nexts:
             self.graph.connect(node, next)
+
+
+class FxTracerToGraphConverter(GraphConverter):
+    """Use fx tracer to parse model, and generate module-graph."""
+
+    def __init__(self, base_graph, model=None) -> None:
+        """
+        Args:
+            model (Module): the model which will be parsed
+            is_extra_leaf_module (Callable): a function used to determine,
+             if a module is a leaf module except torch pre-defined modules
+        """
+        super().__init__(model)
+        self.base_graph = base_graph
+        self._convert_graph()
+
+        self._post_process()
+
+    def _node_converter(self, node: FxBaseNode):
+        """Convert a fxnode to a module-node."""
+        if node.is_function():
+            if node.is_cat():
+                val = 'cat_placeholder'
+            elif len(node.prev_nodes) > 1:
+                val = 'bind_placeholder'
+            else:
+                val = 'pass_placeholder'
+        elif node.is_Tensor():
+            raise Exception('error type')
+        elif node.is_method():
+            if len(node.prev_nodes) > 1:
+                val = 'bind_placeholder'
+            else:
+                val = 'pass_placeholder'
+        elif node.is_get_attr():
+            raise Exception('error type')
+        elif node.is_module():
+            val = node.module()
+        else:
+            raise NotImplementedError(f'{node} is unsupported')
+
+        new_node = ModuleNode(node.name, val)
+        return new_node
+
+    def _delete_useless_nodes(self):
+        """delete useless nodes in torch-graph."""
+        base_graph = self.base_graph
+        # delete input and output nodes
+        for node in copy.copy(list(base_graph)):
+            if node.is_function():
+                pass
+            elif node.is_Tensor():
+                base_graph.delete_node(node)
+            elif node.is_method():
+                base_graph.delete_node(node)
+            elif node.is_get_attr():
+                base_graph.delete_node(node)
+            elif node.is_module():
+                if len(list(node.module().parameters())) == 0:
+                    base_graph.delete_node(node)
+                else:
+                    pass
+            else:
+                raise NotImplementedError(f'{node} is unsupported')
+
+    def _convert_graph(self):
+        """Convert a torch-graph to a module-graph."""
+        self._delete_useless_nodes()
+        base_graph = self.base_graph
+        # copy_nodes and connect
+        module_graph = ModuleGraph.copy_from(base_graph, self._node_converter)
+        self.graph = module_graph

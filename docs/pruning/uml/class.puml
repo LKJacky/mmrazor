@@ -1,0 +1,73 @@
+@startuml pruning
+class PruneAlgorithm{
+    mutator: ChannelMutator
+    architecture: nn.Module
+    __init__(mutator_cfg,**kwargs)
+    forward()
+}
+class ChannelMutator
+{
+    units
+    mutable_units
+    current_choices
+    __init__(unit_cfg,**kwargs)
+    prepare_from_supernet(supernet)
+    set_choices(choices: Dict)
+    sample_choices()
+    config_template()
+}
+class Channel
+{
+    name
+    module
+    module_name
+    start: int
+    end: int
+    is_output_channel: bool
+    expand_ratio: int
+}
+class ChannelUnit
+{
+
+}
+class MutableChannelUnit
+{
+    num_channels
+    output_related: List[Channel]
+    input_related: List[Channel]
+    name
+    is_prunable
+    config_template
+    current_choice
+    mutable_channel: BaseMutableChannel
+    __init__(num_channels,**kwargs)
+    prepare_for_pruning(model)
+    sample_choice()
+}
+class DynamicOp
+{
+    to_static_op()
+    convert_from()
+}
+
+class BaseMutableChannel
+{
+    current_choice
+    current_mask
+    activated_channels
+}
+
+
+ChannelUnit <|. MutableChannelUnit
+BaseMutator <|. ChannelMutator
+BaseAlgorithm <|. PruneAlgorithm
+
+PruneAlgorithm --> ChannelMutator
+ChannelMutator-->MutableChannelUnit
+MutableChannelUnit ---->BaseMutableChannel : change
+' op related
+Channel --> DynamicOp: module
+MutableChannelUnit --> Channel
+DynamicOp --> BaseMutableChannel
+
+@enduml
