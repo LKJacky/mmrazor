@@ -13,7 +13,7 @@ from mmrazor.structures.graph.channel_modules import (BaseChannelUnit,
 from mmrazor.structures.graph.channel_nodes import \
     default_channel_node_converter
 from ...data.models import LineModel
-from .test_graph import TestGraph
+from ...data.tracer_passed_models import PassedModelManager
 
 NodeMap = {}
 
@@ -39,7 +39,7 @@ class TestChannelGraph(unittest.TestCase):
                                    default_channel_node_converter)
 
     def test_forward(self):
-        for model_data in TestGraph.backward_tracer_passed_models():
+        for model_data in PassedModelManager.backward_tracer_passed_models():
             with self.subTest(model=model_data):
                 model = model_data()
                 module_graph = ModuleGraph.init_from_backward_tracer(model)

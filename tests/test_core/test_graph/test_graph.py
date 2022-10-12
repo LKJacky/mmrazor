@@ -9,14 +9,7 @@ from mmrazor.models.architectures.dynamic_ops.mixins import DynamicChannelMixin
 from mmrazor.models.mutators.channel_mutator.channel_mutator import \
     is_dynamic_op_for_fx_tracer
 from mmrazor.structures.graph import ModuleGraph
-from ...data.model_library import MMClsModelLibrary, TorchModelLibrary
-from ...data.models import Icep  # noqa
-from ...data.models import MultipleUseModel  # noqa
-from ...data.models import Xmodel  # noqa
-from ...data.models import (AddCatModel, ConcatModel, ConvAttnModel,
-                            DwConvModel, ExpandLineModel, GroupWiseConvModel,
-                            LineModel, MultiBindModel, MultiConcatModel,
-                            MultiConcatModel2, ResBlock)
+from ...data.tracer_passed_models import PassedModelManager
 
 FULL_TEST = os.getenv('FULL_TEST') == 'true'
 
@@ -39,181 +32,8 @@ class ToyCNNPseudoLoss:
 
 class TestGraph(TestCase):
 
-    @classmethod
-    def fx_passed_models(cls):
-        default_models = [
-            LineModel,
-            ResBlock,
-            AddCatModel,
-            ConcatModel,
-            MultiConcatModel,
-            MultiConcatModel2,
-            GroupWiseConvModel,
-            Xmodel,
-            MultipleUseModel,
-            Icep,
-            ExpandLineModel,
-            MultiBindModel,
-            DwConvModel,  #
-            ConvAttnModel,
-        ]
-        """
-        googlenet: return a tuple when training, so it should
-        trace in eval mode
-        """
-        torch_models_includes = [
-            'alexnet',
-            'densenet',
-            'efficientnet',
-            'googlenet',
-            'inception',
-            'mnasnet',
-            'mobilenet',
-            'regnet',
-            'resnet',
-            'resnext',
-            # 'shufflenet', # bug
-            'squeezenet',
-            'vgg',
-            'wide_resnet',
-        ]
-        torch_model_library = TorchModelLibrary(include=torch_models_includes)
-        """
-        shufflenet consists of chunk operations.
-        resnest: resnest has two problems. First it uses *x.shape() which is
-            not tracerable using fx tracer. Second, it uses channel folding.
-        res2net: res2net consists of split operations.
-        convnext: consist of layernorm.
-        """
-        mmcls_model_include = [
-            'vgg',
-            'efficientnet',
-            'resnet',
-            'mobilenet',
-            'resnext',
-            'wide-resnet',
-            # 'shufflenet', # bug
-            'hrnet',
-            # 'resnest',  # bug
-            'inception',
-            # 'res2net',  # bug
-            'densenet',
-            # 'convnext',  # bug
-            'regnet',
-            # transformer and mlp
-            # # 'van', # bug
-            # # 'swin_transformer', # bug
-            # 'convmixer', # bug
-            # # 't2t', # bug
-            # # 'twins', # bug
-            # # 'repmlp', # bug
-            # # 'tnt', # bug
-            # # 't2t', # bug
-            # # 'mlp_mixer', # bug
-            # # 'conformer', # bug
-            # # 'poolformer', # bug
-            # # 'vit', # bug
-        ]
-        mmcls_exclude = ['cutmix', 'cifar', 'gem']
-        mmcls_model_library = MMClsModelLibrary(
-            include=mmcls_model_include, exclude=mmcls_exclude)
-
-        models = default_models \
-            + torch_model_library.include_models()\
-            + mmcls_model_library.include_models() \
-            if FULL_TEST else default_models
-
-        return models
-
-    @classmethod
-    def backward_tracer_passed_models(cls):
-        '''MultipleUseModel: backward tracer can't distinguish multiple use and
-        first bind then use.'''
-        default_models = [
-            LineModel,
-            ResBlock,
-            AddCatModel,
-            ConcatModel,
-            MultiConcatModel,
-            MultiConcatModel2,
-            GroupWiseConvModel,
-            Xmodel,
-            # MultipleUseModel,  # bug
-            Icep,
-            ExpandLineModel,
-            MultiBindModel,
-            DwConvModel
-        ]
-        """
-        googlenet return a tuple when training, so it
-            should trace in eval mode
-        """
-
-        torch_models_includes = [
-            'alexnet',
-            'densenet',
-            'efficientnet',
-            'googlenet',
-            'inception',
-            'mnasnet',
-            'mobilenet',
-            'regnet',
-            'resnet',
-            'resnext',
-            # 'shufflenet',     # bug
-            'squeezenet',
-            'vgg',
-            'wide_resnet',
-        ]
-        torch_model_library = TorchModelLibrary(include=torch_models_includes)
-        """
-        shufflenet consists of chunk operations.
-        resnest: resnest has two problems. First it uses *x.shape() which is
-            not tracerable using fx tracer. Second, it uses channel folding.
-        res2net: res2net consists of split operations.
-        convnext: consist of layernorm.
-        """
-        mmcls_model_include = [
-            'vgg',
-            'efficientnet',
-            'resnet',
-            'mobilenet',
-            'resnext',
-            'wide-resnet',
-            # 'shufflenet',  # bug
-            'hrnet',
-            # 'resnest',  # bug
-            'inception',
-            # 'res2net',  # bug
-            'densenet',
-            # 'convnext',  # bug
-            'regnet',
-            # 'van',  # bug
-            # 'swin_transformer',  # bug
-            # 'convmixer', # bug
-            # 't2t',  # bug
-            # 'twins',  # bug
-            # 'repmlp',  # bug
-            # 'tnt',  # bug
-            # 't2t',  # bug
-            # 'mlp_mixer',  # bug
-            # 'conformer',  # bug
-            # 'poolformer',  # bug
-            # 'vit',  # bug
-        ]
-        mmcls_exclude = ['cutmix', 'cifar', 'gem']
-        mmcls_model_library = MMClsModelLibrary(
-            include=mmcls_model_include, exclude=mmcls_exclude)
-
-        models = default_models \
-            + torch_model_library.include_models()\
-            + mmcls_model_library.include_models() \
-            if FULL_TEST else default_models
-
-        return models
-
     def test_init_from_fx_tracer(self) -> None:
-        TestData = self.fx_passed_models()
+        TestData = PassedModelManager.fx_tracer_passed_models()
         for data in TestData:
             with self.subTest(data=data):
                 model = data().to(DEVICE)
@@ -228,8 +48,7 @@ class TestGraph(TestCase):
                 self._valid_graph(graph)
 
     def test_init_from_backward_tracer(self) -> None:
-        TestData = self.backward_tracer_passed_models()
-
+        TestData = PassedModelManager.backward_tracer_passed_models()
         for data in TestData:
             with self.subTest(data=data):
                 model = data().to(DEVICE)

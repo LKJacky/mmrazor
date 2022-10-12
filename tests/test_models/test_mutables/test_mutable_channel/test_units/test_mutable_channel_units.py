@@ -14,7 +14,7 @@ from mmrazor.models.mutators.channel_mutator.channel_mutator import \
     is_dynamic_op_for_fx_tracer
 from mmrazor.structures.graph import ModuleGraph as ModuleGraph
 from .....data.models import LineModel
-from .....test_core.test_graph.test_graph import TestGraph
+from .....data.tracer_passed_models import PassedModelManager
 
 MUTABLE_CFG = dict(type='SimpleMutablechannel')
 PARSE_CFG = dict(
@@ -121,21 +121,21 @@ class TestMutableChannelUnit(TestCase):
         self._test_a_graph(model, graph)
 
     def test_with_fx_tracer(self):
-        test_models = TestGraph.fx_passed_models()
+        test_models = PassedModelManager.fx_tracer_passed_models()
         for model_data in test_models:
             with self.subTest(model=model_data):
                 model = model_data()
                 self._test_a_model_from_fx_tracer(model)
 
     def test_with_backward_tracer(self):
-        test_models = TestGraph.backward_tracer_passed_models()
+        test_models = PassedModelManager.backward_tracer_passed_models()
         for model_data in test_models:
             with self.subTest(model=model_data):
                 model = model_data()
                 self._test_a_model_from_backward_tracer(model)
 
     def test_replace_with_dynamic_ops(self):
-        model_datas = TestGraph.backward_tracer_passed_models()
+        model_datas = PassedModelManager.backward_tracer_passed_models()
         for model_data in model_datas:
             for unit_type in GROUPS:
                 with self.subTest(model=model_data, unit=unit_type):
