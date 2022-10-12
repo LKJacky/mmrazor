@@ -9,14 +9,14 @@ from mmrazor.models.architectures.dynamic_ops.mixins import DynamicChannelMixin
 from mmrazor.models.mutators.channel_mutator.channel_mutator import \
     is_dynamic_op_for_fx_tracer
 from mmrazor.structures.graph import ModuleGraph
+from ...data.model_library import MMModelLibrary, TorchModelLibrary
 from ...data.models import Icep  # noqa
 from ...data.models import MultipleUseModel  # noqa
 from ...data.models import Xmodel  # noqa
 from ...data.models import (AddCatModel, ConcatModel, ConvAttnModel,
                             DwConvModel, ExpandLineModel, GroupWiseConvModel,
-                            LineModel, MMModelLibrary, MultiBindModel,
-                            MultiConcatModel, MultiConcatModel2, ResBlock,
-                            TorchModelLibrary)
+                            LineModel, MultiBindModel, MultiConcatModel,
+                            MultiConcatModel2, ResBlock)
 
 FULL_TEST = os.getenv('FULL_TEST') == 'true'
 
