@@ -9,7 +9,7 @@ from mmrazor.models.architectures.dynamic_ops.mixins import DynamicChannelMixin
 from mmrazor.models.mutators.channel_mutator.channel_mutator import \
     is_dynamic_op_for_fx_tracer
 from mmrazor.structures.graph import ModuleGraph
-from ...data.model_library import MMModelLibrary, TorchModelLibrary
+from ...data.model_library import MMClsModelLibrary, TorchModelLibrary
 from ...data.models import Icep  # noqa
 from ...data.models import MultipleUseModel  # noqa
 from ...data.models import Xmodel  # noqa
@@ -115,7 +115,7 @@ class TestGraph(TestCase):
             # # 'vit', # bug
         ]
         mmcls_exclude = ['cutmix', 'cifar', 'gem']
-        mmcls_model_library = MMModelLibrary(
+        mmcls_model_library = MMClsModelLibrary(
             include=mmcls_model_include, exclude=mmcls_exclude)
 
         models = default_models \
@@ -202,7 +202,7 @@ class TestGraph(TestCase):
             # 'vit',  # bug
         ]
         mmcls_exclude = ['cutmix', 'cifar', 'gem']
-        mmcls_model_library = MMModelLibrary(
+        mmcls_model_library = MMClsModelLibrary(
             include=mmcls_model_include, exclude=mmcls_exclude)
 
         models = default_models \

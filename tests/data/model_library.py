@@ -42,19 +42,33 @@ class ModelLibrary:
 
     def is_default_includes_cover_all_models(self):
         models = copy.copy(self.models)
+        is_covered = True
         for name in models:
             if self.is_include(name, self.__class__.default_includes):
                 pass
             else:
+                is_covered = False
                 print(name, '\tnot include')
+        return is_covered
 
 
 class TorchModelLibrary(ModelLibrary):
 
     default_includes = [
-        'alexnet', 'densenet', 'efficientnet', 'googlenet', 'inception',
-        'mnasnet', 'mobilenet', 'regnet', 'resnet', 'resnext', 'shufflenet',
-        'squeezenet', 'vgg', 'wide_resnet', 'vit', 'swin', 'convnext'
+        'alexnet',
+        'densenet',
+        'efficientnet',
+        'googlenet',
+        'inception',
+        'mnasnet',
+        'mobilenet',
+        'regnet',
+        'resnet',
+        'resnext',
+        'shufflenet',
+        'squeezenet',
+        'vgg',
+        'wide_resnet',
     ]
 
     def __init__(self, include=default_includes, exclude=[]) -> None:
@@ -113,18 +127,14 @@ class MMModelLibrary(ModelLibrary):
 
                     cfg_path = dirpath + '/' + filename
                     model_cfg = Config.fromfile(cfg_path)['model']
-                    model_cfg = self._config_process(model_cfg)
-                    models[model_name] = MMModelGenerator(
-                        model_name, model_cfg)
+                    model_cfg['_scope_'] = self.repo
+
+                    models[model_name] = MMModelGenerator(model_name, model_cfg)
         return models
 
     def _get_model_config_path(self, repo, config_path):
         repo_path = get_installed_path(repo)
         return repo_path + '/.mim/configs/' + config_path
-
-    def _config_process(self, config: Dict):
-        config['_scope_'] = self.repo
-        return config
 
 
 class MMClsModelLibrary(MMModelLibrary):
@@ -155,38 +165,30 @@ class MMClsModelLibrary(MMModelLibrary):
         'conformer',
         'poolformer',
         'vit',
-        'mobileone',
-        'edgenext',
-        'efficientformer',
     ]
 
-    def __init__(self,
-                 repo='mmcls',
-                 model_config_path='_base_/models/',
-                 include=default_includes,
-                 exclude=[]) -> None:
-        self.config_path = self._get_model_config_path(repo, model_config_path)
-        self.repo = repo
-        super().__init__(include, exclude)
+    def __init__(self, include=default_includes, exclude=[]) -> None:
+        super().__init__(
+            repo='mmcls',
+            model_config_path='_base_/models/',
+            include=include,
+            exclude=exclude)
 
-    def get_models(self):
-        models = {}
-        for dirpath, dirnames, filenames in os.walk(self.config_path):
-            for filename in filenames:
 
-                model_type_name = '_'.join(
-                    dirpath.replace(self.config_path, '').split('/'))
-                model_type_name = model_type_name if model_type_name == '' else model_type_name + '_'
-                model_name = model_type_name + \
-                    os.path.basename(filename).split('.')[0]
+class MMDetModelLibrary(MMModelLibrary):
+    default_includes = [
+        'rpn',  #
+        'faster-rcnn',
+        'cascade-rcnn',
+        'fast-rcnn',
+        'retinanet',
+        'mask-rcnn',
+        'ssd300'
+    ]
 
-                cfg_path = dirpath + '/' + filename
-                model_cfg = Config.fromfile(cfg_path)['model']
-                model_cfg['_scope_'] = self.repo
-
-                models[model_name] = MMModelGenerator(model_name, model_cfg)
-        return models
-
-    def _get_model_config_path(self, repo, config_path):
-        repo_path = get_installed_path(repo)
-        return repo_path + '/.mim/configs/' + config_path
+    def __init__(self, include=default_includes, exclude=[]) -> None:
+        super().__init__(
+            repo='mmdet',
+            model_config_path='_base_/models/',
+            include=include,
+            exclude=exclude)
