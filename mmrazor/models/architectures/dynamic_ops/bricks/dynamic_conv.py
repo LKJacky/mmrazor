@@ -1,12 +1,14 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import math
 from typing import Callable, Dict
 
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from mmengine.registry import MODELS
 from torch import Tensor
 
 from mmrazor.models.mutables.base_mutable import BaseMutable
-from mmrazor.registry import MODELS
 from ..mixins.dynamic_conv_mixins import (BigNasConvMixin, DynamicConvMixin,
                                           OFAConvMixin)
 
@@ -188,3 +190,26 @@ class OFAConv2d(nn.Conv2d, OFAConvMixin):
     def forward(self, x: Tensor) -> Tensor:
         """Forward of OFA's conv2d."""
         return self.forward_mixin(x)
+
+
+@MODELS.register_module()
+class DynamicConv2dAdaptivePadding(DynamicConv2d):
+    """Dynamic version of mmcv.cnn.bricks.Conv2dAdaptivePadding."""
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        img_h, img_w = x.size()[-2:]
+        kernel_h, kernel_w = self.weight.size()[-2:]
+        stride_h, stride_w = self.stride
+        output_h = math.ceil(img_h / stride_h)
+        output_w = math.ceil(img_w / stride_w)
+        pad_h = (
+            max((output_h - 1) * self.stride[0] +
+                (kernel_h - 1) * self.dilation[0] + 1 - img_h, 0))
+        pad_w = (
+            max((output_w - 1) * self.stride[1] +
+                (kernel_w - 1) * self.dilation[1] + 1 - img_w, 0))
+        if pad_h > 0 or pad_w > 0:
+            x = F.pad(x, [
+                pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2
+            ])
+        return super().forward(x)

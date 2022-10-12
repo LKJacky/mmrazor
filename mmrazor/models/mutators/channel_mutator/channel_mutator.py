@@ -2,6 +2,7 @@
 import copy
 from typing import Dict, Generic, List, Optional, Tuple, Type, Union
 
+import torch.nn as nn
 from mmengine import fileio
 from torch.nn import Module
 
@@ -16,7 +17,10 @@ from ..base_mutator import BaseMutator
 
 
 def is_dynamic_op_for_fx_tracer(module, name):
-    return isinstance(module, DynamicChannelMixin)
+    return isinstance(module, DynamicChannelMixin) \
+        or isinstance(module, nn.Conv2d) \
+        or isinstance(module, nn.Linear) \
+        or isinstance(module, nn.modules.batchnorm._BatchNorm)
 
 
 @MODELS.register_module()

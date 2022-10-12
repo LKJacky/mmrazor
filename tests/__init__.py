@@ -4,6 +4,7 @@ from .test_core.test_graph.test_channel_graph import (TestChannelGraph,
                                                       TestChannelTensor,
                                                       TestChannelUnit)
 from .test_core.test_tracer.test_backward_tracer import TestBackwardTracer
+from .test_data import TestModelLibrary
 from .test_models.test_algorithms.test_autoslim import TestAutoSlim
 from .test_models.test_algorithms.test_prune_algorithm import \
     TestItePruneAlgorithm
@@ -17,5 +18,5 @@ __all__ = [
     'TestGraph', 'TestMutableChannelUnit', 'TestNode', 'TestChannelMutator',
     'TestBackwardTracer', 'TestItePruneAlgorithm', 'TestAutoSlim',
     'TestSlimmable', 'TestSlimmableDDP', 'TestChannelGraph', 'TestChannelUnit',
-    'TestChannelTensor'
+    'TestChannelTensor', 'TestModelLibrary'
 ]

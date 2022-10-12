@@ -152,7 +152,7 @@ class ModuleNode(BaseNode):
             elif isinstance(self.val, nn.Linear):
                 return 'linear'
             else:
-                raise NotImplementedError(f'{self}')
+                raise NotImplementedError(f'{self.val}')
         else:
             if self.val in [
                     'cat_placeholder', 'bind_placeholder', 'pass_placeholder'
@@ -196,13 +196,13 @@ class ModuleNode(BaseNode):
         """Check if the node has right number of previous nodes according to
         their type."""
         if self.is_pass_node():
-            assert len(self.prev_nodes) <= 1, '{name} pass node error'
+            assert len(self.prev_nodes) <= 1, f'{self.name} pass node error'
         elif self.is_cat_node():
             pass
         elif self.is_bind_node():
-            assert len(self.prev_nodes) > 1, '{name} bind node error'
+            assert len(self.prev_nodes) > 1, f'{self.name} bind node error'
         elif self.is_mix_node():
-            assert len(self.prev_nodes) <= 1, '{name} mix node error'
+            assert len(self.prev_nodes) <= 1, f'{self.name} mix node error'
         else:
             raise NotImplementedError(f'{self}')
 
@@ -362,7 +362,8 @@ class GraphConverter:
             if len(node.prev_nodes) == 1:
                 pre: ModuleNode = node.prev_nodes[0]
                 if node.in_channels != pre.out_channels:
-                    assert node.in_channels % pre.out_channels == 0
+                    assert node.in_channels % pre.out_channels == 0, \
+                        f'{node.name} channel error'
                     pass_node = self._new_placeholder_node(
                         'pass_placeholder',
                         node.in_channels // pre.out_channels)
@@ -406,7 +407,7 @@ class GraphConverter:
     # other
     def _post_process(self):
         """Some post process after init a basic module graph."""
-        self._remove_redundant_pass_nodes()
+        # self._remove_redundant_pass_nodes()
         self._insert_bind_nodes()
         self._insert_pass_nodes()
         self._topo_rename()
@@ -574,8 +575,15 @@ class FxTracerToGraphConverter(GraphConverter):
 
     def _convert_graph(self):
         """Convert a torch-graph to a module-graph."""
+        # print(self.base_graph)
+        # print('base graph')
+        # print(self.base_graph)
         self._delete_useless_nodes()
         base_graph = self.base_graph
+        # print('deleted')
+        # print(base_graph)
         # copy_nodes and connect
         module_graph = ModuleGraph.copy_from(base_graph, self._node_converter)
         self.graph = module_graph
+        # print('base module graph')
+        # print(module_graph)

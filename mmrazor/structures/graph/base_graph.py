@@ -185,7 +185,7 @@ class BaseGraph(Generic[BASENODE]):
     def __repr__(self):
         res = f'Graph with {len(self)} nodes:\n'
         for node in self:
-            res += '{0:<40} -> {1:^40} -> {2:<40}\n'.format(
+            res += '{0:<80} -> {1:^80} -> {2:<80}\n'.format(
                 str(node.prev_nodes), node.__repr__(), str(node.next_nodes))
         return res
 

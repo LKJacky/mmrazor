@@ -1,7 +1,17 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+# this file includes models for tesing.
+import copy
+from typing import List
+from typing import Dict, Callable
+from functools import partial
+from mmrazor.registry import MODELS
+from mmengine.config import Config
+import os
+from mmengine.utils import get_installed_path
 from torch.nn import Module
 from torch import Tensor
 import torch.nn as nn
+import torch.nn.functional as F
 import torch
 from mmrazor.models.architectures.dynamic_ops import DynamicBatchNorm2d, DynamicConv2d, DynamicLinear, DynamicChannelMixin
 from mmrazor.models.mutables.mutable_channel import MutableChannelContainer
@@ -12,6 +22,22 @@ from mmrazor.models.mutables import OneShotMutableChannelUnit, SquentialMutableC
 from mmrazor.registry import MODELS
 from mmengine.model import BaseModel
 # this file includes models for tesing.
+
+
+class ConvAttnModel(Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.conv = nn.Conv2d(3, 8, 3, 1, 1)
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.conv2 = nn.Conv2d(8, 16, 3, 1, 1)
+        self.head = LinearHead(16, 1000)
+
+    def forward(self, x):
+        x1 = self.conv(x)
+        attn = F.sigmoid(self.pool(x1))
+        x_attn = x1*attn
+        x_last = self.conv2(x_attn)
+        return self.head(x_last)
 
 
 class LinearHead(Module):
@@ -585,76 +611,179 @@ default_models = [
 
 
 class ModelLibrary:
+    default_includes: List = []
 
-    # includes = [
-    #     'alexnet',        # pass
-    #     'densenet',       # pass
-    #     # 'efficientnet',   # pass
-    #     # 'googlenet',      # pass.
-    #     #   googlenet return a tuple when training,
-    #     #   so it should trace in eval mode
-    #     # 'inception',      # failed
-    #     # 'mnasnet',        # pass
-    #     # 'mobilenet',      # pass
-    #     # 'regnet',         # failed
-    #     # 'resnet',         # pass
-    #     # 'resnext',        # failed
-    #     # 'shufflenet',     # failed
-    #     # 'squeezenet',     # pass
-    #     # 'vgg',            # pass
-    #     # 'wide_resnet',    # pass
-    # ]
-
-    def __init__(self, include=[]) -> None:
-
+    def __init__(self, include=default_includes, exclude=[]) -> None:
         self.include_key = include
+        self.exclude_key = exclude
+        self.models: Dict[str, Callable] = self.get_models()
 
-        self.model_creator = self.get_torch_models()
+    def get_models(self):
+        raise NotImplementedError()
 
-    def __repr__(self) -> str:
-        s = f'model: {len(self.model_creator)}\n'
-        for creator in self.model_creator:
-            s += creator.__name__ + '\n'
-        return s
+    def include_models(self):
+        models = []
+        for name in self.models:
+            if self.is_include(name, self.include_key)\
+                    and not self.is_exclude(name, self.exclude_key):
+                models.append(self.models[name])
+        return models
 
-    def get_torch_models(self):
+    def is_include(self, name, includes):
+        for key in includes:
+            if key in name:
+                return True
+        return False
+
+    def is_exclude(self, name, excludes):
+        for key in excludes:
+            if key in name:
+                return True
+        return False
+
+    def is_default_includes_cover_all_models(self):
+        models = copy.copy(self.models)
+        for name in models:
+            if self.is_include(name, self.__class__.default_includes):
+                pass
+            else:
+                print(name, '\tnot include')
+
+
+class TorchModelLibrary(ModelLibrary):
+
+    default_includes = [
+        'alexnet', 'densenet', 'efficientnet', 'googlenet', 'inception',
+        'mnasnet', 'mobilenet', 'regnet', 'resnet', 'resnext', 'shufflenet',
+        'squeezenet', 'vgg', 'wide_resnet', 'vit', 'swin', 'convnext'
+    ]
+
+    def __init__(self, include=default_includes, exclude=[]) -> None:
+        super().__init__(include, exclude)
+
+    def get_models(self):
         from inspect import isfunction
 
         import torchvision
 
         attrs = dir(torchvision.models)
-        models = []
+        models = {}
         for name in attrs:
             module = getattr(torchvision.models, name)
-            if isfunction(module):
-                models.append(module)
+            if isfunction(module) and name is not 'get_weight':
+                models[name] = module
         return models
 
-    def export_models(self):
-        models = []
-        for creator in self.model_creator:
-            if self.is_include(creator.__name__):
-                models.append(creator)
+
+class MMModelGenerator:
+    def __init__(self, name, cfg) -> None:
+        self.name = name
+        self.cfg = cfg
+
+    def __call__(self):
+        return MODELS.build(self.cfg)
+
+    def __repr__(self) -> str:
+        return self.name
+
+
+class MMModelLibrary(ModelLibrary):
+    default_includes = []
+
+    def __init__(self,
+                 repo='mmcls',
+                 model_config_path='_base_/models/',
+                 include=default_includes,
+                 exclude=[]) -> None:
+        self.config_path = self._get_model_config_path(repo, model_config_path)
+        self.repo = repo
+        super().__init__(include, exclude)
+
+    def get_models(self):
+        models = {}
+        for dirpath, dirnames, filenames in os.walk(self.config_path):
+            for filename in filenames:
+                if filename.endswith('.py'):
+                    print(filename)
+                    model_type_name = '_'.join(
+                        dirpath.replace(self.config_path, '').split('/'))
+                    model_type_name = model_type_name if model_type_name == '' else model_type_name + '_'
+                    model_name = model_type_name + \
+                        os.path.basename(filename).split('.')[0]
+
+                    cfg_path = dirpath + '/' + filename
+                    model_cfg = Config.fromfile(cfg_path)['model']
+                    model_cfg = self._config_process(model_cfg)
+                    models[model_name] = MMModelGenerator(
+                        model_name, model_cfg)
         return models
 
-    def is_include(self, name):
-        for key in self.include_key:
-            if key in name:
-                return True
-        return False
+    def _get_model_config_path(self, repo, config_path):
+        repo_path = get_installed_path(repo)
+        return repo_path + '/.mim/configs/' + config_path
 
-    def include(self):
-        include = []
-        for creator in self.model_creator:
-            for key in self.include_key:
-                if key in creator.__name__:
-                    include.append(creator)
-        return include
+    def _config_process(self, config: Dict):
+        config['_scope_'] = self.repo
+        return config
 
-    def uninclude(self):
-        include = self.include()
-        uninclude = []
-        for creator in self.model_creator:
-            if creator not in include:
-                uninclude.append(creator)
-        return uninclude
+
+class MMClsModelLibrary(MMModelLibrary):
+    default_includes = [
+        'vgg',
+        'efficientnet',
+        'resnet',
+        'mobilenet',
+        'resnext',
+        'wide-resnet',
+        'shufflenet',
+        'hrnet',
+        'resnest',
+        'inception',
+        'res2net',
+        'densenet',
+        'convnext',
+        'regnet',
+        'van',
+        'swin_transformer',
+        'convmixer',
+        't2t',
+        'twins',
+        'repmlp',
+        'tnt',
+        't2t',
+        'mlp_mixer',
+        'conformer',
+        'poolformer',
+        'vit',
+        'mobileone',
+        'edgenext',
+        'efficientformer',
+    ]
+
+    def __init__(self, repo='mmcls', model_config_path='_base_/models/', include=default_includes, exclude=[]) -> None:
+        self.config_path = self._get_model_config_path(
+            repo, model_config_path)
+        self.repo = repo
+        super().__init__(include, exclude)
+
+    def get_models(self):
+        models = {}
+        for dirpath, dirnames, filenames in os.walk(self.config_path):
+            for filename in filenames:
+
+                model_type_name = '_'.join(
+                    dirpath.replace(self.config_path, '').split('/'))
+                model_type_name = model_type_name if model_type_name == '' else model_type_name+'_'
+                model_name = model_type_name + \
+                    os.path.basename(filename).split('.')[0]
+
+                cfg_path = dirpath+'/'+filename
+                model_cfg = Config.fromfile(cfg_path)['model']
+                model_cfg['_scope_'] = self.repo
+
+                models[model_name] = MMModelGenerator(model_name, model_cfg)
+        return models
+
+    def _get_model_config_path(self, repo, config_path):
+        repo_path = get_installed_path(repo)
+        return repo_path+'/.mim/configs/'+config_path
