@@ -37,7 +37,7 @@ class PassedModelManager:
         googlenet: return a tuple when training, so it should
         trace in eval mode
         """
-        torch_models_includes = [
+        torch_includes = [
             'alexnet',
             'densenet',
             'efficientnet',
@@ -53,7 +53,7 @@ class PassedModelManager:
             'vgg',
             'wide_resnet',
         ]
-        torch_model_library = TorchModelLibrary(include=torch_models_includes)
+        torch_model_library = TorchModelLibrary(include=torch_includes)
         """
         shufflenet consists of chunk operations.
         resnest: resnest has two problems. First it uses *x.shape() which is
@@ -61,7 +61,7 @@ class PassedModelManager:
         res2net: res2net consists of split operations.
         convnext: consist of layernorm.
         """
-        mmcls_model_include = [
+        mmcls_include = [
             'vgg',
             'efficientnet',
             'resnet',
@@ -92,11 +92,11 @@ class PassedModelManager:
         ]
         mmcls_exclude = ['cutmix', 'cifar', 'gem']
         mmcls_model_library = MMClsModelLibrary(
-            include=mmcls_model_include, exclude=mmcls_exclude)
+            include=mmcls_include, exclude=mmcls_exclude)
 
         mmdet_model_include = [
             # 'rpn',  #
-            'faster-rcnn',
+            # 'faster-rcnn',
             # 'cascade-rcnn',
             # 'fast-rcnn',  # mmdet has bug.
             # 'retinanet',
@@ -193,16 +193,16 @@ class PassedModelManager:
         mmcls_model_library = MMClsModelLibrary(
             include=mmcls_model_include, exclude=mmcls_exclude)
 
-        mmdet_model_include = [
+        mmdet_include = [
             # 'rpn',  #
-            'faster-rcnn',
+            # 'faster-rcnn',
             # 'cascade-rcnn',
             # 'fast-rcnn',  # mmdet has bug.
             # 'retinanet',
             # 'mask-rcnn',
             # 'ssd300'
         ]
-        mmdet_model_library = MMDetModelLibrary(mmdet_model_include)
+        mmdet_model_library = MMDetModelLibrary(mmdet_include)
         models = default_models \
             + torch_model_library.include_models() \
             + mmcls_model_library.include_models() \
