@@ -127,14 +127,17 @@ class MMModelLibrary(ModelLibrary):
 
                     cfg_path = dirpath + '/' + filename
                     model_cfg = Config.fromfile(cfg_path)['model']
-                    model_cfg['_scope_'] = self.repo
-
+                    model_cfg = self._config_process(model_cfg)
                     models[model_name] = MMModelGenerator(model_name, model_cfg)
         return models
 
     def _get_model_config_path(self, repo, config_path):
         repo_path = get_installed_path(repo)
         return repo_path + '/.mim/configs/' + config_path
+
+    def _config_process(self, config: Dict):
+        config['_scope_'] = self.repo
+        return config
 
 
 class MMClsModelLibrary(MMModelLibrary):
@@ -176,11 +179,12 @@ class MMClsModelLibrary(MMModelLibrary):
 
 
 class MMDetModelLibrary(MMModelLibrary):
+
     default_includes = [
         'rpn',  #
         'faster-rcnn',
         'cascade-rcnn',
-        'fast-rcnn',
+        'fast-rcnn',  # mmdet bug
         'retinanet',
         'mask-rcnn',
         'ssd300'
@@ -192,3 +196,11 @@ class MMDetModelLibrary(MMModelLibrary):
             model_config_path='_base_/models/',
             include=include,
             exclude=exclude)
+
+    def _config_process(self, config: Dict):
+        config = super()._config_process(config)
+        if 'preprocess_cfg' in config:
+            config.pop('preprocess_cfg')
+        if 'pretrained' in config:
+            config.pop('pretrained')
+        return config
