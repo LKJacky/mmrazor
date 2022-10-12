@@ -575,15 +575,8 @@ class FxTracerToGraphConverter(GraphConverter):
 
     def _convert_graph(self):
         """Convert a torch-graph to a module-graph."""
-        # print(self.base_graph)
-        # print('base graph')
-        # print(self.base_graph)
         self._delete_useless_nodes()
         base_graph = self.base_graph
-        # print('deleted')
-        # print(base_graph)
         # copy_nodes and connect
         module_graph = ModuleGraph.copy_from(base_graph, self._node_converter)
         self.graph = module_graph
-        # print('base module graph')
-        # print(module_graph)

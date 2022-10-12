@@ -21,9 +21,6 @@ class TestL1MutableChannelUnit(TestCase):
             })
         mutator.prepare_from_supernet(model)
         mutator.set_choices(mutator.sample_choices())
-        print(mutator.units)
-        print(mutator.mutable_units)
-        print(mutator.choice_template)
 
     def test_convnd(self):
         unit = L1MutableChannelUnit(8)
