@@ -1,31 +1,18 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import copy
 import itertools
-from typing import List, Union
+from typing import List, Set, Union
 
-
-class BaseChannelUnit:
-    """BaseChannelUnit is a collection of BaseChannel.
-
-    All  BaseChannels are saved in two lists: self.input_related and
-    self.output_related.
-    """
-
-    def __init__(self) -> None:
-
-        self.input_related: List[BaseChannel] = []
-        self.output_related: List[BaseChannel] = []
-
-    # collect units
-
-
-class BaseChannel:
-    pass
+from mmrazor.utils import IndexDict
 
 
 class ChannelElem:
 
-    def __init__(self) -> None:
+    def __init__(self, owning_tensor, index_in_tensor) -> None:
         self._parent: Union[None, 'ChannelElem'] = None
+        self._subs: Set[ChannelElem] = set()
+        self.owing_tensor = owning_tensor
+        self.index_in_tensoor = index_in_tensor
 
     # channel elem operations
 
@@ -37,6 +24,20 @@ class ChannelElem:
     def union(self, elem: 'ChannelElem'):
         ChannelElem.union_two(self, elem)
 
+    # unit related
+
+    @property
+    def owing_elem_set(self):
+        root = self.root
+        return root.subs
+
+    @property
+    def elem_set_hash(self):
+        tensor_list = list(self.owing_elem_set)
+        tensor_set = set([elem.owing_tensor for elem in tensor_list])
+        frozen_set = frozenset(tensor_set)
+        return frozen_set.__hash__()
+
     # work as a disjoint set
 
     @property
@@ -46,15 +47,24 @@ class ChannelElem:
         else:
             return self._parent.root
 
+    @property
+    def subs(self):
+        subs = copy.copy(self._subs)
+        subs.add(self)
+        for elem in self._subs:
+            subs = subs.union(elem.subs)
+        return subs
+
     def _set_parent(self, parent: 'ChannelElem'):
         assert self._parent is None
         self._parent = parent
+        parent._subs.add(self)
 
 
 class ChannelTensor:
 
     def __init__(self, num_channel_elem: int) -> None:
-        self.elems = [ChannelElem() for _ in range(num_channel_elem)]
+        self.elems = [ChannelElem(self, i) for i in range(num_channel_elem)]
 
     # tensor operations
 
@@ -81,6 +91,25 @@ class ChannelTensor:
             for j in range(expand_ratio):
                 new_tensor[i * expand_ratio + j].union(self[i])
         return new_tensor
+
+    # unit operation
+
+    @property
+    def elems_hash(self):
+        elem_hashes = [elem.elem_set_hash for elem in self.elems]
+        return elem_hashes
+
+    @property
+    def elems_hash_dict(self):
+        elem_hashes = self.elems_hash
+        unit_dict = IndexDict()
+        start = 0
+        for e in range(1, len(self)):
+            if elem_hashes[e] != elem_hashes[e - 1]:
+                unit_dict[(start, e)] = elem_hashes[start]
+                start = e
+        unit_dict[start, len(self)] = elem_hashes[start]
+        return unit_dict
 
     # work as a tensor
 

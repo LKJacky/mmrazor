@@ -1,11 +1,11 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import copy
 from typing import Callable, Dict, List
 
 from torch.nn import Module
 
 from .base_graph import BaseGraph
 from .channel_flow import ChannelTensor
-from .channel_modules import BaseChannelUnit
 from .channel_nodes import ChannelNode, default_channel_node_converter
 from .module_graph import ModuleGraph
 
@@ -25,17 +25,59 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
         assert isinstance(graph, ModuleGraph)
         return super().copy_from(graph, node_converter)
 
-    def collect_units(self) -> List[BaseChannelUnit]:
-        """Collect channel units in the graph."""
-        units = list()
+    def collect_units(self) -> Dict:
+        """Collect channel units in the graph.
+        "hash"{
+            'channels':{
+                'input_related':[
+                    {
+                        "name":"backbone.bn1",
+                        "start":0,
+                        "end":64,
+                        "expand_ratio":1,
+                        "is_output_channel":false
+                    }
+                ],
+                'output_related':[
+                    ...
+                ]
+            }
+        }"""
+        chanel_config_template: Dict = {
+            'channels': {
+                'input_related': [],
+                'output_related': []
+            }
+        }
+
+        def process_tensor(node: ChannelNode, is_output_tensor,
+                           unit_hash_dict: Dict):
+            if is_output_tensor:
+                tensor = node.out_channel_tensor
+            else:
+                tensor = node.in_channel_tensor
+            assert tensor is not None
+            for (start, end), hash in tensor.elems_hash_dict.items():
+                channel_config = {
+                    'name': node.name,
+                    'start': start,
+                    'end': end,
+                    'is_output_channel': is_output_tensor
+                }
+                if hash not in unit_hash_dict:
+                    unit_hash_dict[hash] = copy.deepcopy(
+                        chanel_config_template)
+                unit_hash_dict[hash][
+                    'channels']['output_related' if is_output_tensor else
+                                'input_related'].append(channel_config)
+
+        unit_hash_dict: Dict = {}
+
         for node in self.topo_traverse():
-            node.register_channel_to_units()
-        for node in self.topo_traverse():
-            for unit in node.in_channel_tensor.unit_list + \
-                    node.out_channel_tensor.unit_list:
-                if unit not in units:
-                    units.append(unit)
-        return units
+            process_tensor(node, True, unit_hash_dict)
+            process_tensor(node, False, unit_hash_dict)
+
+        return unit_hash_dict
 
     def forward(self, num_input_channel=3):
         """Generate a ChanneelTensor and let it forwards through the graph."""

@@ -69,11 +69,12 @@ class TestChannelTensor(unittest.TestCase):
 class TestChannelElem(unittest.TestCase):
 
     def test_union(self):
-        elem1 = ChannelElem()
-        elem2 = ChannelElem()
+        tensor = ChannelTensor(10)
+        elem1 = tensor[1]
+        elem2 = tensor[2]
         ChannelElem.union_two(elem1, elem2)
         self.assertEqual(elem1.root, elem2.root)
 
-        elem3 = ChannelElem()
+        elem3 = tensor[3]
         ChannelElem.union_two(elem2, elem3)
         self.assertEqual(elem1.root, elem3.root)

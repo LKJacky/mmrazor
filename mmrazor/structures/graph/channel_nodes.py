@@ -80,12 +80,12 @@ class ChannelNode(ModuleNode):
         """Register the module of this node to corresponding units."""
         name = self.module_name if isinstance(self.val,
                                               nn.Module) else self.name
-        for index, unit in self.in_channel_tensor.unit_dict.items():
+        for index, unit in self.in_channel_tensor.elems_hash_dict.items():
             channel = BaseChannel(name, self.val, index, None, False,
                                   self.expand_ratio)
             if channel not in unit.input_related:
                 unit.input_related.append(channel)
-        for index, unit in self.out_channel_tensor.unit_dict.items():
+        for index, unit in self.out_channel_tensor.elems_hash_dict.items():
             channel = BaseChannel(name, self.val, index, None, True,
                                   self.expand_ratio)
             if channel not in unit.output_related:
