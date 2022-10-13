@@ -15,8 +15,10 @@ FULL_TEST = os.getenv('FULL_TEST') == 'true'
 
 class PassedModelManager:
 
+    # for fx tracer
+
     @classmethod
-    def fx_tracer_passed_models(cls):
+    def fx_tracer_passed_default_models(cls):
         default_models = [
             LineModel,
             ResBlock,
@@ -33,6 +35,10 @@ class PassedModelManager:
             DwConvModel,  #
             ConvAttnModel,
         ]
+        return default_models
+
+    @classmethod
+    def fx_tracer_passed_torch_models(cls):
         """
         googlenet: return a tuple when training, so it should
         trace in eval mode
@@ -52,8 +58,15 @@ class PassedModelManager:
             'squeezenet',
             'vgg',
             'wide_resnet',
+            # "vit",
+            # "swin",
+            # "convnext"
         ]
         torch_model_library = TorchModelLibrary(include=torch_includes)
+        return torch_model_library.include_models()
+
+    @classmethod
+    def fx_tracer_passed_mmcls_models(cls):
         """
         shufflenet consists of chunk operations.
         resnest: resnest has two problems. First it uses *x.shape() which is
@@ -89,12 +102,18 @@ class PassedModelManager:
             # # 'conformer', # bug
             # # 'poolformer', # bug
             # # 'vit', # bug
+            # 'efficientformer',
+            # 'mobileone',
+            # 'edgenext'
         ]
         mmcls_exclude = ['cutmix', 'cifar', 'gem']
         mmcls_model_library = MMClsModelLibrary(
             include=mmcls_include, exclude=mmcls_exclude)
+        return mmcls_model_library.include_models()
 
-        mmdet_model_include = [
+    @classmethod
+    def fx_tracer_passed_mmdet_models(cls):
+        mmdet_include = [
             # 'rpn',  #
             # 'faster-rcnn',
             # 'cascade-rcnn',
@@ -103,18 +122,25 @@ class PassedModelManager:
             # 'mask-rcnn',
             # 'ssd300'
         ]
-        mmdet_model_library = MMDetModelLibrary(mmdet_model_include)
+        mmdet_model_library = MMDetModelLibrary(mmdet_include)
+        return mmdet_model_library.include_models()
 
-        models = default_models \
-            + torch_model_library.include_models() \
-            + mmcls_model_library.include_models() \
-            + mmdet_model_library.include_models() \
-            if FULL_TEST else default_models
+    @classmethod
+    def fx_tracer_passed_models(cls):
+
+
+        models = cls.fx_tracer_passed_default_models() \
+            + cls.fx_tracer_passed_torch_models() \
+            + cls.fx_tracer_passed_mmcls_models() \
+            + cls.fx_tracer_passed_mmcls_models() \
+            if FULL_TEST else cls.fx_tracer_passed_default_models()
 
         return models
 
+    # for backward tracer
+
     @classmethod
-    def backward_tracer_passed_models(cls):
+    def backward_tracer_passed_default_models(cls):
         '''MultipleUseModel: backward tracer can't distinguish multiple use and
         first bind then use.'''
         default_models = [
@@ -132,12 +158,16 @@ class PassedModelManager:
             MultiBindModel,
             DwConvModel
         ]
+        return default_models
+
+    @classmethod
+    def backward_tracer_passed_torch_models(cls):
         """
         googlenet return a tuple when training, so it
             should trace in eval mode
         """
 
-        torch_models_includes = [
+        torch_includes = [
             'alexnet',
             'densenet',
             'efficientnet',
@@ -152,8 +182,15 @@ class PassedModelManager:
             'squeezenet',
             'vgg',
             'wide_resnet',
+            # "vit",
+            # "swin",
+            # "convnext"
         ]
-        torch_model_library = TorchModelLibrary(include=torch_models_includes)
+        torch_model_library = TorchModelLibrary(include=torch_includes)
+        return torch_model_library.include_models()
+
+    @classmethod
+    def backward_tracer_passed_mmcls_models(cls):
         """
         shufflenet consists of chunk operations.
         resnest: resnest has two problems. First it uses *x.shape() which is
@@ -188,11 +225,17 @@ class PassedModelManager:
             # 'conformer',  # bug
             # 'poolformer',  # bug
             # 'vit',  # bug
+            # 'efficientformer',
+            # 'mobileone',
+            # 'edgenext'
         ]
         mmcls_exclude = ['cutmix', 'cifar', 'gem']
         mmcls_model_library = MMClsModelLibrary(
             include=mmcls_model_include, exclude=mmcls_exclude)
+        return mmcls_model_library.include_models()
 
+    @classmethod
+    def backward_tracer_passed_mmdet_models(cls):
         mmdet_include = [
             # 'rpn',  #
             # 'faster-rcnn',
@@ -203,10 +246,14 @@ class PassedModelManager:
             # 'ssd300'
         ]
         mmdet_model_library = MMDetModelLibrary(mmdet_include)
-        models = default_models \
-            + torch_model_library.include_models() \
-            + mmcls_model_library.include_models() \
-            + mmdet_model_library.include_models() \
-            if FULL_TEST else default_models
+        return mmdet_model_library.include_models()
+
+    @classmethod
+    def backward_tracer_passed_models(cls):
+        models = cls.backward_tracer_passed_default_models() \
+            + cls.backward_tracer_passed_torch_models() \
+            + cls.backward_tracer_passed_mmcls_models() \
+            + cls.backward_tracer_passed_mmdet_models() \
+            if FULL_TEST else cls.backward_tracer_passed_default_models()
 
         return models

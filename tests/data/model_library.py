@@ -55,20 +55,9 @@ class ModelLibrary:
 class TorchModelLibrary(ModelLibrary):
 
     default_includes = [
-        'alexnet',
-        'densenet',
-        'efficientnet',
-        'googlenet',
-        'inception',
-        'mnasnet',
-        'mobilenet',
-        'regnet',
-        'resnet',
-        'resnext',
-        'shufflenet',
-        'squeezenet',
-        'vgg',
-        'wide_resnet',
+        'alexnet', 'densenet', 'efficientnet', 'googlenet', 'inception',
+        'mnasnet', 'mobilenet', 'regnet', 'resnet', 'resnext', 'shufflenet',
+        'squeezenet', 'vgg', 'wide_resnet', "vit", "swin", "convnext"
     ]
 
     def __init__(self, include=default_includes, exclude=[]) -> None:
@@ -128,7 +117,8 @@ class MMModelLibrary(ModelLibrary):
                     cfg_path = dirpath + '/' + filename
                     model_cfg = Config.fromfile(cfg_path)['model']
                     model_cfg = self._config_process(model_cfg)
-                    models[model_name] = MMModelGenerator(model_name, model_cfg)
+                    models[model_name] = MMModelGenerator(
+                        model_name, model_cfg)
         return models
 
     def _get_model_config_path(self, repo, config_path):
@@ -168,6 +158,9 @@ class MMClsModelLibrary(MMModelLibrary):
         'conformer',
         'poolformer',
         'vit',
+        'efficientformer',
+        'mobileone',
+        'edgenext'
     ]
 
     def __init__(self, include=default_includes, exclude=[]) -> None:

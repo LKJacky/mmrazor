@@ -135,7 +135,8 @@ class TestMutableChannelUnit(TestCase):
                 self._test_a_model_from_backward_tracer(model)
 
     def test_replace_with_dynamic_ops(self):
-        model_datas = PassedModelManager.backward_tracer_passed_models()
+        model_datas = PassedModelManager.backward_tracer_passed_default_models(
+        )
         for model_data in model_datas:
             for unit_type in GROUPS:
                 with self.subTest(model=model_data, unit=unit_type):
