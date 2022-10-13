@@ -2,13 +2,14 @@
 
 import operator
 from abc import abstractmethod
-from typing import Union
+from typing import List, Union
 
 import torch
 import torch.nn as nn
 from mmengine import MMLogger
 
-from .channel_modules import BaseChannel, BaseChannelUnit, ChannelTensor
+from .channel_flow import ChannelTensor
+from .channel_modules import BaseChannel
 from .module_graph import ModuleNode
 
 
@@ -36,8 +37,8 @@ class ChannelNode(ModuleNode):
                  module_name='') -> None:
 
         super().__init__(name, val, expand_ratio, module_name)
-        self.in_channel_tensor = ChannelTensor(self.in_channels)
-        self.out_channel_tensor = ChannelTensor(self.out_channels)
+        self.in_channel_tensor: Union[None, ChannelTensor] = None
+        self.out_channel_tensor: Union[None, ChannelTensor] = None
 
     @classmethod
     def copy_from(cls, node):
@@ -47,38 +48,31 @@ class ChannelNode(ModuleNode):
 
     def reset_channel_tensors(self):
         """Reset the owning ChannelTensors."""
-        self.in_channel_tensor = ChannelTensor(self.in_channels)
-        self.out_channel_tensor = ChannelTensor(self.out_channels)
+        self.in_channel_tensor = None
+        self.out_channel_tensor = None
 
     # forward
 
-    def forward(self, in_channel_tensor=None):
+    def forward(self, in_channel_tensors=None):
         """Forward with ChannelTensors."""
-        assert self.in_channel_tensor is not None and \
-            self.out_channel_tensor is not None
-        if in_channel_tensor is None:
+        if in_channel_tensors is None:
             out_channel_tensors = [
                 node.out_channel_tensor for node in self.prev_nodes
             ]
-
-            in_channel_tensor = out_channel_tensors
-        self.channel_forward(*in_channel_tensor)
+            in_channel_tensors = out_channel_tensors
+        self.channel_forward(in_channel_tensors)
         if self.expand_ratio > 1:
+            assert self.out_channel_tensor is not None
             self.out_channel_tensor = self.out_channel_tensor.expand(
                 self.expand_ratio)
 
     @abstractmethod
-    def channel_forward(self, *channel_tensors: ChannelTensor):
+    def channel_forward(self, channel_tensors: List[ChannelTensor]):
         """Forward with ChannelTensors."""
         assert len(channel_tensors) == 1, f'{len(channel_tensors)}'
-        BaseChannelUnit.union_two_units(
-            list(self.in_channel_tensor.unit_dict.values())[0],
-            list(channel_tensors[0].unit_dict.values())[0])
 
-        if self.in_channels == self.out_channels:
-            BaseChannelUnit.union_two_units(
-                self.in_channel_tensor.unit_list[0],
-                self.out_channel_tensor.unit_list[0])
+        self.in_channel_tensor = channel_tensors[0]
+        self.out_channel_tensor = ChannelTensor(self.out_channels)
 
     # register unit
 
@@ -123,9 +117,9 @@ class PassChannelNode(ChannelNode):
     channel unit. Such as  BatchNorm, Relu.
     """
 
-    def channel_forward(self, *in_channel_tensor: ChannelTensor):
+    def channel_forward(self, channel_tensors: List[ChannelTensor]):
         """Channel forward."""
-        PassChannelNode._channel_forward(self, *in_channel_tensor)
+        PassChannelNode._channel_forward(self, channel_tensors[0])
 
     @property
     def in_channels(self) -> int:
@@ -149,22 +143,25 @@ class PassChannelNode(ChannelNode):
         return super().__repr__() + '_pass'
 
     @staticmethod
-    def _channel_forward(node: ChannelNode, *in_channel_tensor: ChannelTensor):
+    def _channel_forward(node: ChannelNode, tensor: ChannelTensor):
         """Channel forward."""
-        assert len(in_channel_tensor) == 1 and \
-            node.in_channels == node.out_channels
-        in_channel_tensor[0].union(node.in_channel_tensor)
-        node.in_channel_tensor.union(node.out_channel_tensor)
+        assert node.in_channels == node.out_channels
+        assert isinstance(tensor, ChannelTensor)
+        node.in_channel_tensor = tensor
+        node.out_channel_tensor = tensor
 
 
 class MixChannelNode(ChannelNode):
     """A MixChannelNode  has independent input channels and output channels."""
 
-    def channel_forward(self, *in_channel_tensor: ChannelTensor):
+    def channel_forward(self, channel_tensors: List[ChannelTensor]):
         """Channel forward."""
-        assert len(in_channel_tensor) <= 1
-        if len(in_channel_tensor) == 1:
-            in_channel_tensor[0].union(self.in_channel_tensor)
+        assert len(channel_tensors) <= 1
+        if len(channel_tensors) == 1:
+            self.in_channel_tensor = channel_tensors[0]
+            self.out_channel_tensor = ChannelTensor(self.out_channels)
+        else:
+            raise NotImplementedError()
 
     @property
     def in_channels(self) -> int:
@@ -190,19 +187,13 @@ class BindChannelNode(PassChannelNode):
     """A BindChannelNode has multiple inputs, and all input channels belong to
     the same channel unit."""
 
-    def channel_forward(self, *in_channel_tensor: ChannelTensor):
+    def channel_forward(self, channel_tensors: List[ChannelTensor]):
         """Channel forward."""
-        assert len(in_channel_tensor) > 1
+        assert len(channel_tensors) > 1
         #  align channel_tensors
-        ChannelTensor.align_tensors(*in_channel_tensor)
-
-        # union tensors
-        node_units = [
-            channel_lis.unit_dict for channel_lis in in_channel_tensor
-        ]
-        for key in node_units[0]:
-            BaseChannelUnit.union_units([units[key] for units in node_units])
-        super().channel_forward(in_channel_tensor[0])
+        for tensor in channel_tensors[1:]:
+            channel_tensors[0].union(tensor)
+        super().channel_forward(channel_tensors[:1])
 
     def __repr__(self) -> str:
         return super(ChannelNode, self).__repr__() + '_bind'
@@ -211,22 +202,10 @@ class BindChannelNode(PassChannelNode):
 class CatChannelNode(ChannelNode):
     """A CatChannelNode cat all input channels."""
 
-    def channel_forward(self, *in_channel_tensors: ChannelTensor):
-        BaseChannelUnit.union_two_units(self.in_channel_tensor.unit_list[0],
-                                        self.out_channel_tensor.unit_list[0])
-        num_ch = []
-        for in_ch_tensor in in_channel_tensors:
-            for start, end in in_ch_tensor.unit_dict:
-                num_ch.append(end - start)
-
-        split_units = BaseChannelUnit.split_unit(
-            self.in_channel_tensor.unit_list[0], num_ch)
-
-        i = 0
-        for in_ch_tensor in in_channel_tensors:
-            for in_unit in in_ch_tensor.unit_dict.values():
-                BaseChannelUnit.union_two_units(split_units[i], in_unit)
-                i += 1
+    def channel_forward(self, channel_tensors: List[ChannelTensor]):
+        tensor_cat = ChannelTensor.cat(channel_tensors)
+        self.in_channel_tensor = tensor_cat
+        self.out_channel_tensor = tensor_cat
 
     @property
     def in_channels(self) -> int:
@@ -265,13 +244,13 @@ class ConvNode(MixChannelNode):
         else:
             self.conv_type = 'gwconv'
 
-    def channel_forward(self, *in_channel_tensor: ChannelTensor):
+    def channel_forward(self, channel_tensors: List[ChannelTensor]):
         if self.conv_type == 'conv':
-            return super().channel_forward(*in_channel_tensor)
+            return super().channel_forward(channel_tensors)
         elif self.conv_type == 'dwconv':
-            return PassChannelNode._channel_forward(self, *in_channel_tensor)
+            return PassChannelNode._channel_forward(self, channel_tensors[0])
         elif self.conv_type == 'gwconv':
-            return super().channel_forward(*in_channel_tensor)
+            return super().channel_forward(channel_tensors)
         else:
             pass
 

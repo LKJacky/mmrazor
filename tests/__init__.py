@@ -1,8 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from .test_core.test_graph.test_graph import TestGraph  # isort:skip
-from .test_core.test_graph.test_channel_graph import (TestChannelGraph,
-                                                      TestChannelTensor,
-                                                      TestChannelUnit)
+from .test_core.test_graph.test_channel_graph import TestChannelGraph
 from .test_core.test_tracer.test_backward_tracer import TestBackwardTracer
 from .test_data import TestModelLibrary
 from .test_models.test_algorithms.test_autoslim import TestAutoSlim

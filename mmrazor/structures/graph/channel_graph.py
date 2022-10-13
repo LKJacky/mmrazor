@@ -4,7 +4,8 @@ from typing import Callable, Dict, List
 from torch.nn import Module
 
 from .base_graph import BaseGraph
-from .channel_modules import BaseChannelUnit, ChannelTensor
+from .channel_flow import ChannelTensor
+from .channel_modules import BaseChannelUnit
 from .channel_nodes import ChannelNode, default_channel_node_converter
 from .module_graph import ModuleGraph
 
@@ -40,14 +41,14 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
         """Generate a ChanneelTensor and let it forwards through the graph."""
         for node in self.topo_traverse():
             node.reset_channel_tensors()
-        self._merge_same_module()
         for i, node in enumerate(self.topo_traverse()):
             node: ChannelNode
             if len(node.prev_nodes) == 0:
-                channel_list = ChannelTensor(num_input_channel)
-                node.forward([channel_list])
+                tensor = ChannelTensor(num_input_channel)
+                node.forward([tensor])
             else:
                 node.forward()
+        self._merge_same_module()
 
     def _merge_same_module(self):
         """Union all nodes with the same module to the same unit."""
@@ -62,10 +63,8 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
         for module in module2node:
             if len(module2node[module]) > 1:
                 nodes = module2node[module]
-                input_channel_tensor = ChannelTensor(nodes[0].in_channels)
-                out_channel_tensor = ChannelTensor(nodes[0].out_channels)
-                for node in nodes:
-                    ChannelTensor.union(input_channel_tensor,
-                                        node.in_channel_tensor)
-                    ChannelTensor.union(out_channel_tensor,
-                                        node.out_channel_tensor)
+                assert nodes[0].in_channel_tensor is not None and \
+                    nodes[0].out_channel_tensor is not None
+                for node in nodes[1:]:
+                    nodes[0].in_channel_tensor.union(node.in_channel_tensor)
+                    nodes[0].out_channel_tensor.union(node.out_channel_tensor)
