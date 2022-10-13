@@ -4,6 +4,7 @@ from unittest import TestCase
 
 import torch
 import torch.nn as nn
+from torch import multiprocessing as mp
 
 from mmrazor.models.architectures.dynamic_ops.mixins import DynamicChannelMixin
 from mmrazor.models.mutables.mutable_channel import (
@@ -15,6 +16,7 @@ from mmrazor.models.mutators.channel_mutator.channel_mutator import \
 from mmrazor.structures.graph import ModuleGraph as ModuleGraph
 from .....data.models import LineModel
 from .....data.tracer_passed_models import PassedModelManager
+from .....utils import SetTorchThread
 
 MUTABLE_CFG = dict(type='SimpleMutablechannel')
 PARSE_CFG = dict(
@@ -31,6 +33,52 @@ GROUPS: List[MutableChannelUnit] = [
 DefaultChannelUnit = SequentialMutableChannelUnit
 
 
+def _test_units(units: List[MutableChannelUnit], model):
+    for unit in units:
+        unit.prepare_for_pruning(model)
+    mutable_units = [unit for unit in units if unit.is_mutable]
+    assert len(mutable_units) >= 1
+    for unit in mutable_units:
+        choice = unit.sample_choice()
+        unit.current_choice = choice
+        assert abs(unit.current_choice - choice) < 0.1
+    x = torch.rand([2, 3, 224, 224]).to(DEVICE)
+    y = model(x)
+    assert list(y.shape) == [2, 1000]
+
+
+def _test_a_graph(model, graph):
+    try:
+        units = DefaultChannelUnit.init_from_graph(graph)
+        _test_units(units, model)
+        return True, ''
+    except Exception as e:
+        return False, f'{e},{graph}'
+
+
+def _test_a_model_from_fx_tracer(Model):
+    print(f'test {Model}')
+    model = Model()
+    model.eval()
+    model = model.to(DEVICE)
+    graph = ModuleGraph.init_from_fx_tracer(
+        model,
+        fx_tracer=dict(
+            type='RazorFxTracer',
+            is_extra_leaf_module=is_dynamic_op_for_fx_tracer,
+            concrete_args=dict(mode='tensor')))
+    return _test_a_graph(model, graph)
+
+
+def _test_a_model_from_backward_tracer(Model):
+    print(f'test {Model}')
+    model = Model()
+    model.eval()
+    model = model.to(DEVICE)
+    graph = ModuleGraph.init_from_backward_tracer(model)
+    return _test_a_graph(model, graph)
+
+
 class TestMutableChannelUnit(TestCase):
 
     def test_init_from_graph(self):
@@ -38,7 +86,7 @@ class TestMutableChannelUnit(TestCase):
         # init using tracer
         graph = ModuleGraph.init_from_backward_tracer(model)
         units = DefaultChannelUnit.init_from_graph(graph)
-        self._test_units(units, model)
+        _test_units(units, model)
 
     def test_init_from_cfg(self):
         model = LineModel()
@@ -78,7 +126,7 @@ class TestMutableChannelUnit(TestCase):
             }
         }
         units = [DefaultChannelUnit.init_from_cfg(model, config)]
-        self._test_units(units, model)
+        _test_units(units, model)
 
     def test_init_from_channel_unit(self):
         model = LineModel()
@@ -88,51 +136,25 @@ class TestMutableChannelUnit(TestCase):
         mutable_units = [
             DefaultChannelUnit.init_from_channel_unit(unit) for unit in units
         ]
-        self._test_units(mutable_units, model)
-
-    def _test_units(self, units: List[MutableChannelUnit], model):
-        for unit in units:
-            unit.prepare_for_pruning(model)
-        mutable_units = [unit for unit in units if unit.is_mutable]
-        self.assertGreaterEqual(len(mutable_units), 1)
-        for unit in mutable_units:
-            choice = unit.sample_choice()
-            unit.current_choice = choice
-            self.assertAlmostEqual(unit.current_choice, choice, delta=0.1)
-        x = torch.rand([2, 3, 224, 224]).to(DEVICE)
-        y = model(x)
-        self.assertSequenceEqual(y.shape, [2, 1000])
-
-    def _test_a_model_from_fx_tracer(self, model):
-        model.eval()
-        model = model.to(DEVICE)
-        graph = ModuleGraph.init_from_fx_tracer(
-            model,
-            fx_tracer=dict(
-                type='RazorFxTracer',
-                is_extra_leaf_module=is_dynamic_op_for_fx_tracer,
-                concrete_args=dict(mode='tensor')))
-        self._test_a_graph(model, graph)
-
-    def _test_a_model_from_backward_tracer(self, model):
-        model.eval()
-        model = model.to(DEVICE)
-        graph = ModuleGraph.init_from_backward_tracer(model)
-        self._test_a_graph(model, graph)
+        _test_units(mutable_units, model)
 
     def test_with_fx_tracer(self):
         test_models = PassedModelManager.fx_tracer_passed_models()
-        for model_data in test_models:
+        with SetTorchThread(1):
+            with mp.Pool() as p:
+                result = p.map(_test_a_model_from_fx_tracer, test_models)
+        for res, model_data in zip(result, test_models):
             with self.subTest(model=model_data):
-                model = model_data()
-                self._test_a_model_from_fx_tracer(model)
+                self.assertTrue(res[0], res[1])
 
     def test_with_backward_tracer(self):
         test_models = PassedModelManager.backward_tracer_passed_models()
-        for model_data in test_models:
+        with SetTorchThread(1):
+            with mp.Pool() as p:
+                result = p.map(_test_a_model_from_backward_tracer, test_models)
+        for res, model_data in zip(result, test_models):
             with self.subTest(model=model_data):
-                model = model_data()
-                self._test_a_model_from_backward_tracer(model)
+                self.assertTrue(res[0], res[1])
 
     def test_replace_with_dynamic_ops(self):
         model_datas = PassedModelManager.backward_tracer_passed_default_models(
@@ -159,10 +181,3 @@ class TestMutableChannelUnit(TestCase):
                         if isinstance(module, nn.BatchNorm2d):
                             self.assertTrue(
                                 isinstance(module, DynamicChannelMixin))
-
-    def _test_a_graph(self, model, graph):
-        try:
-            units = DefaultChannelUnit.init_from_graph(graph)
-            self._test_units(units, model)
-        except Exception as e:
-            self.fail(f'{e}')
