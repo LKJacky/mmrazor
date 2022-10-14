@@ -43,6 +43,7 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
                 ]
             }
         }"""
+
         chanel_config_template: Dict = {
             'init_args': {
                 'num_channels': 1

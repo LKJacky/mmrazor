@@ -13,8 +13,7 @@ from .test_models.test_mutables.test_mutable_channel.test_units.test_mutable_cha
 from .test_models.test_mutators.test_channel_mutator import TestChannelMutator
 
 __all__ = [
-    'TestGraph', 'TestMutableChannelUnit', 'TestNode', 'TestChannelMutator',
+    'TestGraph', 'TestMutableChannelUnit', 'TestChannelMutator',
     'TestBackwardTracer', 'TestItePruneAlgorithm', 'TestAutoSlim',
-    'TestSlimmable', 'TestSlimmableDDP', 'TestChannelGraph', 'TestChannelUnit',
-    'TestChannelTensor', 'TestModelLibrary'
+    'TestSlimmable', 'TestSlimmableDDP', 'TestChannelGraph', 'TestModelLibrary'
 ]

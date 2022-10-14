@@ -189,7 +189,6 @@ class ChannelUnit(BaseModule):
     @classmethod
     def init_from_graph(cls,
                         graph: ModuleGraph,
-                        unit_args={},
                         num_input_channel=3) -> List['ChannelUnit']:
         """Parse a module-graph and get ChannelUnits."""
 
