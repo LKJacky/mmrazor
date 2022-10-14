@@ -219,12 +219,15 @@ class ConvNode(MixChannelNode):
                  module_name='') -> None:
         super().__init__(name, val, expand_ratio, module_name)
         assert isinstance(self.val, nn.Conv2d)
+
+    @property
+    def conv_type(self):
         if self.val.groups == 1:
-            self.conv_type = 'conv'
+            return 'conv'
         elif self.val.in_channels == self.out_channels == self.val.groups:
-            self.conv_type = 'dwconv'
+            return 'dwconv'
         else:
-            self.conv_type = 'gwconv'
+            return 'gwconv'
 
     def channel_forward(self, channel_tensors: List[ChannelTensor]):
         if self.conv_type == 'conv':
@@ -232,9 +235,27 @@ class ConvNode(MixChannelNode):
         elif self.conv_type == 'dwconv':
             return PassChannelNode._channel_forward(self, channel_tensors[0])
         elif self.conv_type == 'gwconv':
-            return super().channel_forward(channel_tensors)
+            print(self.val)
+            return self._gw_conv_channel_forward(channel_tensors)
         else:
             pass
+
+    def _gw_conv_channel_forward(self, channel_tensors: List[ChannelTensor]):
+        assert len(channel_tensors) == 1
+
+        def group_union(tensor: ChannelTensor, groups: int):
+            c_per_group = len(tensor) // groups
+            for c in range(c_per_group):
+                for g in range(groups):
+                    tensor[0 * c_per_group + c].union(tensor[g * c_per_group +
+                                                             c])
+
+        tensor0 = channel_tensors[0]
+        conv: nn.Conv2d = self.val
+        group_union(tensor0, conv.groups)
+        self.in_channel_tensor = tensor0
+        self.out_channel_tensor = ChannelTensor(self.out_channels)
+        group_union(self.out_channel_tensor, conv.groups)
 
     @property
     def in_channels(self) -> int:
