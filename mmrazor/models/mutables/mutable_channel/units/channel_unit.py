@@ -7,8 +7,6 @@ from mmengine.model import BaseModule
 
 from mmrazor.structures.graph import ModuleGraph
 from mmrazor.structures.graph.channel_graph import ChannelGraph
-from mmrazor.structures.graph.channel_modules import (BaseChannel,
-                                                      BaseChannelUnit)
 from mmrazor.structures.graph.channel_nodes import \
     default_channel_node_converter
 
@@ -69,17 +67,6 @@ class Channel(BaseModule):
             is_output_channel=is_output_channel,
             expand_ratio=expand_ratio)
 
-    @classmethod
-    def init_from_base_channel(cls, base_channel: BaseChannel):
-        """Init from a BaseChannel object."""
-        return cls(
-            base_channel.name,
-            base_channel.module,
-            base_channel.index,
-            node=None,
-            is_output_channel=base_channel.is_output_channel,
-            expand_ratio=base_channel.expand_ratio)
-
     # config template
 
     def config_template(self):
@@ -120,7 +107,7 @@ class Channel(BaseModule):
                 ')')
 
     def __eq__(self, obj: object) -> bool:
-        if isinstance(obj, BaseChannel):
+        if isinstance(obj, Channel):
             return self.name == obj.name \
                 and self.module == obj.module \
                 and self.index == obj.index \
@@ -206,23 +193,14 @@ class ChannelUnit(BaseModule):
                         num_input_channel=3) -> List['ChannelUnit']:
         """Parse a module-graph and get ChannelUnits."""
 
-        def init_from_base_channel_unit(base_channel_unit: BaseChannelUnit):
-            unit = cls(len(base_channel_unit.channel_elems), **unit_args)
-            unit.input_related = nn.ModuleList([
-                Channel.init_from_base_channel(channel)
-                for channel in base_channel_unit.input_related
-            ])
-            unit.output_related = nn.ModuleList([
-                Channel.init_from_base_channel(channel)
-                for channel in base_channel_unit.output_related
-            ])
-            return unit
-
         unit_graph = ChannelGraph.copy_from(graph,
                                             default_channel_node_converter)
         unit_graph.forward(num_input_channel)
-        units = unit_graph.collect_units()
-        units = [init_from_base_channel_unit(unit) for unit in units]
+        units_config = unit_graph.generate_units_config()
+        units = [
+            cls.init_from_cfg(graph._model, unit_config)
+            for unit_config in units_config.values()
+        ]
         return units
 
     # tools
@@ -256,14 +234,18 @@ class ChannelUnit(BaseModule):
     def add_ouptut_related(self, channel: Channel):
         """Add a Channel which is output related."""
         assert channel.is_output_channel
-        assert self.num_channels == channel.num_channels
+        assert self.num_channels == channel.num_channels or (
+            channel.num_channels > self.num_channels
+            and channel.num_channels % self.num_channels == 0)
         if channel not in self.output_related:
             self.output_related.append(channel)
 
     def add_input_related(self, channel: Channel):
         """Add a Channel which is input related."""
         assert channel.is_output_channel is False
-        assert self.num_channels == channel.num_channels
+        assert self.num_channels == channel.num_channels or (
+            channel.num_channels > self.num_channels
+            and channel.num_channels % self.num_channels == 0)
         if channel not in self.input_related:
             self.input_related.append(channel)
 

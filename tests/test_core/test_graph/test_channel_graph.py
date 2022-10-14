@@ -48,8 +48,7 @@ class TestChannelGraph(unittest.TestCase):
                 channel_graph.forward()
 
                 # units = channel_graph.collect_units()
-                unit_config = channel_graph.collect_units()
-                print(unit_config)
+                _ = channel_graph.generate_units_config()
 
     def test_forward_with_config_num_in_channel(self):
 
@@ -73,4 +72,4 @@ class TestChannelGraph(unittest.TestCase):
                                                default_channel_node_converter)
         channel_graph.forward(num_input_channel=6)
 
-        _ = channel_graph.collect_units
+        _ = channel_graph.generate_units_config

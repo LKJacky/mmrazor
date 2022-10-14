@@ -25,7 +25,7 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
         assert isinstance(graph, ModuleGraph)
         return super().copy_from(graph, node_converter)
 
-    def collect_units(self) -> Dict:
+    def generate_units_config(self) -> Dict:
         """Collect channel units in the graph.
         "hash"{
             'channels':{
@@ -44,6 +44,9 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
             }
         }"""
         chanel_config_template: Dict = {
+            'init_args': {
+                'num_channels': 1
+            },
             'channels': {
                 'input_related': [],
                 'output_related': []
@@ -59,7 +62,7 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
             assert tensor is not None
             for (start, end), hash in tensor.elems_hash_dict.items():
                 channel_config = {
-                    'name': node.name,
+                    'name': node.module_name,
                     'start': start,
                     'end': end,
                     'is_output_channel': is_output_tensor
@@ -71,12 +74,27 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
                     'channels']['output_related' if is_output_tensor else
                                 'input_related'].append(channel_config)
 
+        def fill_num_channels(units_config: Dict):
+
+            def min_num_channels(channel_configs: List[Dict]):
+                min_num_channels = int(pow(2, 32))
+                for channel in channel_configs:
+                    min_num_channels = min(min_num_channels,
+                                           channel['end'] - channel['start'])
+                return min_num_channels
+
+            for name in units_config:
+                units_config[name]['init_args'][
+                    'num_channels'] = min_num_channels(
+                        units_config[name]['channels']['input_related'] +
+                        units_config[name]['channels']['output_related'])
+
         unit_hash_dict: Dict = {}
 
         for node in self.topo_traverse():
             process_tensor(node, True, unit_hash_dict)
             process_tensor(node, False, unit_hash_dict)
-
+        fill_num_channels(unit_hash_dict)
         return unit_hash_dict
 
     def forward(self, num_input_channel=3):

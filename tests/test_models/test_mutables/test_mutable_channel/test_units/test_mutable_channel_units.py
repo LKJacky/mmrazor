@@ -37,7 +37,8 @@ def _test_units(units: List[MutableChannelUnit], model):
     for unit in units:
         unit.prepare_for_pruning(model)
     mutable_units = [unit for unit in units if unit.is_mutable]
-    assert len(mutable_units) >= 1
+    assert len(mutable_units) >= 1, \
+        'len of mutable units should greater or equal than 0.'
     for unit in mutable_units:
         choice = unit.sample_choice()
         unit.current_choice = choice

@@ -9,7 +9,6 @@ import torch.nn as nn
 from mmengine import MMLogger
 
 from .channel_flow import ChannelTensor
-from .channel_modules import BaseChannel
 from .module_graph import ModuleNode
 
 
@@ -73,23 +72,6 @@ class ChannelNode(ModuleNode):
 
         self.in_channel_tensor = channel_tensors[0]
         self.out_channel_tensor = ChannelTensor(self.out_channels)
-
-    # register unit
-
-    def register_channel_to_units(self):
-        """Register the module of this node to corresponding units."""
-        name = self.module_name if isinstance(self.val,
-                                              nn.Module) else self.name
-        for index, unit in self.in_channel_tensor.elems_hash_dict.items():
-            channel = BaseChannel(name, self.val, index, None, False,
-                                  self.expand_ratio)
-            if channel not in unit.input_related:
-                unit.input_related.append(channel)
-        for index, unit in self.out_channel_tensor.elems_hash_dict.items():
-            channel = BaseChannel(name, self.val, index, None, True,
-                                  self.expand_ratio)
-            if channel not in unit.output_related:
-                unit.output_related.append(channel)
 
     # channels
 

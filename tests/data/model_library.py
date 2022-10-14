@@ -107,7 +107,6 @@ class MMModelLibrary(ModelLibrary):
         for dirpath, dirnames, filenames in os.walk(self.config_path):
             for filename in filenames:
                 if filename.endswith('.py'):
-                    print(filename)
                     model_type_name = '_'.join(
                         dirpath.replace(self.config_path, '').split('/'))
                     model_type_name = model_type_name if model_type_name == '' else model_type_name + '_'
