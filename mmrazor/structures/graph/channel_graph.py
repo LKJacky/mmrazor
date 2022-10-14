@@ -28,6 +28,9 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
     def generate_units_config(self) -> Dict:
         """Collect channel units in the graph.
         "hash"{
+            'init_args':{
+                'num_channels': 10
+            }
             'channels':{
                 'input_related':[
                     {
