@@ -71,9 +71,10 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
                 if hash not in unit_hash_dict:
                     unit_hash_dict[hash] = copy.deepcopy(
                         chanel_config_template)
-                unit_hash_dict[hash][
-                    'channels']['output_related' if is_output_tensor else
-                                'input_related'].append(channel_config)
+                related_dict = unit_hash_dict[hash]['channels'][
+                    'output_related' if is_output_tensor else 'input_related']
+                if channel_config not in related_dict:
+                    related_dict.append(channel_config)
 
         def fill_num_channels(units_config: Dict):
 
