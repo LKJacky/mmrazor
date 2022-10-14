@@ -9,8 +9,8 @@ from torch import multiprocessing as mp
 from mmrazor.models.architectures.dynamic_ops.mixins import DynamicChannelMixin
 from mmrazor.models.mutables.mutable_channel import (
     L1MutableChannelUnit, MutableChannelUnit, SequentialMutableChannelUnit)
-from mmrazor.models.mutables.mutable_channel.units.channel_unit import (  # noqa
-    Channel, ChannelUnit)
+from mmrazor.models.mutables.mutable_channel.units.channel_unit import \
+    ChannelUnit  # noqa
 from mmrazor.models.mutators.channel_mutator.channel_mutator import \
     is_dynamic_op_for_fx_tracer
 from mmrazor.structures.graph import ModuleGraph as ModuleGraph

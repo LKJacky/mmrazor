@@ -23,7 +23,6 @@ class Channel(BaseModule):
             Channel. Defaults to None.
         is_output_channel (bool, optional): Is the channel output channel.
             Defaults to True.
-        expand_ratio (int, optional): Expand ratio of the mask. Defaults to 1.
     """
 
     # init
@@ -33,8 +32,7 @@ class Channel(BaseModule):
                  module,
                  index,
                  node=None,
-                 is_output_channel=True,
-                 expand_ratio=1) -> None:
+                 is_output_channel=True) -> None:
         super().__init__()
         self.name = name
         self.module = module
@@ -45,7 +43,6 @@ class Channel(BaseModule):
         self.node = node
 
         self.is_output_channel = is_output_channel
-        self.expand_ratio = expand_ratio
 
     @classmethod
     def init_from_cfg(cls, model: nn.Module, config: Dict):
@@ -54,18 +51,13 @@ class Channel(BaseModule):
         name = config['name']
         start = config['start']
         end = config['end']
-        expand_ratio = config['expand_ratio'] \
-            if 'expand_ratio' in config else 1
         is_output_channel = config['is_output_channel']
 
         name2module = dict(model.named_modules())
         name2module.pop('')
         module = name2module[name] if name in name2module else None
         return Channel(
-            name,
-            module, (start, end),
-            is_output_channel=is_output_channel,
-            expand_ratio=expand_ratio)
+            name, module, (start, end), is_output_channel=is_output_channel)
 
     # config template
 
@@ -76,7 +68,6 @@ class Channel(BaseModule):
             'name': self.name,
             'start': self.start,
             'end': self.end,
-            'expand_ratio': self.expand_ratio,
             'is_output_channel': self.is_output_channel
         }
 
@@ -103,7 +94,6 @@ class Channel(BaseModule):
                 f'{self.name}, index={self.index}, '
                 f'is_output_channel='
                 f'{"true" if self.is_output_channel else "false"}, '
-                f'expand_ratio={self.expand_ratio}'
                 ')')
 
     def __eq__(self, obj: object) -> bool:
@@ -112,7 +102,6 @@ class Channel(BaseModule):
                 and self.module == obj.module \
                 and self.index == obj.index \
                 and self.is_output_channel == obj.is_output_channel \
-                and self.expand_ratio == obj.expand_ratio \
                 and self.node == obj.node
         else:
             return False
