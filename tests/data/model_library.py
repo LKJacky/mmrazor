@@ -28,9 +28,9 @@ class ModelLibrary:
                 models.append(self.models[name])
         return models
 
-    def is_include(self, name, includes):
+    def is_include(self, name: str, includes: List[str]):
         for key in includes:
-            if key in name:
+            if name.startswith(key):
                 return True
         return False
 
@@ -120,6 +120,20 @@ class MMModelLibrary(ModelLibrary):
                         model_name, model_cfg)
         return models
 
+    def get_default_model_names(self):
+
+        def get_base_model_name(name: str):
+            names = name.split('_')
+            return names[0]
+
+        names = []
+        for name in self.models:
+            base_name = get_base_model_name(name)
+            if base_name not in names:
+                names.append(base_name)
+
+        return names
+
     def _get_model_config_path(self, repo, config_path):
         repo_path = get_installed_path(repo)
         return repo_path + '/.mim/configs/' + config_path
@@ -159,7 +173,12 @@ class MMClsModelLibrary(MMModelLibrary):
         'vit',
         'efficientformer',
         'mobileone',
-        'edgenext'
+        'edgenext',
+        'mvit',
+        'seresnet',
+        'repvgg',
+        'seresnext',
+        'seresnext',
     ]
 
     def __init__(self, include=default_includes, exclude=[]) -> None:
@@ -173,13 +192,14 @@ class MMClsModelLibrary(MMModelLibrary):
 class MMDetModelLibrary(MMModelLibrary):
 
     default_includes = [
-        'rpn',  #
+        'rpn',
         'faster-rcnn',
         'cascade-rcnn',
-        'fast-rcnn',  # mmdet bug
+        'fast-rcnn',
+        'cascade-mask-rcnn',
         'retinanet',
         'mask-rcnn',
-        'ssd300'
+        'ssd300',
     ]
 
     def __init__(self, include=default_includes, exclude=[]) -> None:
@@ -196,3 +216,45 @@ class MMDetModelLibrary(MMModelLibrary):
         if 'pretrained' in config:
             config.pop('pretrained')
         return config
+
+
+class MMSegModelLibrary(MMModelLibrary):
+    default_includes: List = [
+        'cgnet',
+        'gcnet',
+        'setr',
+        'deeplabv3',
+        'twins',
+        'fastfcn',
+        'fpn',
+        'upernet',
+        'dnl',
+        'icnet',
+        'segmenter',
+        'encnet',
+        'erfnet',
+        'segformer',
+        'apcnet',
+        'fast',
+        'ocrnet',
+        'lraspp',
+        'dpt',
+        'fcn',
+        'psanet',
+        'bisenetv2',
+        'pointrend',
+        'ccnet',
+        'pspnet',
+        'dmnet',
+        'stdc',
+        'ann',
+        'nonlocal',
+        'isanet',
+        'danet',
+        'emanet',
+        'deeplabv3plus',
+        'bisenetv1',
+    ]
+
+    def __init__(self, include=default_includes, exclude=[]) -> None:
+        super().__init__('mmsegmentation', '_base_/models/', include, exclude)

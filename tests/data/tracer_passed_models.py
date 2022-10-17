@@ -1,6 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from .model_library import (MMClsModelLibrary, MMDetModelLibrary,
-                            TorchModelLibrary)
+                            TorchModelLibrary, MMSegModelLibrary)
 from .models import Icep  # noqa
 from .models import MultipleUseModel  # noqa
 from .models import Xmodel  # noqa
@@ -126,13 +126,55 @@ class PassedModelManager:
         return mmdet_model_library.include_models()
 
     @classmethod
+    def fx_tracer_passed_mmseg_models(cls):
+        include = [
+            # 'cgnet',
+            # 'gcnet',
+            # 'setr',
+            # 'deeplabv3',
+            # 'twins',
+            # 'fastfcn',
+            # 'fpn',
+            # 'upernet',
+            # 'dnl',
+            # 'icnet',
+            # 'segmenter',
+            # 'encnet',
+            # 'erfnet',
+            # 'segformer',
+            # 'apcnet',
+            # 'fast',
+            # 'ocrnet',
+            # 'lraspp',
+            # 'dpt',
+            # 'fcn',
+            # 'psanet',
+            # 'bisenetv2',
+            # 'pointrend',
+            # 'ccnet',
+            'pspnet',
+            # 'dmnet',
+            # 'stdc',
+            # 'ann',
+            # 'nonlocal',
+            # 'isanet',
+            # 'danet',
+            # 'emanet',
+            # 'deeplabv3plus',
+            # 'bisenetv1',
+        ]
+        model_library = MMSegModelLibrary(include=include)
+        return model_library.include_models()
+
+    @classmethod
     def fx_tracer_passed_models(cls):
 
 
         models = cls.fx_tracer_passed_default_models() \
             + cls.fx_tracer_passed_torch_models() \
             + cls.fx_tracer_passed_mmcls_models() \
-            + cls.fx_tracer_passed_mmcls_models() \
+            + cls.fx_tracer_passed_mmdet_models() \
+            + cls.fx_tracer_passed_mmseg_models() \
             if FULL_TEST else cls.fx_tracer_passed_default_models()
 
         return models
@@ -249,11 +291,53 @@ class PassedModelManager:
         return mmdet_model_library.include_models()
 
     @classmethod
+    def backward_tracer_passed_mmseg_models(cls):
+        include = [
+            # 'cgnet',
+            # 'gcnet',
+            # 'setr',
+            # 'deeplabv3',
+            # 'twins',
+            # 'fastfcn',
+            # 'fpn',
+            # 'upernet',
+            # 'dnl',
+            # 'icnet',
+            # 'segmenter',
+            # 'encnet',
+            # 'erfnet',
+            # 'segformer',
+            # 'apcnet',
+            # 'fast',
+            # 'ocrnet',
+            # 'lraspp',
+            # 'dpt',
+            # 'fcn',
+            # 'psanet',
+            # 'bisenetv2',
+            # 'pointrend',
+            # 'ccnet',
+            'pspnet',
+            # 'dmnet',
+            # 'stdc',
+            # 'ann',
+            # 'nonlocal',
+            # 'isanet',
+            # 'danet',
+            # 'emanet',
+            # 'deeplabv3plus',
+            # 'bisenetv1',
+        ]
+        model_library = MMSegModelLibrary(include=include)
+        return model_library.include_models()
+
+    @classmethod
     def backward_tracer_passed_models(cls):
         models = cls.backward_tracer_passed_default_models() \
             + cls.backward_tracer_passed_torch_models() \
             + cls.backward_tracer_passed_mmcls_models() \
             + cls.backward_tracer_passed_mmdet_models() \
+            + cls.backward_tracer_passed_mmseg_models() \
             if FULL_TEST else cls.backward_tracer_passed_default_models()
 
         return models
