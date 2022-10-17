@@ -241,15 +241,15 @@ class ConvNode(MixChannelNode):
             pass
 
     def _gw_conv_channel_forward(self, channel_tensors: List[ChannelTensor]):
-        assert len(channel_tensors) == 1
 
         def group_union(tensor: ChannelTensor, groups: int):
             c_per_group = len(tensor) // groups
-            for c in range(c_per_group):
-                for g in range(groups):
-                    tensor[0 * c_per_group + c].union(tensor[g * c_per_group +
-                                                             c])
+            group_tensor = ChannelTensor(c_per_group)
+            for i in range(groups):
+                tensor[i * c_per_group:(i + 1) *
+                       c_per_group].union(group_tensor)
 
+        assert len(channel_tensors) == 1
         tensor0 = channel_tensors[0]
         conv: nn.Conv2d = self.val
         group_union(tensor0, conv.groups)

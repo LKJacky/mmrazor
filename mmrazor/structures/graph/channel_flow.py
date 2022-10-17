@@ -38,6 +38,14 @@ class ChannelElem:
         frozen_set = frozenset(tensor_set)
         return frozen_set.__hash__()
 
+    @property
+    def min_elem_set_index(self):
+        elem_set = self.owing_elem_set
+        min_index = int(pow(2, 32))
+        for elem in elem_set:
+            min_index = min(min_index, elem.index_in_tensoor)
+        return min_index
+
     # work as a disjoint set
 
     @property
@@ -95,20 +103,22 @@ class ChannelTensor:
     # unit operation
 
     @property
-    def elems_hash(self):
-        elem_hashes = [elem.elem_set_hash for elem in self.elems]
+    def elems_hash_with_index(self):
+        elem_hashes = [(elem.elem_set_hash, elem.min_elem_set_index)
+                       for elem in self.elems]
         return elem_hashes
 
     @property
     def elems_hash_dict(self):
-        elem_hashes = self.elems_hash
+        elem_hash_with_index = self.elems_hash_with_index
         unit_dict = IndexDict()
         start = 0
         for e in range(1, len(self)):
-            if elem_hashes[e] != elem_hashes[e - 1]:
-                unit_dict[(start, e)] = elem_hashes[start]
+            if elem_hash_with_index[e] != (elem_hash_with_index[e - 1][0],
+                                           elem_hash_with_index[e - 1][1] + 1):
+                unit_dict[(start, e)] = elem_hash_with_index[start][0]
                 start = e
-        unit_dict[start, len(self)] = elem_hashes[start]
+        unit_dict[start, len(self)] = elem_hash_with_index[start][0]
         return unit_dict
 
     # work as a tensor

@@ -81,12 +81,6 @@ class Channel(BaseModule):
     @property
     def is_mutable(self) -> bool:
         """If the channel is prunable."""
-        if isinstance(self.module, nn.Conv2d):
-            # group-wise conv
-            if self.module.groups != 1 and not (self.module.groups ==
-                                                self.module.in_channels ==
-                                                self.module.out_channels):
-                return False
         return True
 
     def __repr__(self) -> str:
