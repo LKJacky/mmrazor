@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import os
 import signal
 from contextlib import contextmanager
 from typing import List
@@ -19,6 +20,8 @@ from ...utils import SetTorchThread
 # sys.setrecursionlimit(int(1e8))
 
 DEVICE = torch.device('cpu')
+DEBUG = os.getenv('DEBUG') == 'true'
+POOL_SIZE = mp.cpu_count() if not DEBUG else 1
 
 
 class TimeoutException(Exception):
@@ -26,10 +29,11 @@ class TimeoutException(Exception):
 
 
 @contextmanager
-def time_limit(seconds, msg=''):
+def time_limit(seconds, msg='', activated=(not DEBUG)):
 
     def signal_handler(signum, frame):
-        raise TimeoutException(f'{msg} run over {seconds} s!')
+        if activated:
+            raise TimeoutException(f'{msg} run over {seconds} s!')
 
     signal.signal(signal.SIGALRM, signal_handler)
     signal.alarm(seconds)
@@ -102,7 +106,6 @@ def _test_a_model(Model, tracer_type='fx'):
         with time_limit(20, 'tracer2graph'):
             # trace a model and get graph
             graph = _test_tracer_2_graph(model, tracer_type)
-
         with time_limit(20, 'graph2units'):
             # graph 2 unit
             units = _test_graph2units(graph)
@@ -113,9 +116,11 @@ def _test_a_model(Model, tracer_type='fx'):
         print(f'test {Model} successful.')
         return True, ''
     except Exception as e:
-        # raise e
-        print(f'test {Model} failed.')
-        return False, f'{e}'
+        if DEBUG:
+            raise e
+        else:
+            print(f'test {Model} failed.')
+            return False, f'{e}'
 
 
 class TestTraceModel(TestCase):
@@ -123,7 +128,7 @@ class TestTraceModel(TestCase):
     def test_init_from_fx_tracer(self) -> None:
         TestData = PassedModelManager.fx_tracer_passed_models()
         with SetTorchThread(1):
-            with mp.Pool() as p:
+            with mp.Pool(POOL_SIZE) as p:
                 result = p.map(_test_a_model, TestData)
         for res, model in zip(result, TestData):
             with self.subTest(model=model):
@@ -136,7 +141,7 @@ class TestTraceModel(TestCase):
     def test_init_from_backward_tracer(self) -> None:
         TestData = PassedModelManager.backward_tracer_passed_models()
         with SetTorchThread(1) as _:
-            with mp.Pool() as p:
+            with mp.Pool(POOL_SIZE) as p:
                 result = p.map(_test_a_model, TestData)
         for res, model in zip(result, TestData):
             with self.subTest(model=model):
