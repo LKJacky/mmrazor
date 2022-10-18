@@ -1,7 +1,9 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import os
 import signal
+import time
 from contextlib import contextmanager
+from functools import partial
 from typing import List
 from unittest import TestCase
 
@@ -103,10 +105,11 @@ def _test_a_model(Model, tracer_type='fx'):
     model.eval()
     print(f'test {Model} using {tracer_type} tracer.')
     try:
+        start = time.time()
         with time_limit(20, 'tracer2graph'):
             # trace a model and get graph
             graph = _test_tracer_2_graph(model, tracer_type)
-        with time_limit(20, 'graph2units'):
+        with time_limit(60, 'graph2units'):
             # graph 2 unit
             units = _test_graph2units(graph)
 
@@ -114,13 +117,13 @@ def _test_a_model(Model, tracer_type='fx'):
             # get unit
             _test_units(units, model)
         print(f'test {Model} successful.')
-        return True, ''
+        return Model, True, '', time.time() - start
     except Exception as e:
         if DEBUG:
             raise e
         else:
             print(f'test {Model} failed.')
-            return False, f'{e}'
+            return Model, False, f'{e}', time.time() - start
 
 
 class TestTraceModel(TestCase):
@@ -129,24 +132,21 @@ class TestTraceModel(TestCase):
         TestData = PassedModelManager.fx_tracer_passed_models()
         with SetTorchThread(1):
             with mp.Pool(POOL_SIZE) as p:
-                result = p.map(_test_a_model, TestData)
-        for res, model in zip(result, TestData):
-            with self.subTest(model=model):
-                print()
-                print(f'Test {model} using fx tracer.')
-                if res[0] is False:
-                    print(f'failed: {res[1]}')
-                self.assertTrue(res[0], res[1])
+                result = p.map(
+                    partial(_test_a_model, tracer_type='fx'), TestData)
+        self.report(result, 'fx')
 
     def test_init_from_backward_tracer(self) -> None:
         TestData = PassedModelManager.backward_tracer_passed_models()
         with SetTorchThread(1) as _:
             with mp.Pool(POOL_SIZE) as p:
-                result = p.map(_test_a_model, TestData)
-        for res, model in zip(result, TestData):
-            with self.subTest(model=model):
-                print()
-                print(f'Test {model} using backward tracer.')
-                if res[0] is False:
-                    print(f'failed: {res[1]}')
-                self.assertTrue(res[0], res[1])
+                result = p.map(_test_a_model, [TestData, 'backward'])
+        self.report(result, 'backward')
+
+    def report(self, result, fx_type='fx'):
+        for model, passed, msg, used_time in result:
+            print()
+            print(f'Test {model} using {fx_type} tracer. ({int(used_time)})')
+            if not passed:
+                print(f'failed: {msg}')
+            self.assertTrue(passed, msg)
