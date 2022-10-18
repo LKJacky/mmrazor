@@ -97,7 +97,7 @@ class ChannelTensor:
 
         for i in range(len(self)):
             for j in range(expand_ratio):
-                new_tensor[i * expand_ratio + j].union(self[i])
+                self[i].union(new_tensor[i * expand_ratio + j])
         return new_tensor
 
     # unit operation
@@ -114,8 +114,10 @@ class ChannelTensor:
         unit_dict = IndexDict()
         start = 0
         for e in range(1, len(self)):
-            if elem_hash_with_index[e] != (elem_hash_with_index[e - 1][0],
-                                           elem_hash_with_index[e - 1][1] + 1):
+            if (elem_hash_with_index[e][0] != elem_hash_with_index[e - 1][0]
+                    or elem_hash_with_index[e][1] <
+                    elem_hash_with_index[e - 1][1]):
+
                 unit_dict[(start, e)] = elem_hash_with_index[start][0]
                 start = e
         unit_dict[start, len(self)] = elem_hash_with_index[start][0]
