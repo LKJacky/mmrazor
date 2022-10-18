@@ -235,7 +235,6 @@ class ConvNode(MixChannelNode):
         elif self.conv_type == 'dwconv':
             return PassChannelNode._channel_forward(self, channel_tensors[0])
         elif self.conv_type == 'gwconv':
-            print(self.val)
             return self._gw_conv_channel_forward(channel_tensors)
         else:
             pass

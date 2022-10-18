@@ -187,7 +187,6 @@ class DynamicConvMixin(DynamicChannelMixin):
             weight = weight[mask]
             weight = weight.reshape(
                 [self.groups * out_per_group, in_per_group, *self.kernel_size])
-            print(weight.shape)
 
         bias = self.bias[out_mask] if self.bias is not None else None
         return weight, bias
