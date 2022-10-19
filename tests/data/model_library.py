@@ -9,6 +9,10 @@ from mmengine.utils import get_installed_path
 from mmrazor.registry import MODELS
 import torch
 import torch.nn as nn
+from .models import (AddCatModel, ConcatModel, ConvAttnModel, DwConvModel,
+                     ExpandLineModel, GroupWiseConvModel, LineModel,
+                     MultiBindModel, MultiConcatModel, MultiConcatModel2,
+                     ResBlock, Xmodel, MultipleUseModel, Icep)
 
 
 class ModelLibrary:
@@ -26,20 +30,26 @@ class ModelLibrary:
         models = []
         for name in self.models:
             if self.is_include(name, self.include_key)\
-                    and not self.is_exclude(name, self.exclude_key):
+                    and not self.is_include(name, self.exclude_key,False):
                 models.append(self.models[name])
         return models
 
-    def is_include(self, name: str, includes: List[str]):
-        for key in includes:
-            if name.startswith(key):
-                return True
-        return False
+    def uninclude_models(self):
+        models = []
+        for name in self.models:
+            if (not self.is_include(name, self.include_key)
+                    and not self.is_include(name, self.exclude_key, False)):
+                models.append(self.models[name])
+        return models
 
-    def is_exclude(self, name, excludes):
-        for key in excludes:
-            if key in name:
-                return True
+    def is_include(self, name: str, includes: List[str], start_with=True):
+        for key in includes:
+            if start_with:
+                if name.startswith(key):
+                    return True
+            else:
+                if key in name:
+                    return True
         return False
 
     def is_default_includes_cover_all_models(self):
@@ -52,6 +62,48 @@ class ModelLibrary:
                 is_covered = False
                 print(name, '\tnot include')
         return is_covered
+
+
+class DefaultModelLibrary(ModelLibrary):
+
+    default_includes: List = [
+        'LineModel',
+        'ResBlock',
+        'AddCatModel',
+        'ConcatModel',
+        'MultiConcatModel',
+        'MultiConcatModel2',
+        'GroupWiseConvModel',
+        'Xmodel',
+        'MultipleUseModel',
+        'Icep',
+        'ExpandLineModel',
+        'MultiBindModel',
+        'DwConvModel',
+        'ConvAttnModel',
+    ]
+
+    def get_models(self):
+        models = [
+            LineModel,
+            ResBlock,
+            AddCatModel,
+            ConcatModel,
+            MultiConcatModel,
+            MultiConcatModel2,
+            GroupWiseConvModel,
+            Xmodel,
+            MultipleUseModel,
+            Icep,
+            ExpandLineModel,
+            MultiBindModel,
+            DwConvModel,  #
+            ConvAttnModel,
+        ]
+        model_dict = {}
+        for model in models:
+            model_dict[model.__name__] = model
+        return model_dict
 
 
 class TorchModelLibrary(ModelLibrary):
@@ -209,7 +261,9 @@ class MMClsModelLibrary(MMModelLibrary):
         'seresnext',
     ]
 
-    def __init__(self, include=default_includes, exclude=[]) -> None:
+    def __init__(self,
+                 include=default_includes,
+                 exclude=['cutmix', 'cifar', 'gem']) -> None:
         super().__init__(
             repo='mmcls',
             model_config_path='_base_/models/',

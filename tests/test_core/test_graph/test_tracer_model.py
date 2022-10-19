@@ -16,13 +16,16 @@ from mmrazor.models.mutables.mutable_channel.units import \
 from mmrazor.models.mutators.channel_mutator.channel_mutator import \
     is_dynamic_op_for_fx_tracer
 from mmrazor.structures.graph import ModuleGraph
-from ...data.tracer_passed_models import PassedModelManager
+from ...data.tracer_passed_models import (BackwardPassedModelManager,
+                                          FxPassedModelManager,
+                                          PassedModelManager)
 from ...utils import SetTorchThread
 
 # sys.setrecursionlimit(int(1e8))
 
 DEVICE = torch.device('cpu')
 DEBUG = os.getenv('DEBUG') == 'true'
+FULL_TEST = os.getenv('FULL_TEST') == 'true'
 POOL_SIZE = mp.cpu_count() if not DEBUG else 1
 
 
@@ -129,24 +132,41 @@ def _test_a_model(Model, tracer_type='fx'):
 class TestTraceModel(TestCase):
 
     def test_init_from_fx_tracer(self) -> None:
-        TestData = PassedModelManager.fx_tracer_passed_models()
+        TestData = FxPassedModelManager.include_models(FULL_TEST)
         with SetTorchThread(1):
             with mp.Pool(POOL_SIZE) as p:
                 result = p.map(
                     partial(_test_a_model, tracer_type='fx'), TestData)
-        self.report(result, 'fx')
+        self.report(result, FxPassedModelManager, 'fx')
 
     def test_init_from_backward_tracer(self) -> None:
-        TestData = PassedModelManager.backward_tracer_passed_models()
+        TestData = BackwardPassedModelManager.include_models(FULL_TEST)
         with SetTorchThread(1) as _:
             with mp.Pool(POOL_SIZE) as p:
-                result = p.map(_test_a_model, [TestData, 'backward'])
-        self.report(result, 'backward')
+                result = p.map(
+                    partial(_test_a_model, tracer_type='backward'), TestData)
+        self.report(result, BackwardPassedModelManager, 'backward')
 
-    def report(self, result, fx_type='fx'):
-        for model, passed, msg, used_time in result:
-            print()
-            print(f'Test {model} using {fx_type} tracer. ({int(used_time)})')
-            if not passed:
-                print(f'failed: {msg}')
-            self.assertTrue(passed, msg)
+    def report(self, result, model_manager: PassedModelManager, fx_type='fx'):
+        print()
+        print(f'Trace model summary using {fx_type} tracer.')
+
+        passd_test = [res for res in result if res[1] is True]
+        unpassd_test = [res for res in result if res[1] is False]
+
+        print('Passed:')
+        for model, passed, msg, used_time in passd_test:
+            with self.subTest(model=model):
+                print(f'\t{model}\t({int(used_time)}s)')
+                self.assertTrue(passed, msg)
+
+        print('UnPassed:')
+        for model, passed, msg, used_time in unpassd_test:
+            with self.subTest(model=model):
+                print(f'\t{model}\t({int(used_time)}s)')
+                print(f'\t\t{msg}')
+                self.assertTrue(passed, msg)
+
+        print('UnTest:')
+        for model in model_manager.uninclude_models(full_test=FULL_TEST):
+            print(f'\t{model}')

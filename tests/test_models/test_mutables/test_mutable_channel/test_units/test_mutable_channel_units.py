@@ -15,7 +15,8 @@ from mmrazor.models.mutators.channel_mutator.channel_mutator import \
     is_dynamic_op_for_fx_tracer
 from mmrazor.structures.graph import ModuleGraph as ModuleGraph
 from .....data.models import LineModel
-from .....data.tracer_passed_models import PassedModelManager
+from .....data.tracer_passed_models import (BackwardPassedModelManager,
+                                            FxPassedModelManager)
 from .....utils import SetTorchThread
 
 MUTABLE_CFG = dict(type='SimpleMutablechannel')
@@ -140,7 +141,7 @@ class TestMutableChannelUnit(TestCase):
         _test_units(mutable_units, model)
 
     def test_with_fx_tracer(self):
-        test_models = PassedModelManager.fx_tracer_passed_models()
+        test_models = FxPassedModelManager.include_models()
         with SetTorchThread(1):
             with mp.Pool() as p:
                 result = p.map(_test_a_model_from_fx_tracer, test_models)
@@ -149,7 +150,7 @@ class TestMutableChannelUnit(TestCase):
                 self.assertTrue(res[0], res[1])
 
     def test_with_backward_tracer(self):
-        test_models = PassedModelManager.backward_tracer_passed_models()
+        test_models = BackwardPassedModelManager.include_models()
         with SetTorchThread(1):
             with mp.Pool() as p:
                 result = p.map(_test_a_model_from_backward_tracer, test_models)
@@ -158,8 +159,7 @@ class TestMutableChannelUnit(TestCase):
                 self.assertTrue(res[0], res[1])
 
     def test_replace_with_dynamic_ops(self):
-        model_datas = PassedModelManager.backward_tracer_passed_default_models(
-        )
+        model_datas = BackwardPassedModelManager.include_models()
         for model_data in model_datas:
             for unit_type in GROUPS:
                 with self.subTest(model=model_data, unit=unit_type):

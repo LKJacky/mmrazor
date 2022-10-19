@@ -9,7 +9,8 @@ from mmrazor.models.architectures.dynamic_ops.mixins import DynamicChannelMixin
 from mmrazor.models.mutators.channel_mutator.channel_mutator import \
     is_dynamic_op_for_fx_tracer
 from mmrazor.structures.graph import ModuleGraph
-from ...data.tracer_passed_models import PassedModelManager
+from ...data.tracer_passed_models import (BackwardPassedModelManager,
+                                          FxPassedModelManager)
 from ...utils import SetTorchThread
 
 sys.setrecursionlimit(int(1e8))
@@ -62,7 +63,7 @@ def _test_init_from_backward_tracer(Model):
 class TestGraph(TestCase):
 
     def test_init_from_fx_tracer(self) -> None:
-        TestData = PassedModelManager.fx_tracer_passed_models()
+        TestData = BackwardPassedModelManager.include_models()
         with SetTorchThread(1):
             with mp.Pool() as p:
                 result = p.map(_test_init_from_fx_tracer, TestData)
@@ -71,7 +72,7 @@ class TestGraph(TestCase):
                 self.assertTrue(res[0], res[1])
 
     def test_init_from_backward_tracer(self) -> None:
-        TestData = PassedModelManager.backward_tracer_passed_models()
+        TestData = FxPassedModelManager.include_models()
         with SetTorchThread(1) as _:
             with mp.Pool() as p:
                 result = p.map(_test_init_from_backward_tracer, TestData)
