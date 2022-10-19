@@ -13,7 +13,7 @@ from .models import (AddCatModel, ConcatModel, ConvAttnModel, DwConvModel,
                      ExpandLineModel, GroupWiseConvModel, LineModel,
                      MultiBindModel, MultiConcatModel, MultiConcatModel2,
                      ResBlock, Xmodel, MultipleUseModel, Icep)
-
+import json
 # model generator
 
 
@@ -96,6 +96,17 @@ class ModelLibrary:
                 print(name, '\tnot include')
         return is_covered
 
+    def short_names(self):
+
+        def get_short_name(name: str):
+            names = name.replace('-', '.').replace('_', '.').split('.')
+            return names[0]
+
+        short_names = set()
+        for name in self.models:
+            short_names.add(get_short_name(name))
+        return short_names
+
 
 class DefaultModelLibrary(ModelLibrary):
 
@@ -170,7 +181,7 @@ class MMModelLibrary(ModelLibrary):
 
     def __init__(self,
                  repo='mmcls',
-                 model_config_path='_base_/models/',
+                 model_config_path='/',
                  include=default_includes,
                  exclude=[]) -> None:
         self.config_path = self._get_model_config_path(repo, model_config_path)
@@ -179,20 +190,28 @@ class MMModelLibrary(ModelLibrary):
 
     def get_models(self):
         models = {}
+        added_models = set()
         for dirpath, dirnames, filenames in os.walk(self.config_path):
             for filename in filenames:
                 if filename.endswith('.py'):
-                    model_type_name = '_'.join(
-                        dirpath.replace(self.config_path, '').split('/'))
-                    model_type_name = model_type_name if model_type_name == '' else model_type_name + '_'
-                    model_name = model_type_name + \
-                        os.path.basename(filename).split('.')[0]
 
                     cfg_path = dirpath + '/' + filename
-                    model_cfg = Config.fromfile(cfg_path)['model']
-                    model_cfg = self._config_process(model_cfg)
-                    models[model_name] = MMModelGenerator(
-                        self.repo + '.' + model_name, model_cfg)
+                    config = Config.fromfile(cfg_path)
+                    if 'model' in config:
+
+                        # get model_name
+                        model_type_name = '_'.join(
+                            dirpath.replace(self.config_path, '').split('/'))
+                        model_type_name = model_type_name if model_type_name == '' else model_type_name + '_'
+                        model_name = model_type_name + \
+                            os.path.basename(filename).split('.')[0]
+
+                        model_cfg = config['model']
+                        model_cfg = self._config_process(model_cfg)
+                        if json.dumps(model_cfg) not in added_models:
+                            models[model_name] = MMModelGenerator(
+                                self.repo + '.' + model_name, model_cfg)
+                            added_models.add(json.dumps(model_cfg))
         return models
 
     def get_default_model_names(self):
@@ -269,20 +288,101 @@ class MMClsModelLibrary(MMModelLibrary):
 class MMDetModelLibrary(MMModelLibrary):
 
     default_includes = [
+        '_base',
+        'gfl',
+        'sparse',
+        'simple',
+        'pisa',
+        'lvis',
+        'carafe',
+        'selfsup',
+        'solo',
+        'ssd',
+        'res2net',
+        'yolof',
+        'reppoints',
+        'htc',
+        'groie',
+        'dyhead',
+        'grid',
+        'soft',
+        'swin',
+        'regnet',
+        'gcnet',
+        'ddod',
+        'instaboost',
+        'point',
+        'vfnet',
+        'pafpn',
+        'ghm',
+        'mask',
+        'resnest',
+        'tood',
+        'detectors',
+        'cornernet',
+        'convnext',
+        'cascade',
+        'paa',
+        'detr',
         'rpn',
-        'faster-rcnn',
-        'cascade-rcnn',
-        'fast-rcnn',
-        'cascade-mask-rcnn',
+        'ld',
+        'lad',
+        'ms',
+        'faster',
+        'centripetalnet',
+        'gn',
+        'dcnv2',
+        'legacy',
+        'panoptic',
+        'strong',
+        'fpg',
+        'deformable',
+        'free',
+        'scratch',
+        'openimages',
+        'fsaf',
+        'rtmdet',
+        'solov2',
+        'yolact',
+        'empirical',
+        'centernet',
+        'hrnet',
+        'guided',
+        'deepfashion',
+        'fast',
+        'mask2former',
         'retinanet',
-        'mask-rcnn',
-        'ssd300',
+        'autoassign',
+        'gn+ws',
+        'dcn',
+        'yolo',
+        'foveabox',
+        'libra',
+        'double',
+        'queryinst',
+        'resnet',
+        'nas',
+        'sabl',
+        'fcos',
+        'scnet',
+        'maskformer',
+        'pascal',
+        'cityscapes',
+        'timm',
+        'seesaw',
+        'pvt',
+        'atss',
+        'efficientnet',
+        'wider',
+        'tridentnet',
+        'dynamic',
+        'yolox',
     ]
 
     def __init__(self, include=default_includes, exclude=[]) -> None:
         super().__init__(
             repo='mmdet',
-            model_config_path='_base_/models/',
+            model_config_path='/',
             include=include,
             exclude=exclude)
 

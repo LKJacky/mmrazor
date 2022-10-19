@@ -24,6 +24,7 @@ class TestModelLibrary(unittest.TestCase):
 
     def test_mmdet(self):
         library = MMDetModelLibrary()
+        print(library.short_names())
         self.assertTrue(library.is_default_includes_cover_all_models())
 
     def test_mmseg(self):
