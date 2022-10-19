@@ -26,6 +26,8 @@ from ...utils import SetTorchThread
 DEVICE = torch.device('cpu')
 DEBUG = os.getenv('DEBUG') == 'true'
 FULL_TEST = os.getenv('FULL_TEST') == 'true'
+if DEBUG:
+    FULL_TEST = True
 POOL_SIZE = mp.cpu_count() if not DEBUG else 1
 
 

@@ -85,7 +85,11 @@ class ModuleNode(BaseNode):
             if len(self.prev_nodes) > 0:
                 return self.prev_nodes[0].out_channels
             else:
-                return 0
+                from mmengine import MMLogger
+                MMLogger.get_current_instance().info(
+                    (f'{self.name} in module_graph has no prev nodes,'
+                     ' so the input channel are sopposed to be 3.'))
+                return 3
         elif self.is_cat_node():
             return sum([
                 node.out_channels if node.out_channels is not None else 0
@@ -112,7 +116,11 @@ class ModuleNode(BaseNode):
             if len(self.prev_nodes) > 0:
                 return self.prev_nodes[0].out_channels
             else:
-                return 0
+                from mmengine import MMLogger
+                MMLogger.get_current_instance().info(
+                    (f'{self.name} in module_graph has no prev nodes,'
+                     ' so the input channel are sopposed to be 3.'))
+                return 3
         elif self.is_pass_node():
             return self.in_channels * self.expand_ratio
         elif self.is_cat_node():

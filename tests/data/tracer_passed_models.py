@@ -130,7 +130,8 @@ class FxPassedModelManager(PassedModelManager):
     @classmethod
     def mmdet_library(cls):
         mmdet_include = [
-            'yolo_yolov3_mobilenetv2_8xb24-320-300e_coco',
+            'yolov3',
+            'yolox',
             # '_base',
             # 'gfl',
             # 'sparse',
