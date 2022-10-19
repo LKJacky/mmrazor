@@ -14,6 +14,39 @@ from .models import (AddCatModel, ConcatModel, ConvAttnModel, DwConvModel,
                      MultiBindModel, MultiConcatModel, MultiConcatModel2,
                      ResBlock, Xmodel, MultipleUseModel, Icep)
 
+# model generator
+
+
+class ModelGenerator:
+
+    def __init__(self, name: str, model_src) -> None:
+        self.name = name
+        self.model_src = model_src
+
+    def __call__(self, ) -> nn.Module:
+        return self.model_src()
+
+    def __repr__(self) -> str:
+        return self.name
+
+
+class MMModelGenerator:
+
+    def __init__(self, name, cfg) -> None:
+        self.name = name
+        self.cfg = cfg
+
+    def __call__(self):
+        model = MODELS.build(self.cfg)
+        model = revert_sync_batchnorm(model)
+        return model
+
+    def __repr__(self) -> str:
+        return self.name
+
+
+# model library
+
 
 class ModelLibrary:
     default_includes: List = []
@@ -102,7 +135,8 @@ class DefaultModelLibrary(ModelLibrary):
         ]
         model_dict = {}
         for model in models:
-            model_dict[model.__name__] = model
+            model_dict[model.__name__] = ModelGenerator(
+                'default' + model.__name__, model)
         return model_dict
 
 
@@ -127,47 +161,8 @@ class TorchModelLibrary(ModelLibrary):
         for name in attrs:
             module = getattr(torchvision.models, name)
             if isfunction(module) and name is not 'get_weight':
-                models[name] = module
+                models[name] = ModelGenerator('torch.' + name, module)
         return models
-
-
-def revert_sync_batchnorm(module):
-    # this is very similar to the function that it is trying to revert:
-    # https://github.com/pytorch/pytorch/blob/c8b3686a3e4ba63dc59e5dcfe5db3430df256833/torch/nn/modules/batchnorm.py#L679
-    module_output = module
-    if isinstance(module, torch.nn.modules.batchnorm.SyncBatchNorm):
-        new_cls = nn.BatchNorm2d
-        module_output = nn.BatchNorm2d(module.num_features, module.eps,
-                                       module.momentum, module.affine,
-                                       module.track_running_stats)
-        if module.affine:
-            with torch.no_grad():
-                module_output.weight = module.weight
-                module_output.bias = module.bias
-        module_output.running_mean = module.running_mean
-        module_output.running_var = module.running_var
-        module_output.num_batches_tracked = module.num_batches_tracked
-        if hasattr(module, "qconfig"):
-            module_output.qconfig = module.qconfig
-    for name, child in module.named_children():
-        module_output.add_module(name, revert_sync_batchnorm(child))
-    del module
-    return module_output
-
-
-class MMModelGenerator:
-
-    def __init__(self, name, cfg) -> None:
-        self.name = name
-        self.cfg = cfg
-
-    def __call__(self):
-        model = MODELS.build(self.cfg)
-        model = revert_sync_batchnorm(model)
-        return model
-
-    def __repr__(self) -> str:
-        return self.name
 
 
 class MMModelLibrary(ModelLibrary):
@@ -197,7 +192,7 @@ class MMModelLibrary(ModelLibrary):
                     model_cfg = Config.fromfile(cfg_path)['model']
                     model_cfg = self._config_process(model_cfg)
                     models[model_name] = MMModelGenerator(
-                        model_name, model_cfg)
+                        self.repo + '.' + model_name, model_cfg)
         return models
 
     def get_default_model_names(self):
@@ -344,3 +339,30 @@ class MMSegModelLibrary(MMModelLibrary):
     def _config_process(self, config: Dict):
         config['_scope_'] = 'mmseg'
         return config
+
+
+# tools
+
+
+def revert_sync_batchnorm(module):
+    # this is very similar to the function that it is trying to revert:
+    # https://github.com/pytorch/pytorch/blob/c8b3686a3e4ba63dc59e5dcfe5db3430df256833/torch/nn/modules/batchnorm.py#L679
+    module_output = module
+    if isinstance(module, torch.nn.modules.batchnorm.SyncBatchNorm):
+        new_cls = nn.BatchNorm2d
+        module_output = nn.BatchNorm2d(module.num_features, module.eps,
+                                       module.momentum, module.affine,
+                                       module.track_running_stats)
+        if module.affine:
+            with torch.no_grad():
+                module_output.weight = module.weight
+                module_output.bias = module.bias
+        module_output.running_mean = module.running_mean
+        module_output.running_var = module.running_var
+        module_output.num_batches_tracked = module.num_batches_tracked
+        if hasattr(module, "qconfig"):
+            module_output.qconfig = module.qconfig
+    for name, child in module.named_children():
+        module_output.add_module(name, revert_sync_batchnorm(child))
+    del module
+    return module_output
