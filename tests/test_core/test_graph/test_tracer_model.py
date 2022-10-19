@@ -33,6 +33,24 @@ class TimeoutException(Exception):
     pass
 
 
+def get_shape(tensor):
+    if isinstance(tensor, torch.Tensor):
+        return tensor.shape
+    elif isinstance(tensor, list) or isinstance(tensor, tuple):
+        shapes = []
+        for x in tensor:
+            shapes.append(get_shape(x))
+        return shapes
+    elif isinstance(tensor, dict):
+        shapes = {}
+        for key in tensor:
+            shapes[key] = get_shape[tensor[key]]
+        return shapes
+    else:
+        raise NotImplementedError(
+            f'unsuppored type{type(tensor)} to get shape of tensors.')
+
+
 @contextmanager
 def time_limit(seconds, msg='', activated=(not DEBUG)):
 
@@ -89,6 +107,9 @@ def _test_graph2units(graph: ModuleGraph):
 
 
 def _test_units(units: List[SequentialMutableChannelUnit], model):
+    x = torch.rand([2, 3, 224, 224]).to(DEVICE)
+    tensors_org = model(x)
+    # prune
     for unit in units:
         unit.prepare_for_pruning(model)
     mutable_units = [unit for unit in units if unit.is_mutable]
@@ -98,9 +119,11 @@ def _test_units(units: List[SequentialMutableChannelUnit], model):
         choice = unit.sample_choice()
         unit.current_choice = choice
         assert abs(unit.current_choice - choice) < 0.1
+
     x = torch.rand([2, 3, 224, 224]).to(DEVICE)
-    y = model(x)
-    assert list(y.shape) == [2, 1000]
+    tensors = model(x)
+    assert get_shape(tensors_org) == get_shape(tensors)
+    return mutable_units
 
 
 def _test_a_model(Model, tracer_type='fx'):
@@ -118,15 +141,15 @@ def _test_a_model(Model, tracer_type='fx'):
 
         with time_limit(20, 'test units'):
             # get unit
-            _test_units(units, model)
+            mutable_units = _test_units(units, model)
         print(f'test {Model} successful.')
-        return Model, True, '', time.time() - start
+        return Model, True, '', time.time() - start, len(mutable_units)
     except Exception as e:
         if DEBUG:
             raise e
         else:
             print(f'test {Model} failed.')
-            return Model, False, f'{e}', time.time() - start
+            return Model, False, f'{e}', time.time() - start, -1
 
 
 class TestTraceModel(TestCase):
@@ -155,15 +178,15 @@ class TestTraceModel(TestCase):
         unpassd_test = [res for res in result if res[1] is False]
 
         print('Passed:')
-        for model, passed, msg, used_time in passd_test:
+        for model, passed, msg, used_time, len_mutable in passd_test:
             with self.subTest(model=model):
-                print(f'\t{model}\t({int(used_time)}s)')
+                print(f'\t{model}\t{int(used_time)}s\t{len_mutable}')
                 self.assertTrue(passed, msg)
 
         print('UnPassed:')
-        for model, passed, msg, used_time in unpassd_test:
+        for model, passed, msg, used_time, len_mutable in unpassd_test:
             with self.subTest(model=model):
-                print(f'\t{model}\t({int(used_time)}s)')
+                print(f'\t{model}\t{int(used_time)}s\t{len_mutable}')
                 print(f'\t\t{msg}')
                 self.assertTrue(passed, msg)
 
