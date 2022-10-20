@@ -196,7 +196,7 @@ class CatChannelNode(ChannelNode):
             f'the channel of {self} dismatched with prev nodes')
 
     def _get_in_channels_by_prev_nodes(self, prev_nodes):
-        assert len(prev_nodes) > 1
+        assert len(prev_nodes) > 0
         nums = [node.out_channels for node in prev_nodes]
         return sum(nums)
 
@@ -350,6 +350,10 @@ def default_channel_node_converter(node: ModuleNode) -> ChannelNode:
         nn.Conv2d: ConvNode,
         nn.BatchNorm2d: NormNode,
         nn.Linear: LinearNode,
+        nn.modules.ReLU: PassChannelNode,
+        nn.modules.Hardtanh: PassChannelNode,
+        nn.modules.pooling._AvgPoolNd: PassChannelNode,
+        nn.modules.pooling._MaxPoolNd: PassChannelNode,
     }
     function_mapping = {
         torch.add: BindChannelNode,
@@ -357,6 +361,8 @@ def default_channel_node_converter(node: ModuleNode) -> ChannelNode:
         operator.add: BindChannelNode
     }
     name_mapping = {
+        'bind_placeholder': BindChannelNode,
+        'pass_placeholder': PassChannelNode,
         'cat_placeholder': CatChannelNode,
     }
     if isinstance(node.val, nn.Module):

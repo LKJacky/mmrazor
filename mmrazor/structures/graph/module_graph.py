@@ -412,21 +412,13 @@ class FxTracerToGraphConverter(GraphConverter):
     def _node_converter(self, node: FxBaseNode):
         """Convert a fxnode to a module-node."""
         if node.is_function():
-            if node.is_cat():
-                val = 'cat_placeholder'
-            elif len(node.prev_nodes) > 1:
-                val = 'bind_placeholder'
-            else:
-                val = 'pass_placeholder'
+            val = node.function()
         elif node.is_Tensor():
-            val = 'pass_placeholder'
+            val = 'tensor'
         elif node.is_method():
-            if len(node.prev_nodes) > 1:
-                val = 'bind_placeholder'
-            else:
-                val = 'pass_placeholder'
+            val = 'method'
         elif node.is_get_attr():
-            val = 'pass_placeholder'
+            val = 'get_attr'
         elif node.is_module():
             val = node.module()
         else:
