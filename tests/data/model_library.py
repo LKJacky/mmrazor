@@ -55,25 +55,17 @@ class ModelLibrary:
         self.include_key = include
         self.exclude_key = exclude
         self.models: Dict[str, Callable] = self.get_models()
+        self._include_models, self._uninclude_models, self.exclude_models =\
+             self._classify_models(self.models)
 
     def get_models(self):
         raise NotImplementedError()
 
     def include_models(self):
-        models = []
-        for name in self.models:
-            if self.is_include(name, self.include_key)\
-                    and not self.is_include(name, self.exclude_key,False):
-                models.append(self.models[name])
-        return models
+        return self._include_models
 
     def uninclude_models(self):
-        models = []
-        for name in self.models:
-            if (not self.is_include(name, self.include_key)
-                    and not self.is_include(name, self.exclude_key, False)):
-                models.append(self.models[name])
-        return models
+        return self._uninclude_models
 
     def is_include(self, name: str, includes: List[str], start_with=True):
         for key in includes:
@@ -106,6 +98,19 @@ class ModelLibrary:
         for name in self.models:
             short_names.add(get_short_name(name))
         return short_names
+
+    def _classify_models(self, models: Dict):
+        include = []
+        uninclude = []
+        exclude = []
+        for name in models:
+            if self.is_include(name, self.include_key):
+                include.append(models[name])
+            elif self.is_include(name, self.exclude_key):
+                exclude.append(models[name])
+            else:
+                uninclude.append(models[name])
+        return include, uninclude, exclude
 
 
 class DefaultModelLibrary(ModelLibrary):
