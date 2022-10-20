@@ -97,8 +97,7 @@ class ChannelNode(ModuleNode):
     @property
     def _in_channels(self) -> int:
         raise NotImplementedError(
-            f'{self.name}({type(self.__class__.__name__)}) has no _in_channels'
-        )
+            f'{self.name}({self.__class__.__name__}) has no _in_channels')
 
     @property
     def _out_channels(self) -> int:
@@ -112,7 +111,7 @@ class ChannelNode(ModuleNode):
         if len(prev_nodes) == 0:
             from mmengine import MMLogger
             MMLogger.get_current_instance().warning(
-                (f'As {self}'
+                (f'As {self.name}'
                  'has no prev nodes, so we set the in channels of it to 3.'))
             return 3
         else:
@@ -352,8 +351,11 @@ def default_channel_node_converter(node: ModuleNode) -> ChannelNode:
         nn.Linear: LinearNode,
         nn.modules.ReLU: PassChannelNode,
         nn.modules.Hardtanh: PassChannelNode,
+        # pools
         nn.modules.pooling._AvgPoolNd: PassChannelNode,
+        nn.modules.pooling._AdaptiveAvgPoolNd: PassChannelNode,
         nn.modules.pooling._MaxPoolNd: PassChannelNode,
+        nn.modules.pooling._AdaptiveMaxPoolNd: PassChannelNode,
     }
     function_mapping = {
         torch.add: BindChannelNode,
