@@ -110,8 +110,8 @@ class ChannelNode(ModuleNode):
     def _get_in_channels_by_prev_nodes(self, prev_nodes):
         if len(prev_nodes) == 0:
             from mmengine import MMLogger
-            MMLogger.get_current_instance().warning(
-                (f'As {self.name}'
+            MMLogger.get_current_instance().debug(
+                (f'As {self.name} '
                  'has no prev nodes, so we set the in channels of it to 3.'))
             return 3
         else:
@@ -341,9 +341,9 @@ def default_channel_node_converter(node: ModuleNode) -> ChannelNode:
 
     def warn(default='PassChannelNode'):
         logger = MMLogger('mmrazor', 'mmrazor')
-        logger.warn((f"{node.name}({node.val}) node can't find match type of"
-                     'channel_nodes,'
-                     f'replaced with {default} by default.'))
+        logger.debug((f"{node.name}({node.val}) node can't find match type of"
+                      'channel_nodes,'
+                      f'replaced with {default} by default.'))
 
     module_mapping = {
         nn.Conv2d: ConvNode,
