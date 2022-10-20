@@ -67,7 +67,7 @@ class ModelLibrary:
     def uninclude_models(self):
         return self._uninclude_models
 
-    def is_include(self, name: str, includes: List[str], start_with=True):
+    def is_include(self, name: str, includes: List[str], start_with=False):
         for key in includes:
             if start_with:
                 if name.startswith(key):
@@ -104,10 +104,10 @@ class ModelLibrary:
         uninclude = []
         exclude = []
         for name in models:
-            if self.is_include(name, self.include_key):
-                include.append(models[name])
-            elif self.is_include(name, self.exclude_key):
+            if self.is_include(name, self.exclude_key):
                 exclude.append(models[name])
+            elif self.is_include(name, self.include_key):
+                include.append(models[name])
             else:
                 uninclude.append(models[name])
         return include, uninclude, exclude

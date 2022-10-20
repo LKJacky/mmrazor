@@ -24,11 +24,12 @@ from ...utils import SetTorchThread
 # sys.setrecursionlimit(int(1e8))
 
 DEVICE = torch.device('cpu')
-DEBUG = os.getenv('DEBUG') == 'true'
 FULL_TEST = os.getenv('FULL_TEST') == 'true'
-if DEBUG:
-    FULL_TEST = True
-POOL_SIZE = mp.cpu_count() if not DEBUG else 1
+try:
+    POOL_SIZE = int(os.getenv('POOL_SIZE'))
+except Exception:
+    POOL_SIZE = mp.cpu_count()
+DEBUG = os.getenv('DEBUG') == 'true'
 
 
 class TimeoutException(Exception):
