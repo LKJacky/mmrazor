@@ -126,7 +126,8 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
         """Union all nodes with the same module to the same unit."""
         module2node: Dict[Module, List[ChannelNode]] = dict()
         for node in self:
-            if isinstance(node.val, Module):
+            if isinstance(node.val,
+                          Module) and len(list(node.val.parameters())) > 0:
                 if node.val not in module2node:
                     module2node[node.val] = []
                 if node not in module2node[node.val]:
