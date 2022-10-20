@@ -32,10 +32,9 @@ class ChannelNode(ModuleNode):
     def __init__(self,
                  name: str,
                  val: Union[nn.Module, str],
-                 expand_ratio: int = 1,
                  module_name='') -> None:
 
-        super().__init__(name, val, expand_ratio, module_name)
+        super().__init__(name, val, module_name)
         self.in_channel_tensor: Union[None, ChannelTensor] = None
         self.out_channel_tensor: Union[None, ChannelTensor] = None
 
@@ -43,7 +42,7 @@ class ChannelNode(ModuleNode):
     def copy_from(cls, node):
         """Copy from a ModuleNode."""
         assert isinstance(node, ModuleNode)
-        return cls(node.name, node.val, node.expand_ratio, node.module_name)
+        return cls(node.name, node.val, node.module_name)
 
     def reset_channel_tensors(self):
         """Reset the owning ChannelTensors."""
@@ -60,10 +59,6 @@ class ChannelNode(ModuleNode):
             ]
             in_channel_tensors = out_channel_tensors
         self.channel_forward(in_channel_tensors)
-        if self.expand_ratio > 1:
-            assert self.out_channel_tensor is not None
-            self.out_channel_tensor = self.out_channel_tensor.expand(
-                self.expand_ratio)
 
     @abstractmethod
     def channel_forward(self, channel_tensors: List[ChannelTensor]):
@@ -79,13 +74,52 @@ class ChannelNode(ModuleNode):
     @property
     def in_channels(self) -> int:
         """Get the number of input channels of the node."""
-        raise NotImplementedError()
+        try:
+            return self._in_channels
+        except NotImplementedError:
+            return \
+                self._get_in_channels_by_prev_nodes(self.prev_nodes)
 
     # @abstractmethod
     @property
     def out_channels(self) -> int:
         """Get the number of output channels of the node."""
-        raise NotImplementedError()
+        try:
+            return self._out_channels
+        except NotImplementedError:
+            return self._get_out_channel_by_in_channels(self.in_channels)
+
+    def check_channel(self):
+        for node in self.prev_nodes:
+            assert node.out_channels == self.in_channels, \
+                f'{self} and {node} dismatch'
+
+    @property
+    def _in_channels(self) -> int:
+        raise NotImplementedError(
+            f'{self.name}({type(self.__class__.__name__)}) has no _in_channels'
+        )
+
+    @property
+    def _out_channels(self) -> int:
+        raise NotImplementedError(
+            f'{self.name}({self.__class__.__name__}) has no _out_channels')
+
+    def _get_out_channel_by_in_channels(self, in_channels):
+        return in_channels
+
+    def _get_in_channels_by_prev_nodes(self, prev_nodes):
+        if len(prev_nodes) == 0:
+            from mmengine import MMLogger
+            MMLogger.get_current_instance().warning(
+                (f'As {self}'
+                 'has no prev nodes, so we set the in channels of it to 3.'))
+            return 3
+        else:
+            return prev_nodes[0].out_channels
+
+    def __repr__(self) -> str:
+        return f'{self.name}_({self.in_channels},{self.out_channels})'
 
 
 # basic nodes
@@ -102,24 +136,6 @@ class PassChannelNode(ChannelNode):
     def channel_forward(self, channel_tensors: List[ChannelTensor]):
         """Channel forward."""
         PassChannelNode._channel_forward(self, channel_tensors[0])
-
-    @property
-    def in_channels(self) -> int:
-        """Get the number of input channels of the node."""
-        if len(self.prev_nodes) > 0:
-            return self.prev_nodes[0].out_channels
-        else:
-            from mmengine import MMLogger
-            logger = MMLogger.get_current_instance()
-            logger.info(
-                (f'{self.name} node has no prev nodes, so we cannot determine '
-                 'the number of input channels, it is set to 3 by default.'))
-            return 3
-
-    @property
-    def out_channels(self) -> int:
-        """Get the number of output channels of the node."""
-        return self.in_channels
 
     def __repr__(self) -> str:
         return super().__repr__() + '_pass'
@@ -145,27 +161,11 @@ class MixChannelNode(ChannelNode):
         else:
             raise NotImplementedError()
 
-    @property
-    def in_channels(self) -> int:
-        """Get the number of input channels of the node."""
-        if len(self.prev_nodes) > 0:
-            return self.prev_nodes[0].in_channels
-        else:
-            return 0
-
-    @property
-    def out_channels(self) -> int:
-        """Get the number of output channels of the node."""
-        if len(self.next_nodes) > 0:
-            return self.next_nodes[0].in_channels
-        else:
-            return 0
-
     def __repr__(self) -> str:
         return super().__repr__() + '_mix'
 
 
-class BindChannelNode(PassChannelNode):
+class BindChannelNode(ChannelNode):
     """A BindChannelNode has multiple inputs, and all input channels belong to
     the same channel unit."""
 
@@ -175,10 +175,11 @@ class BindChannelNode(PassChannelNode):
         #  align channel_tensors
         for tensor in channel_tensors[1:]:
             channel_tensors[0].union(tensor)
-        super().channel_forward(channel_tensors[:1])
+        self.in_channel_tensor = channel_tensors[0]
+        self.out_channel_tensor = channel_tensors[0]
 
     def __repr__(self) -> str:
-        return super(ChannelNode, self).__repr__() + '_bind'
+        return super().__repr__() + '_bind'
 
 
 class CatChannelNode(ChannelNode):
@@ -189,18 +190,40 @@ class CatChannelNode(ChannelNode):
         self.in_channel_tensor = tensor_cat
         self.out_channel_tensor = tensor_cat
 
-    @property
-    def in_channels(self) -> int:
-        """Get the number of input channels of the node."""
-        return sum([node.out_channels for node in self.prev_nodes])
+    def check_channel(self):
+        in_num = [node.out_channels for node in self.prev_nodes]
+        assert sum(in_num) == self.in_channels, (
+            f'the channel of {self} dismatched with prev nodes')
 
-    @property
-    def out_channels(self) -> int:
-        """Get the number of output channels of the node."""
-        return self.in_channels
+    def _get_in_channels_by_prev_nodes(self, prev_nodes):
+        assert len(prev_nodes) > 1
+        nums = [node.out_channels for node in prev_nodes]
+        return sum(nums)
 
     def __repr__(self) -> str:
         return super().__repr__() + '_cat'
+
+
+class ExpandChannelNode(ChannelNode):
+
+    def __init__(self,
+                 name: str,
+                 val: Union[nn.Module, str],
+                 module_name='',
+                 expand_ratio=1) -> None:
+        super().__init__(name, val, module_name)
+        self.expand_ratio = expand_ratio
+
+    def _get_out_channel_by_in_channels(self, in_channels):
+        return in_channels * self.expand_ratio
+
+    def channel_forward(self, channel_tensors: List[ChannelTensor]):
+        assert len(channel_tensors) == 1, f'{self}'
+        assert self.out_channels >= self.in_channels, f'{self}'
+        assert self.out_channels % self.in_channels == 0, f'{self}'
+        tensor0 = channel_tensors[0]
+        self.in_channel_tensor = tensor0
+        self.out_channel_tensor = tensor0.expand(self.expand_ratio)
 
 
 # module nodes
@@ -215,9 +238,8 @@ class ConvNode(MixChannelNode):
     def __init__(self,
                  name: str,
                  val: Union[nn.Module, str],
-                 expand_ratio: int = 1,
                  module_name='') -> None:
-        super().__init__(name, val, expand_ratio, module_name)
+        super().__init__(name, val, module_name)
         assert isinstance(self.val, nn.Conv2d)
 
     @property
@@ -237,7 +259,7 @@ class ConvNode(MixChannelNode):
         elif self.conv_type == 'gwconv':
             return self._gw_conv_channel_forward(channel_tensors)
         else:
-            pass
+            raise NotImplementedError(f'{self}')
 
     def _gw_conv_channel_forward(self, channel_tensors: List[ChannelTensor]):
 
@@ -257,11 +279,11 @@ class ConvNode(MixChannelNode):
         group_union(self.out_channel_tensor, conv.groups)
 
     @property
-    def in_channels(self) -> int:
+    def _in_channels(self) -> int:
         return self.val.in_channels
 
     @property
-    def out_channels(self) -> int:
+    def _out_channels(self) -> int:
         return self.val.out_channels
 
     def __repr__(self) -> str:
@@ -274,17 +296,16 @@ class LinearNode(MixChannelNode):
     def __init__(self,
                  name: str,
                  val: Union[nn.Module, str],
-                 expand_ratio: int = 1,
                  module_name='') -> None:
-        super().__init__(name, val, expand_ratio, module_name)
+        super().__init__(name, val, module_name)
         assert isinstance(self.val, nn.Linear)
 
     @property
-    def in_channels(self) -> int:
+    def _in_channels(self) -> int:
         return self.val.in_features
 
     @property
-    def out_channels(self) -> int:
+    def _out_channels(self) -> int:
         return self.val.out_features
 
     def __repr__(self) -> str:
@@ -297,17 +318,16 @@ class NormNode(PassChannelNode):
     def __init__(self,
                  name: str,
                  val: Union[nn.Module, str],
-                 expand_ratio: int = 1,
                  module_name='') -> None:
-        super().__init__(name, val, expand_ratio, module_name)
+        super().__init__(name, val, module_name)
         assert isinstance(self.val, nn.BatchNorm2d)
 
     @property
-    def in_channels(self) -> int:
+    def _in_channels(self) -> int:
         return self.val.num_features
 
     @property
-    def out_channels(self) -> int:
+    def _out_channels(self) -> int:
         return self.val.num_features
 
     def __repr__(self) -> str:
@@ -337,8 +357,6 @@ def default_channel_node_converter(node: ModuleNode) -> ChannelNode:
         operator.add: BindChannelNode
     }
     name_mapping = {
-        'bind_placeholder': BindChannelNode,
-        'pass_placeholder': PassChannelNode,
         'cat_placeholder': CatChannelNode,
     }
     if isinstance(node.val, nn.Module):

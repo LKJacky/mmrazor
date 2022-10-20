@@ -10,7 +10,7 @@ from mmrazor.structures.graph import ModuleGraph
 from mmrazor.structures.graph.channel_graph import ChannelGraph
 from mmrazor.structures.graph.channel_nodes import \
     default_channel_node_converter
-from ...data.models import LineModel
+from ...data.models import SingleLineModel
 from ...data.tracer_passed_models import BackwardPassedModelManager
 
 NodeMap = {}
@@ -30,7 +30,7 @@ class ImageClassifierPseudoLossWithSixChannel:
 class TestChannelGraph(unittest.TestCase):
 
     def test_init(self):
-        model = LineModel()
+        model = SingleLineModel()
         module_graph = ModuleGraph.init_from_backward_tracer(model)
 
         _ = ChannelGraph.copy_from(module_graph,
@@ -57,7 +57,7 @@ class TestChannelGraph(unittest.TestCase):
             def __init__(self) -> None:
                 super().__init__()
                 self.conv1 = nn.Conv2d(6, 3, 3, 1, 1)
-                self.net = LineModel()
+                self.net = SingleLineModel()
 
             def forward(self, x):
                 return self.net(self.conv1(x))

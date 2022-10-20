@@ -38,7 +38,7 @@ class FxPassedModelManager(PassedModelManager):
     @classmethod
     def default_library(cls):
         library = DefaultModelLibrary(include=[
-            'LineModel',
+            'SingleLineModel',
             'ResBlock',
             'AddCatModel',
             'ConcatModel',
@@ -49,7 +49,7 @@ class FxPassedModelManager(PassedModelManager):
             'MultipleUseModel',
             'Icep',
             'ExpandLineModel',
-            # 'MultiBindModel',
+            'MultiBindModel',
             'DwConvModel',
             'ConvAttnModel',
         ])

@@ -10,7 +10,7 @@ from mmrazor.registry import MODELS
 import torch
 import torch.nn as nn
 from .models import (AddCatModel, ConcatModel, ConvAttnModel, DwConvModel,
-                     ExpandLineModel, GroupWiseConvModel, LineModel,
+                     ExpandLineModel, GroupWiseConvModel, SingleLineModel,
                      MultiBindModel, MultiConcatModel, MultiConcatModel2,
                      ResBlock, Xmodel, MultipleUseModel, Icep)
 import json
@@ -116,7 +116,7 @@ class ModelLibrary:
 class DefaultModelLibrary(ModelLibrary):
 
     default_includes: List = [
-        'LineModel',
+        'SingleLineModel',
         'ResBlock',
         'AddCatModel',
         'ConcatModel',
@@ -134,7 +134,7 @@ class DefaultModelLibrary(ModelLibrary):
 
     def get_models(self):
         models = [
-            LineModel,
+            SingleLineModel,
             ResBlock,
             AddCatModel,
             ConcatModel,
@@ -152,7 +152,7 @@ class DefaultModelLibrary(ModelLibrary):
         model_dict = {}
         for model in models:
             model_dict[model.__name__] = ModelGenerator(
-                'default' + model.__name__, model)
+                'default.' + model.__name__, model)
         return model_dict
 
 

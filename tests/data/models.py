@@ -211,7 +211,7 @@ class ResBlock(Module):
         return output
 
 
-class LineModel(BaseModel):
+class SingleLineModel(BaseModel):
     """
         x
         |net0,net1
@@ -594,17 +594,3 @@ class DynamicLinearModel(nn.Module):
             self.linear, mutable2, False)
 
 
-default_models = [
-    LineModel,
-    ResBlock,
-    AddCatModel,
-    ConcatModel,
-    MultiConcatModel,
-    MultiConcatModel2,
-    GroupWiseConvModel,
-    Xmodel,
-    MultipleUseModel,
-    Icep,
-    ExpandLineModel,
-    DwConvModel,
-]

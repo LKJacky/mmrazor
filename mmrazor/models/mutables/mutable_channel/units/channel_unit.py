@@ -177,6 +177,7 @@ class ChannelUnit(BaseModule):
 
         unit_graph = ChannelGraph.copy_from(graph,
                                             default_channel_node_converter)
+        unit_graph.check()
         unit_graph.forward(num_input_channel)
         units_config = unit_graph.generate_units_config()
         units = [

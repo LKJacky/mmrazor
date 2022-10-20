@@ -37,7 +37,6 @@ class ModuleNode(BaseNode):
     def __init__(self,
                  name: str,
                  val: Union[Module, str],
-                 expand_ratio: int = 1,
                  module_name='') -> None:
         """
         Args:
@@ -45,8 +44,6 @@ class ModuleNode(BaseNode):
             val (Module | str): content of the node. It can be Module or
             string. If val is a string, the string can only be one of
                 self.pre_defined_node_val_str
-            expand_ratio (int): expand_ratio is used in bind node,
-                where the out_channel is always a multiple of the in_channel.
         Note:
             Here, we give an example of expand_ratio.
             >>> class Pool(nn.Module):
@@ -56,86 +53,20 @@ class ModuleNode(BaseNode):
             >>> assert node.out_channels == node.in_channels*4
         """
 
-        assert (isinstance(val, Module)
-                or val in self.__class__.pre_defined_node_val_str
-                ), f'{val} node is not allowed'
-        if expand_ratio != 1:
-            assert val == 'pass_placeholder', \
-                'expand != 1 is only valid when val=="pass"'
+        # assert (isinstance(val, Module)
+        #         or val in self.__class__.pre_defined_node_val_str
+        #         ), f'{val} node is not allowed'
         super().__init__(name, val)
-        self.expand_ratio = expand_ratio
         self.module_name = module_name
-
-    # channel
-
-    @property
-    def in_channels(self) -> int:
-        """int: the in_channels of the node."""
-        if isinstance(self.val, nn.Module):
-            MAPPING = {
-                nn.Conv2d: 'in_channels',
-                nn.modules.batchnorm._BatchNorm: 'num_features',
-                nn.modules.Linear: 'in_features',
-            }
-            for basetype in MAPPING:
-                if isinstance(self.val, basetype):
-                    return getattr(self.val, MAPPING[basetype])
-            raise NotImplementedError(f'unsupported module: {self.val}')
-        elif self.is_bind_node() or self.is_pass_node():
-            if len(self.prev_nodes) > 0:
-                return self.prev_nodes[0].out_channels
-            else:
-                from mmengine import MMLogger
-                MMLogger.get_current_instance().info(
-                    (f'{self.name} in module_graph has no prev nodes,'
-                     ' so the input channel are sopposed to be 3.'))
-                return 3
-        elif self.is_cat_node():
-            return sum([
-                node.out_channels if node.out_channels is not None else 0
-                for node in self.prev_nodes
-            ])
-        else:
-            raise NotImplementedError(
-                f'unsupported node type: {self.basic_type}')
-
-    @property
-    def out_channels(self) -> int:
-        """int: the out_channels of the node."""
-        if isinstance(self.val, nn.Module):
-            MAPPING = {
-                nn.Conv2d: 'out_channels',
-                nn.modules.batchnorm._BatchNorm: 'num_features',
-                nn.modules.Linear: 'out_features',
-            }
-            for basetype in MAPPING:
-                if isinstance(self.val, basetype):
-                    return getattr(self.val, MAPPING[basetype])
-            raise NotImplementedError(f'unsupported module: {self.val}')
-        elif self.is_bind_node():
-            if len(self.prev_nodes) > 0:
-                return self.prev_nodes[0].out_channels
-            else:
-                from mmengine import MMLogger
-                MMLogger.get_current_instance().info(
-                    (f'{self.name} in module_graph has no prev nodes,'
-                     ' so the input channel are sopposed to be 3.'))
-                return 3
-        elif self.is_pass_node():
-            return self.in_channels * self.expand_ratio
-        elif self.is_cat_node():
-            return sum([
-                node.out_channels if node.out_channels is not None else 0
-                for node in self.prev_nodes
-            ])
-        else:
-            raise NotImplementedError(
-                f'unsupported node type: {self.basic_type}')
 
     # other
 
+    @property
+    def is_module(self):
+        return isinstance(self.val, nn.Module)
+
     def __repr__(self) -> str:
-        return f'{self.name}_({self.in_channels},{self.out_channels})'
+        return f'{self.name}({self.module_name})'
 
     # node type
 
@@ -188,32 +119,6 @@ class ModuleNode(BaseNode):
         generete new output channels, such as conv and linear."""
         return self.basic_type in ['conv2d', 'linear', 'gwconv2d']
 
-    # check
-
-    def check_channel(self):
-        """Check if the channels of the node is matchable with previous nodes
-        and next nodes."""
-        if self.is_cat_node():
-            pass
-        else:
-            for pre in self.prev_nodes:
-                assert pre.out_channels == self.in_channels, \
-                    f'{self} has channel error'
-
-    def check_type(self):
-        """Check if the node has right number of previous nodes according to
-        their type."""
-        if self.is_pass_node():
-            assert len(self.prev_nodes) <= 1, f'{self.name} pass node error'
-        elif self.is_cat_node():
-            pass
-        elif self.is_bind_node():
-            assert len(self.prev_nodes) > 1, f'{self.name} bind node error'
-        elif self.is_mix_node():
-            assert len(self.prev_nodes) <= 1, f'{self.name} mix node error'
-        else:
-            raise NotImplementedError(f'{self}')
-
 
 MODULENODE = TypeVar('MODULENODE', bound=ModuleNode)
 
@@ -264,34 +169,6 @@ class ModuleGraph(BaseGraph[MODULENODE]):
         the relation among modules."""
         pass
 
-    # check
-
-    def check(self):
-        """Check if the graph is valid."""
-        for node in self:
-            node.check_channel()
-            node.check_type()
-
-    # static method for models that can't use tracer
-
-    @staticmethod
-    def connect_module(pre: Module, next: Module):
-        """This function is used to write hardcode in modules to generate Graph
-        object using init_from_model."""
-        if hasattr(pre, '_next'):
-            _next = getattr(pre, '_next')
-            assert isinstance(_next, List)
-        else:
-            pre._next = set()
-        pre._next.add(next)
-
-        if hasattr(next, '_pre'):
-            _pre = getattr(next, '_pre')
-            assert isinstance(_pre, List)
-        else:
-            next._pre = set()
-        next._pre.add(pre)
-
     # others
     def refresh_module_name(self):
         module2name = {}
@@ -335,7 +212,7 @@ class GraphConverter:
             self.bind_placeholder_num += 1
         else:
             pass
-        node = ModuleNode(f'{type}_{num}', type, expand_ratio=expand_ratio)
+        node = ModuleNode(f'{type}_{num}', type)
         self.graph.add_or_find_node(node)
         return node
 
@@ -417,7 +294,6 @@ class GraphConverter:
         """Some post process after init a basic module graph."""
         # self._remove_redundant_pass_nodes()
         self._insert_bind_nodes()
-        self._insert_pass_nodes()
         self._topo_rename()
 
 
@@ -437,7 +313,8 @@ class PathToGraphConverter(GraphConverter):
         self.name2module = dict(model.named_modules())
         self._parse(self.path_list)
 
-        self._post_process()
+        self._insert_bind_nodes()
+        self._topo_rename()
 
     def _parse(self, path_list: PathList):
         """Parse path list."""
@@ -532,8 +409,6 @@ class FxTracerToGraphConverter(GraphConverter):
         self.base_graph = base_graph
         self._convert_graph()
 
-        self._post_process()
-
     def _node_converter(self, node: FxBaseNode):
         """Convert a fxnode to a module-node."""
         if node.is_function():
@@ -544,14 +419,14 @@ class FxTracerToGraphConverter(GraphConverter):
             else:
                 val = 'pass_placeholder'
         elif node.is_Tensor():
-            raise Exception('error type')
+            val = 'pass_placeholder'
         elif node.is_method():
             if len(node.prev_nodes) > 1:
                 val = 'bind_placeholder'
             else:
                 val = 'pass_placeholder'
         elif node.is_get_attr():
-            raise Exception('error type')
+            val = 'pass_placeholder'
         elif node.is_module():
             val = node.module()
         else:
@@ -570,12 +445,12 @@ class FxTracerToGraphConverter(GraphConverter):
             elif node.is_Tensor():
                 base_graph.delete_node(node)
             elif node.is_method():
-                base_graph.delete_node(node)
+                pass
             elif node.is_get_attr():
-                base_graph.delete_node(node)
+                pass
             elif node.is_module():
                 if len(list(node.module().parameters())) == 0:
-                    base_graph.delete_node(node)
+                    pass
                 else:
                     pass
             else:

@@ -14,7 +14,7 @@ from mmrazor.models.mutables.mutable_channel.units.channel_unit import \
 from mmrazor.models.mutators.channel_mutator.channel_mutator import \
     is_dynamic_op_for_fx_tracer
 from mmrazor.structures.graph import ModuleGraph as ModuleGraph
-from .....data.models import LineModel
+from .....data.models import SingleLineModel
 from .....data.tracer_passed_models import (BackwardPassedModelManager,
                                             FxPassedModelManager)
 from .....utils import SetTorchThread
@@ -84,14 +84,14 @@ def _test_a_model_from_backward_tracer(Model):
 class TestMutableChannelUnit(TestCase):
 
     def test_init_from_graph(self):
-        model = LineModel()
+        model = SingleLineModel()
         # init using tracer
         graph = ModuleGraph.init_from_backward_tracer(model)
         units = DefaultChannelUnit.init_from_graph(graph)
         _test_units(units, model)
 
     def test_init_from_cfg(self):
-        model = LineModel()
+        model = SingleLineModel()
         # init using tracer
 
         config = {
@@ -131,7 +131,7 @@ class TestMutableChannelUnit(TestCase):
         _test_units(units, model)
 
     def test_init_from_channel_unit(self):
-        model = LineModel()
+        model = SingleLineModel()
         # init using tracer
         graph = ModuleGraph.init_from_backward_tracer(model)
         units: List[ChannelUnit] = ChannelUnit.init_from_graph(graph)

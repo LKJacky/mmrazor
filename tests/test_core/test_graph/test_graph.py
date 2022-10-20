@@ -32,7 +32,6 @@ class ToyCNNPseudoLoss:
 
 def valid_graph(graph: ModuleGraph):
     try:
-        graph.check()
         return True, ''
     except Exception as e:
         return False, f'{e},{graph}'

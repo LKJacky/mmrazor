@@ -31,6 +31,10 @@ except Exception:
     POOL_SIZE = mp.cpu_count()
 DEBUG = os.getenv('DEBUG') == 'true'
 
+print(f'FULL_TEST: {FULL_TEST}')
+print(f'POOL_SIZE: {POOL_SIZE}')
+print(f'DEBUG: {DEBUG}')
+
 
 class TimeoutException(Exception):
     pass
@@ -137,7 +141,7 @@ def _test_a_model(Model, tracer_type='fx'):
         start = time.time()
         with time_limit(20, 'tracer2graph'):
             # trace a model and get graph
-            graph = _test_tracer_2_graph(model, tracer_type)
+            graph: ModuleGraph = _test_tracer_2_graph(model, tracer_type)
         with time_limit(60, 'graph2units'):
             # graph 2 unit
             units = _test_graph2units(graph)

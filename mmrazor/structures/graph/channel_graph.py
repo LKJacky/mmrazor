@@ -6,7 +6,8 @@ from torch.nn import Module
 
 from .base_graph import BaseGraph
 from .channel_flow import ChannelTensor
-from .channel_nodes import ChannelNode, default_channel_node_converter
+from .channel_nodes import (ChannelNode, ExpandChannelNode,
+                            default_channel_node_converter)
 from .module_graph import ModuleGraph
 
 
@@ -23,7 +24,9 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
                   node_converter: Callable = default_channel_node_converter):
         """Copy from a ModuleGraph."""
         assert isinstance(graph, ModuleGraph)
-        return super().copy_from(graph, node_converter)
+        channel_graph: ChannelGraph = super().copy_from(graph, node_converter)
+        channel_graph._insert_expand_node()
+        return channel_graph
 
     def generate_units_config(self) -> Dict:
         """Collect channel units in the graph.
@@ -66,7 +69,7 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
             assert tensor is not None
             for (start, end), hash in tensor.elems_hash_dict.items():
                 channel_config = {
-                    'name': node.module_name,
+                    'name': node.module_name if node.is_module else node.name,
                     'start': start,
                     'end': end,
                     'is_output_channel': is_output_tensor
@@ -115,6 +118,10 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
                 node.forward()
         self._merge_same_module()
 
+    def check(self):
+        for node in self.topo_traverse():
+            node.check_channel()
+
     def _merge_same_module(self):
         """Union all nodes with the same module to the same unit."""
         module2node: Dict[Module, List[ChannelNode]] = dict()
@@ -133,3 +140,31 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
                 for node in nodes[1:]:
                     nodes[0].in_channel_tensor.union(node.in_channel_tensor)
                     nodes[0].out_channel_tensor.union(node.out_channel_tensor)
+
+    def _insert_expand_node(self):
+        num_expand_nodes = 0
+        nodes: List[ChannelNode] = copy.copy(list(self.topo_traverse()))
+        for node in nodes:
+            try:
+                node.check_channel()
+            except AssertionError:
+                for pre_node in node.prev_nodes:
+                    pre_node: ChannelNode
+                    if (pre_node.out_channels < node.in_channels
+                            and node.in_channels % pre_node.out_channels == 0):
+                        from mmengine import MMLogger
+                        MMLogger.get_current_instance().warning(
+                            f'As the channels of {pre_node} and {node} '
+                            'dismatch, we add an ExpandNode between them.')
+                        expand_ratio = (
+                            node.in_channels // pre_node.out_channels)
+                        # insert a expand node
+                        new_node = ExpandChannelNode(
+                            f'expand_{num_expand_nodes}',
+                            'expand',
+                            expand_ratio=expand_ratio)
+                        num_expand_nodes += 1
+                        self.add_node(new_node)
+                        self.connect(pre_node, new_node)
+                        self.connect(new_node, node)
+                        self.disconnect(pre_node, node)
