@@ -170,7 +170,7 @@ class BindChannelNode(ChannelNode):
 
     def channel_forward(self, channel_tensors: List[ChannelTensor]):
         """Channel forward."""
-        assert len(channel_tensors) > 1
+        assert len(channel_tensors) > 0, f'{self}'
         #  align channel_tensors
         for tensor in channel_tensors[1:]:
             channel_tensors[0].union(tensor)
