@@ -4,9 +4,12 @@ import torch
 
 class SetTorchThread:
 
-    def __init__(self, num_thread: int = 1) -> None:
+    def __init__(self, num_thread: int = -1) -> None:
         self.prev_num_threads = torch.get_num_threads()
-        self.num_threads = num_thread
+        if num_thread == -1:
+            self.num_threads = self.prev_num_threads
+        else:
+            self.num_threads = num_thread
 
     def __enter__(self):
         torch.set_num_threads(self.num_threads)

@@ -15,6 +15,7 @@ from mmrazor.models.mutables.mutable_channel.units import \
     SequentialMutableChannelUnit
 from mmrazor.models.mutators.channel_mutator.channel_mutator import \
     is_dynamic_op_for_fx_tracer
+from mmrazor.models.task_modules.tracer.backward_tracer import BackwardTracer
 from mmrazor.structures.graph import ModuleGraph
 from ...data.tracer_passed_models import (BackwardPassedModelManager,
                                           FxPassedModelManager,
@@ -29,6 +30,7 @@ try:
     POOL_SIZE = int(os.getenv('POOL_SIZE'))
 except Exception:
     POOL_SIZE = mp.cpu_count()
+
 DEBUG = os.getenv('DEBUG') == 'true'
 
 print(f'FULL_TEST: {FULL_TEST}')
@@ -77,6 +79,27 @@ def is_dynamic_op_fx(module, name):
     return isinstance(module, DynamicChannelMixin)
 
 
+class SumLoss:
+
+    def __call__(self, model):
+        img = torch.zeros([2, 3, 224, 224])
+        y = model(img)
+        return self.get_loss(y)
+
+    def get_loss(self, output):
+        if isinstance(output, torch.Tensor):
+            return output.sum()
+        elif isinstance(output, list) or isinstance(output, tuple):
+            loss = 0
+            for out in output:
+                loss += self.get_loss(out)
+            return loss
+        elif isinstance(output, dict):
+            return self.get_loss(list(output.values()))
+        else:
+            raise NotImplementedError()
+
+
 class ToyCNNPseudoLoss:
 
     def __call__(self, model):
@@ -98,7 +121,8 @@ def _test_tracer_2_graph(model, tracer_type='fx'):
 
     def _test_backward_tracer_2_graph(model):
         model.eval()
-        graph = ModuleGraph.init_from_backward_tracer(model)
+        graph = ModuleGraph.init_from_backward_tracer(
+            model, backward_tracer=BackwardTracer(SumLoss()))
         return graph
 
     if tracer_type == 'fx':
