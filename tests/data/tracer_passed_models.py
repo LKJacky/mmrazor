@@ -130,8 +130,10 @@ class FxPassedModelManager(PassedModelManager):
     @classmethod
     def mmdet_library(cls):
         mmdet_include = [
-            'yolov3',
-            'yolox',
+            'retinanet',
+            'faster-rcnn',
+            'mask-rcnn',
+            'fcos',
             # '_base',
             # 'gfl',
             # 'sparse',

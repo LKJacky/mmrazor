@@ -158,11 +158,13 @@ def _test_units(units: List[SequentialMutableChannelUnit], model):
 
 
 def _test_a_model(Model, tracer_type='fx'):
-    model = Model()
-    model.eval()
-    print(f'test {Model} using {tracer_type} tracer.')
+    start = time.time()
+
     try:
-        start = time.time()
+        model = Model()
+        model.eval()
+        print(f'test {Model} using {tracer_type} tracer.')
+
         with time_limit(20, 'tracer2graph'):
             # trace a model and get graph
             graph: ModuleGraph = _test_tracer_2_graph(model, tracer_type)
@@ -207,6 +209,9 @@ class TestTraceModel(TestCase):
 
         passd_test = [res for res in result if res[1] is True]
         unpassd_test = [res for res in result if res[1] is False]
+
+        print(f'{len(passd_test)},{len(unpassd_test)},'
+              f'{len(model_manager.uninclude_models(full_test=FULL_TEST))}')
 
         print('Passed:')
         for model, passed, msg, used_time, len_mutable in passd_test:

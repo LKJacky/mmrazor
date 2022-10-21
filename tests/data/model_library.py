@@ -239,6 +239,17 @@ class MMModelLibrary(ModelLibrary):
 
     def _config_process(self, config: Dict):
         config['_scope_'] = self.repo
+        config = self._remove_certain_key(config, 'init_cfg')
+        config = self._remove_certain_key(config, 'pretrained')
+        config = self._remove_certain_key(config, 'Pretrained')
+        return config
+
+    def _remove_certain_key(self, config: Dict, key: str = 'init_cfg'):
+        if isinstance(config, dict):
+            if key in config:
+                config.pop(key)
+            for keyx in config:
+                config[keyx] = self._remove_certain_key(config[keyx], key)
         return config
 
 
@@ -384,7 +395,9 @@ class MMDetModelLibrary(MMModelLibrary):
         'yolox',
     ]
 
-    def __init__(self, include=default_includes, exclude=[]) -> None:
+    def __init__(self,
+                 include=default_includes,
+                 exclude=['lad', 'ld']) -> None:
         super().__init__(
             repo='mmdet',
             model_config_path='/',
@@ -395,8 +408,6 @@ class MMDetModelLibrary(MMModelLibrary):
         config = super()._config_process(config)
         if 'preprocess_cfg' in config:
             config.pop('preprocess_cfg')
-        if 'pretrained' in config:
-            config.pop('pretrained')
         return config
 
 
