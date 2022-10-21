@@ -98,7 +98,7 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
                         units_config[name]['channels']['output_related'])
 
         unit_hash_dict: Dict = {}
-
+        self._reset_channel_elem_cache()
         for node in self.topo_traverse():
             process_tensor(node, True, unit_hash_dict)
             process_tensor(node, False, unit_hash_dict)
@@ -169,3 +169,11 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
                         self.connect(pre_node, new_node)
                         self.connect(new_node, node)
                         self.disconnect(pre_node, node)
+
+    def _reset_channel_elem_cache(self):
+        # may has bug, as some tensor not recorded by node.xxxx_tensors
+        for node in self.topo_traverse():
+            assert node.in_channel_tensor is not None and \
+                node.out_channel_tensor is not None
+            node.in_channel_tensor._reset_channel_elem_cache()
+            node.out_channel_tensor._reset_channel_elem_cache()

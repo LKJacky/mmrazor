@@ -13,6 +13,8 @@ class ChannelElem:
         self._subs: Set[ChannelElem] = set()
         self.owing_tensor = owning_tensor
         self.index_in_tensoor = index_in_tensor
+        self._hash_cache = None
+        self._min_elem_set_index_cache = None
 
     # channel elem operations
 
@@ -31,20 +33,37 @@ class ChannelElem:
         root = self.root
         return root.subs
 
+    def reset_cache(self):
+        self._hash_cache = None
+        self._min_elem_set_index_cache = None
+
     @property
     def elem_set_hash(self):
-        tensor_list = list(self.owing_elem_set)
-        tensor_set = set([elem.owing_tensor for elem in tensor_list])
-        frozen_set = frozenset(tensor_set)
-        return frozen_set.__hash__()
+        if self._hash_cache is not None:
+            return self._hash_cache
+        else:
+            tensor_list = list(self.owing_elem_set)
+            tensor_set = set([elem.owing_tensor for elem in tensor_list])
+            frozen_set = frozenset(tensor_set)
+            hash = frozen_set.__hash__()
+            for elem in self.owing_elem_set:
+                assert elem._hash_cache is None
+                elem._hash_cache = hash
+            return hash
 
     @property
     def min_elem_set_index(self):
-        elem_set = self.owing_elem_set
-        min_index = int(pow(2, 32))
-        for elem in elem_set:
-            min_index = min(min_index, elem.index_in_tensoor)
-        return min_index
+        if self._min_elem_set_index_cache is not None:
+            return self._min_elem_set_index_cache
+        else:
+            elem_set = self.owing_elem_set
+            min_index = int(pow(2, 32))
+            for elem in elem_set:
+                min_index = min(min_index, elem.index_in_tensoor)
+            for elem in elem_set:
+                assert elem._min_elem_set_index_cache is None
+                elem._min_elem_set_index_cache = min_index
+            return min_index
 
     # work as a disjoint set
 
@@ -145,3 +164,7 @@ class ChannelTensor:
 
     def __add__(self, tensor: 'ChannelTensor'):
         return ChannelTensor.cat([self, tensor])
+
+    def _reset_channel_elem_cache(self):
+        for elem in self.elems:
+            elem.reset_cache()
