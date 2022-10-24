@@ -1,6 +1,8 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import unittest
 
+import torch
+
 from .data.model_library import (DefaultModelLibrary, MMClsModelLibrary,
                                  MMDetModelLibrary, MMSegModelLibrary,
                                  TorchModelLibrary)
@@ -24,7 +26,6 @@ class TestModelLibrary(unittest.TestCase):
 
     def test_mmdet(self):
         library = MMDetModelLibrary()
-        print(library.short_names())
         self.assertTrue(library.is_default_includes_cover_all_models())
 
     def test_mmseg(self):
@@ -37,3 +38,18 @@ class TestModelLibrary(unittest.TestCase):
             print(BackwardPassedModelManager.include_models(True))
         except Exception:
             self.fail()
+
+
+class TestModels(unittest.TestCase):
+
+    def _test_a_model(self, Model):
+        model = Model()
+        x = torch.rand(2, 3, 224, 224)
+        y = model(x)
+        self.assertSequenceEqual(y.shape, [2, 1000])
+
+    def test_models(self):
+        library = DefaultModelLibrary()
+        for Model in library.include_models():
+            with self.subTest(model=Model):
+                self._test_a_model(Model)

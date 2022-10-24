@@ -1,6 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 # this file includes models for tesing.
 import copy
+import math
 from typing import List
 from typing import Dict, Callable
 from mmrazor.registry import MODELS
@@ -497,6 +498,48 @@ class DwConvModel(nn.Module):
         return self.head(self.net(x))
 
 
+class SelfAttention(nn.Module):
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.stem = nn.Conv2d(3, 32, 4, 4, 4)
+
+        self.num_head = 4
+        self.qkv = nn.Linear(32, 32 * 3)
+        self.proj = nn.Linear(32, 32)
+
+        self.head = LinearHead(32, 1000)
+
+    def forward(self, x: torch.Tensor):
+        x = self.stem(x)
+        h, w = x.shape[-2:]
+        x = self._to_token(x)
+        x = x + self._forward_attention(x)
+        x = self._to_img(x, h, w)
+        return self.head(x)
+
+    def _to_img(self, x, h, w):
+        x = x.reshape([x.shape[0], h, w, x.shape[2]])
+        x = x.permute(0, 3, 1, 2)
+        return x
+
+    def _to_token(self, x):
+        x = x.flatten(2).transpose(-1, -2)
+        return x
+
+    def _forward_attention(self, x: torch.Tensor):
+        qkv = self.qkv(x)
+        qkv = qkv.reshape([
+            x.shape[0], x.shape[1], 3, self.num_head,
+            x.shape[2] // self.num_head
+        ]).permute(2, 0, 3, 1, 4).contiguous()
+        q, k, v = qkv
+        attn = q @ k.transpose(-1, -2) / math.sqrt(32 // self.num_head)
+        y = attn @ v  # B H N h
+        y = y.permute(0, 2, 1, 3).flatten(-2)
+        return self.proj(y)
+
+
 # models with dynamicop
 
 
@@ -592,5 +635,3 @@ class DynamicLinearModel(nn.Module):
             self.net[4], mutable2, True)
         MutableChannelContainer.register_mutable_channel_to_module(
             self.linear, mutable2, False)
-
-

@@ -12,7 +12,7 @@ import torch.nn as nn
 from .models import (AddCatModel, ConcatModel, ConvAttnModel, DwConvModel,
                      ExpandLineModel, GroupWiseConvModel, SingleLineModel,
                      MultiBindModel, MultiConcatModel, MultiConcatModel2,
-                     ResBlock, Xmodel, MultipleUseModel, Icep)
+                     ResBlock, Xmodel, MultipleUseModel, Icep, SelfAttention)
 import json
 # model generator
 
@@ -130,7 +130,10 @@ class DefaultModelLibrary(ModelLibrary):
         'MultiBindModel',
         'DwConvModel',
         'ConvAttnModel',
+        'SelfAttention',
     ]
+    def __init__(self, include=default_includes, exclude=[]) -> None:
+        super().__init__(include, exclude)
 
     def get_models(self):
         models = [
@@ -148,6 +151,7 @@ class DefaultModelLibrary(ModelLibrary):
             MultiBindModel,
             DwConvModel,  #
             ConvAttnModel,
+            SelfAttention,
         ]
         model_dict = {}
         for model in models:
