@@ -50,15 +50,23 @@ class MMModelGenerator:
 
 class ModelLibrary:
     default_includes: List = []
+    _models = None
 
     def __init__(self, include=default_includes, exclude=[]) -> None:
         self.include_key = include
         self.exclude_key = exclude
-        self.models: Dict[str, Callable] = self.get_models()
         self._include_models, self._uninclude_models, self.exclude_models =\
              self._classify_models(self.models)
 
-    def get_models(self):
+    @property
+    def models(self):
+        if self.__class__._models is None:
+            self.__class__._models: Dict[
+                str, Callable] = self.__class__.get_models()
+        return self.__class__._models
+
+    @classmethod
+    def get_models(cls):
         raise NotImplementedError()
 
     def include_models(self):
@@ -78,7 +86,7 @@ class ModelLibrary:
         return False
 
     def is_default_includes_cover_all_models(self):
-        models = copy.copy(self.models)
+        models = copy.copy(self._models)
         is_covered = True
         for name in models:
             if self.is_include(name, self.__class__.default_includes):
@@ -95,7 +103,7 @@ class ModelLibrary:
             return names[0]
 
         short_names = set()
-        for name in self.models:
+        for name in self._models:
             short_names.add(get_short_name(name))
         return short_names
 
@@ -132,10 +140,12 @@ class DefaultModelLibrary(ModelLibrary):
         'ConvAttnModel',
         'SelfAttention',
     ]
+
     def __init__(self, include=default_includes, exclude=[]) -> None:
         super().__init__(include, exclude)
 
-    def get_models(self):
+    @classmethod
+    def get_models(cls):
         models = [
             SingleLineModel,
             ResBlock,
@@ -171,7 +181,8 @@ class TorchModelLibrary(ModelLibrary):
     def __init__(self, include=default_includes, exclude=[]) -> None:
         super().__init__(include, exclude)
 
-    def get_models(self):
+    @classmethod
+    def get_models(cls):
         from inspect import isfunction
 
         import torchvision
@@ -187,20 +198,23 @@ class TorchModelLibrary(ModelLibrary):
 
 class MMModelLibrary(ModelLibrary):
     default_includes = []
+    base_config_path = '/'
+    repo = 'mmxx'
 
-    def __init__(self,
-                 repo='mmcls',
-                 model_config_path='/',
-                 include=default_includes,
-                 exclude=[]) -> None:
-        self.config_path = self._get_model_config_path(repo, model_config_path)
-        self.repo = repo
+    def __init__(self, include=default_includes, exclude=[]) -> None:
         super().__init__(include, exclude)
 
-    def get_models(self):
+    @classmethod
+    def config_path(cls):
+        repo_path = get_installed_path(cls.repo)
+        path = repo_path + '/.mim/configs/' + cls.base_config_path
+        return path
+
+    @classmethod
+    def get_models(cls):
         models = {}
         added_models = set()
-        for dirpath, dirnames, filenames in os.walk(self.config_path):
+        for dirpath, dirnames, filenames in os.walk(cls.config_path()):
             for filename in filenames:
                 if filename.endswith('.py'):
 
@@ -210,54 +224,39 @@ class MMModelLibrary(ModelLibrary):
 
                         # get model_name
                         model_type_name = '_'.join(
-                            dirpath.replace(self.config_path, '').split('/'))
+                            dirpath.replace(cls.config_path(), '').split('/'))
                         model_type_name = model_type_name if model_type_name == '' else model_type_name + '_'
                         model_name = model_type_name + \
                             os.path.basename(filename).split('.')[0]
 
                         model_cfg = config['model']
-                        model_cfg = self._config_process(model_cfg)
+                        model_cfg = cls._config_process(model_cfg)
                         if json.dumps(model_cfg) not in added_models:
                             models[model_name] = MMModelGenerator(
-                                self.repo + '.' + model_name, model_cfg)
+                                cls.repo + '.' + model_name, model_cfg)
                             added_models.add(json.dumps(model_cfg))
         return models
 
-    def get_default_model_names(self):
-
-        def get_base_model_name(name: str):
-            names = name.split('_')
-            return names[0]
-
-        names = []
-        for name in self.models:
-            base_name = get_base_model_name(name)
-            if base_name not in names:
-                names.append(base_name)
-
-        return names
-
-    def _get_model_config_path(self, repo, config_path):
-        repo_path = get_installed_path(repo)
-        return repo_path + '/.mim/configs/' + config_path
-
-    def _config_process(self, config: Dict):
-        config['_scope_'] = self.repo
-        config = self._remove_certain_key(config, 'init_cfg')
-        config = self._remove_certain_key(config, 'pretrained')
-        config = self._remove_certain_key(config, 'Pretrained')
+    @classmethod
+    def _config_process(cls, config: Dict):
+        config['_scope_'] = cls.repo
+        config = cls._remove_certain_key(config, 'init_cfg')
+        config = cls._remove_certain_key(config, 'pretrained')
+        config = cls._remove_certain_key(config, 'Pretrained')
         return config
 
-    def _remove_certain_key(self, config: Dict, key: str = 'init_cfg'):
+    @classmethod
+    def _remove_certain_key(cls, config: Dict, key: str = 'init_cfg'):
         if isinstance(config, dict):
             if key in config:
                 config.pop(key)
             for keyx in config:
-                config[keyx] = self._remove_certain_key(config[keyx], key)
+                config[keyx] = cls._remove_certain_key(config[keyx], key)
         return config
 
 
 class MMClsModelLibrary(MMModelLibrary):
+
     default_includes = [
         'vgg',
         'efficientnet',
@@ -294,15 +293,13 @@ class MMClsModelLibrary(MMModelLibrary):
         'seresnext',
         'seresnext',
     ]
+    base_config_path = '_base_/models/'
+    repo = 'mmcls'
 
     def __init__(self,
                  include=default_includes,
                  exclude=['cutmix', 'cifar', 'gem']) -> None:
-        super().__init__(
-            repo='mmcls',
-            model_config_path='_base_/models/',
-            include=include,
-            exclude=exclude)
+        super().__init__(include=include, exclude=exclude)
 
 
 class MMDetModelLibrary(MMModelLibrary):
@@ -398,17 +395,16 @@ class MMDetModelLibrary(MMModelLibrary):
         'dynamic',
         'yolox',
     ]
+    base_config_path = '/'
+    repo = 'mmdet'
 
     def __init__(self,
                  include=default_includes,
                  exclude=['lad', 'ld']) -> None:
-        super().__init__(
-            repo='mmdet',
-            model_config_path='/',
-            include=include,
-            exclude=exclude)
+        super().__init__(include=include, exclude=exclude)
 
-    def _config_process(self, config: Dict):
+    @classmethod
+    def _config_process(cls, config: Dict):
         config = super()._config_process(config)
         if 'preprocess_cfg' in config:
             config.pop('preprocess_cfg')
@@ -452,11 +448,14 @@ class MMSegModelLibrary(MMModelLibrary):
         'deeplabv3plus',
         'bisenetv1',
     ]
+    base_config_path = '_base_/models/'
+    repo = 'mmsegmentation'
 
     def __init__(self, include=default_includes, exclude=[]) -> None:
-        super().__init__('mmsegmentation', '_base_/models/', include, exclude)
+        super().__init__(include, exclude)
 
-    def _config_process(self, config: Dict):
+    @classmethod
+    def _config_process(cls, config: Dict):
         config['_scope_'] = 'mmseg'
         return config
 

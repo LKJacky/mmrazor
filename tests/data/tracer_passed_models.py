@@ -461,5 +461,5 @@ class BackwardPassedModelManager(PassedModelManager):
         return cls._mmseg_library
 
 
-backward_passed_library = FxPassedModelManager()
-fx_passed_library = BackwardPassedModelManager()
+fx_passed_library = FxPassedModelManager()
+backward_passed_library = BackwardPassedModelManager()
