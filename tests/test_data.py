@@ -34,8 +34,8 @@ class TestModelLibrary(unittest.TestCase):
 
     def test_passed_models(self):
         try:
-            print(FxPassedModelManager.include_models(True))
-            print(BackwardPassedModelManager.include_models(True))
+            print(FxPassedModelManager().include_models())
+            print(BackwardPassedModelManager().include_models())
         except Exception:
             self.fail()
 

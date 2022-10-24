@@ -2,58 +2,70 @@
 from .model_library import (MMClsModelLibrary, MMDetModelLibrary, ModelLibrary,
                             DefaultModelLibrary, TorchModelLibrary,
                             MMSegModelLibrary)
-import os
-from typing import List
 
 
 class PassedModelManager:
 
-    @classmethod
-    def librarys(cls) -> List[ModelLibrary]:
+    def __init__(self) -> None:
+        pass
+
+    def include_models(self, full_test=False):
+        models = []
+        for library in self.libraries(full_test):
+            models.extend(library.include_models())
+        return models
+
+    def uninclude_models(self, full_test=False):
+        models = []
+        for library in self.libraries(full_test):
+            models.extend(library.uninclude_models())
+        return models
+
+    def libraries(self, full=False):
         return []
-
-    @classmethod
-    def include_models(cls, full_test=False):
-        if full_test:
-            models = []
-            for library in cls.librarys():
-                models.extend(library.include_models())
-            return models
-        else:
-            return cls.librarys()[0].include_models()
-
-    @classmethod
-    def uninclude_models(cls, full_test=False):
-        if full_test:
-            models = []
-            for library in cls.librarys():
-                models.extend(library.uninclude_models())
-            return models
-        else:
-            return cls.librarys()[0].uninclude_models()
 
 
 class FxPassedModelManager(PassedModelManager):
 
+    _default_library = None
+    _torch_library = None
+    _mmcls_library = None
+    _mmseg_library = None
+    _mmdet_library = None
+
+    def libraries(self, full=False):
+        if full:
+            return [
+                self.__class__.default_library(),
+                self.__class__.torch_library(),
+                self.__class__.mmcls_library(),
+                self.__class__.mmseg_library(),
+                self.__class__.mmdet_library(),
+            ]
+        else:
+            return [self.__class__.default_library()]
+
     @classmethod
     def default_library(cls):
-        library = DefaultModelLibrary(include=[
-            'SingleLineModel',
-            'ResBlock',
-            'AddCatModel',
-            'ConcatModel',
-            'MultiConcatModel',
-            'MultiConcatModel2',
-            'GroupWiseConvModel',
-            'Xmodel',
-            'MultipleUseModel',
-            'Icep',
-            'ExpandLineModel',
-            'MultiBindModel',
-            'DwConvModel',
-            'ConvAttnModel',
-        ])
-        return library
+        if cls._default_library is None:
+            cls._default_library = DefaultModelLibrary(include=[
+                'SingleLineModel',
+                'ResBlock',
+                'AddCatModel',
+                'ConcatModel',
+                'MultiConcatModel',
+                'MultiConcatModel2',
+                'GroupWiseConvModel',
+                'Xmodel',
+                'MultipleUseModel',
+                'Icep',
+                'ExpandLineModel',
+                'MultiBindModel',
+                'DwConvModel',
+                'ConvAttnModel',
+            ])
+
+        return cls._default_library
 
     @classmethod
     def torch_library(cls):
@@ -80,8 +92,9 @@ class FxPassedModelManager(PassedModelManager):
             # "swin",
             # "convnext"
         ]
-        torch_model_library = TorchModelLibrary(include=torch_includes)
-        return torch_model_library
+        if cls._torch_library is None:
+            cls._torch_library = TorchModelLibrary(include=torch_includes)
+        return cls._torch_library
 
     @classmethod
     def mmcls_library(cls):
@@ -124,8 +137,9 @@ class FxPassedModelManager(PassedModelManager):
             # 'mobileone',
             # 'edgenext'
         ]
-        mmcls_model_library = MMClsModelLibrary(include=mmcls_include)
-        return mmcls_model_library
+        if cls._mmcls_library is None:
+            cls._mmcls_library = MMClsModelLibrary(include=mmcls_include)
+        return cls._mmcls_library
 
     @classmethod
     def mmdet_library(cls):
@@ -223,8 +237,9 @@ class FxPassedModelManager(PassedModelManager):
             # 'dynamic',
             # 'yolox',
         ]
-        mmdet_model_library = MMDetModelLibrary(mmdet_include)
-        return mmdet_model_library
+        if cls._mmdet_library is None:
+            cls._mmdet_library = MMDetModelLibrary(mmdet_include)
+        return cls._mmdet_library
 
     @classmethod
     def mmseg_library(cls):
@@ -264,43 +279,53 @@ class FxPassedModelManager(PassedModelManager):
             # 'deeplabv3plus',
             # 'bisenetv1',
         ]
-        model_library = MMSegModelLibrary(include=include)
-        return model_library
-
-    @classmethod
-    def librarys(cls) -> List[ModelLibrary]:
-        return [
-            cls.default_library(),
-            cls.torch_library(),
-            cls.mmcls_library(),
-            cls.mmseg_library(),
-            cls.mmdet_library(),
-        ]
+        if cls._mmseg_library is None:
+            cls._mmseg_library = MMSegModelLibrary(include=include)
+        return cls._mmseg_library
 
     # for backward tracer
 
 
 class BackwardPassedModelManager(PassedModelManager):
 
+    _default_library = None
+    _torch_library = None
+    _mmcls_library = None
+    _mmseg_library = None
+    _mmdet_library = None
+
+    def libraries(self, full=False):
+        if full:
+            return [
+                self.__class__.default_library(),
+                self.__class__.torch_library(),
+                self.__class__.mmcls_library(),
+                self.__class__.mmseg_library(),
+                self.__class__.mmdet_library(),
+            ]
+        else:
+            return [self.__class__.default_library()]
+
     @classmethod
     def default_library(cls):
-        library = DefaultModelLibrary(include=[
-            'LineModel',
-            'ResBlock',
-            'AddCatModel',
-            'ConcatModel',
-            'MultiConcatModel',
-            'MultiConcatModel2',
-            'GroupWiseConvModel',
-            'Xmodel',
-            # 'MultipleUseModel', # bug
-            'Icep',
-            'ExpandLineModel',
-            'MultiBindModel',
-            'DwConvModel',
-            'ConvAttnModel',
-        ])
-        return library
+        if cls._default_library is None:
+            cls._default_library = DefaultModelLibrary(include=[
+                'LineModel',
+                'ResBlock',
+                'AddCatModel',
+                'ConcatModel',
+                'MultiConcatModel',
+                'MultiConcatModel2',
+                'GroupWiseConvModel',
+                'Xmodel',
+                # 'MultipleUseModel', # bug
+                'Icep',
+                'ExpandLineModel',
+                'MultiBindModel',
+                'DwConvModel',
+                'ConvAttnModel',
+            ])
+        return cls._default_library
 
     @classmethod
     def torch_library(cls):
@@ -328,8 +353,9 @@ class BackwardPassedModelManager(PassedModelManager):
             # "swin",
             # "convnext"
         ]
-        torch_model_library = TorchModelLibrary(include=torch_includes)
-        return torch_model_library
+        if cls._torch_library is None:
+            cls._torch_library = TorchModelLibrary(include=torch_includes)
+        return cls._torch_library
 
     @classmethod
     def mmcls_library(cls):
@@ -372,9 +398,10 @@ class BackwardPassedModelManager(PassedModelManager):
             # 'edgenext'
         ]
         mmcls_exclude = ['cutmix', 'cifar', 'gem']
-        mmcls_model_library = MMClsModelLibrary(
-            include=mmcls_model_include, exclude=mmcls_exclude)
-        return mmcls_model_library
+        if cls._mmcls_library is None:
+            cls._mmcls_library = MMClsModelLibrary(
+                include=mmcls_model_include, exclude=mmcls_exclude)
+        return cls._mmcls_library
 
     @classmethod
     def mmdet_library(cls):
@@ -387,8 +414,9 @@ class BackwardPassedModelManager(PassedModelManager):
             # 'mask-rcnn',
             # 'ssd300'
         ]
-        mmdet_model_library = MMDetModelLibrary(mmdet_include)
-        return mmdet_model_library
+        if cls._mmdet_library is None:
+            cls._mmdet_library = MMDetModelLibrary(mmdet_include)
+        return cls._mmdet_library
 
     @classmethod
     def mmseg_library(cls):
@@ -428,15 +456,10 @@ class BackwardPassedModelManager(PassedModelManager):
             # 'deeplabv3plus',
             # 'bisenetv1',
         ]
-        model_library = MMSegModelLibrary(include=include)
-        return model_library
+        if cls._mmseg_library is None:
+            cls._mmseg_library = MMSegModelLibrary(include=include)
+        return cls._mmseg_library
 
-    @classmethod
-    def librarys(cls) -> List[ModelLibrary]:
-        return [
-            cls.default_library(),
-            cls.torch_library(),
-            cls.mmcls_library(),
-            cls.mmseg_library(),
-            cls.mmdet_library(),
-        ]
+
+backward_passed_library = FxPassedModelManager()
+fx_passed_library = BackwardPassedModelManager()

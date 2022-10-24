@@ -12,7 +12,7 @@ from mmrazor.models.mutables.mutable_channel.units.channel_unit import \
     ChannelUnit  # noqa
 from mmrazor.structures.graph import ModuleGraph as ModuleGraph
 from .....data.models import SingleLineModel
-from .....data.tracer_passed_models import BackwardPassedModelManager
+from .....data.tracer_passed_models import backward_passed_library
 
 MUTABLE_CFG = dict(type='SimpleMutablechannel')
 PARSE_CFG = dict(
@@ -154,7 +154,7 @@ class TestMutableChannelUnit(TestCase):
     #             self.assertTrue(res[0], res[1])
 
     def test_replace_with_dynamic_ops(self):
-        model_datas = BackwardPassedModelManager.include_models()
+        model_datas = backward_passed_library.include_models()
         for model_data in model_datas:
             for unit_type in GROUPS:
                 with self.subTest(model=model_data, unit=unit_type):

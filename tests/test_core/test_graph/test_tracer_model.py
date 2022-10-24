@@ -17,9 +17,9 @@ from mmrazor.models.mutators.channel_mutator.channel_mutator import \
     is_dynamic_op_for_fx_tracer
 from mmrazor.models.task_modules.tracer.backward_tracer import BackwardTracer
 from mmrazor.structures.graph import ModuleGraph
-from ...data.tracer_passed_models import (BackwardPassedModelManager,
-                                          FxPassedModelManager,
-                                          PassedModelManager)
+from ...data.tracer_passed_models import (PassedModelManager,
+                                          backward_passed_library,
+                                          fx_passed_library)
 from ...utils import SetTorchThread
 
 # sys.setrecursionlimit(int(1e8))
@@ -188,20 +188,20 @@ def _test_a_model(Model, tracer_type='fx'):
 class TestTraceModel(TestCase):
 
     def test_init_from_fx_tracer(self) -> None:
-        TestData = FxPassedModelManager.include_models(FULL_TEST)
+        TestData = fx_passed_library.include_models(FULL_TEST)
         with SetTorchThread(1):
             with mp.Pool(POOL_SIZE) as p:
                 result = p.map(
                     partial(_test_a_model, tracer_type='fx'), TestData)
-        self.report(result, FxPassedModelManager, 'fx')
+        self.report(result, fx_passed_library, 'fx')
 
     def test_init_from_backward_tracer(self) -> None:
-        TestData = BackwardPassedModelManager.include_models(FULL_TEST)
+        TestData = backward_passed_library.include_models(FULL_TEST)
         with SetTorchThread(1) as _:
             with mp.Pool(POOL_SIZE) as p:
                 result = p.map(
                     partial(_test_a_model, tracer_type='backward'), TestData)
-        self.report(result, BackwardPassedModelManager, 'backward')
+        self.report(result, backward_passed_library, 'backward')
 
     def report(self, result, model_manager: PassedModelManager, fx_type='fx'):
         print()
