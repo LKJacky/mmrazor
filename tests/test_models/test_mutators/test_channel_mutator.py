@@ -46,7 +46,7 @@ class TestChannelMutator(unittest.TestCase):
         self.assertEqual(list(y.shape), [2, 1000])
 
     def test_sample_subnet(self):
-        data_models = BackwardPassedModelManager.include_models()
+        data_models = BackwardPassedModelManager.include_models()[:2]
 
         for i, data in enumerate(data_models):
             with self.subTest(i=i, data=data):

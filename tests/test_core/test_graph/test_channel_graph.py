@@ -11,7 +11,6 @@ from mmrazor.structures.graph.channel_graph import ChannelGraph
 from mmrazor.structures.graph.channel_nodes import \
     default_channel_node_converter
 from ...data.models import SingleLineModel
-from ...data.tracer_passed_models import BackwardPassedModelManager
 
 NodeMap = {}
 
@@ -36,19 +35,19 @@ class TestChannelGraph(unittest.TestCase):
         _ = ChannelGraph.copy_from(module_graph,
                                    default_channel_node_converter)
 
-    def test_forward(self):
-        for model_data in BackwardPassedModelManager.include_models(  # noqa
-        ):  # noqa
-            with self.subTest(model=model_data):
-                model = model_data()
-                module_graph = ModuleGraph.init_from_backward_tracer(model)
+    # def test_forward(self):
+    #     for model_data in BackwardPassedModelManager.include_models(  # noqa
+    #     ):  # noqa
+    #         with self.subTest(model=model_data):
+    #             model = model_data()
+    #             module_graph = ModuleGraph.init_from_backward_tracer(model)
 
-                channel_graph = ChannelGraph.copy_from(
-                    module_graph, default_channel_node_converter)
-                channel_graph.forward()
+    #             channel_graph = ChannelGraph.copy_from(
+    #                 module_graph, default_channel_node_converter)
+    #             channel_graph.forward()
 
-                # units = channel_graph.collect_units()
-                _ = channel_graph.generate_units_config()
+    #             # units = channel_graph.collect_units()
+    #             _ = channel_graph.generate_units_config()
 
     def test_forward_with_config_num_in_channel(self):
 
