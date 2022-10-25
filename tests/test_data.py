@@ -5,7 +5,8 @@ import torch
 
 from .data.model_library import (DefaultModelLibrary, MMClsModelLibrary,
                                  MMDetModelLibrary, MMSegModelLibrary,
-                                 TorchModelLibrary)
+                                 ModelGenerator, TorchModelLibrary)
+from .data.models import SingleLineModel
 from .data.tracer_passed_models import (BackwardPassedModelManager,
                                         FxPassedModelManager)
 
@@ -53,3 +54,11 @@ class TestModels(unittest.TestCase):
         for Model in library.include_models():
             with self.subTest(model=Model):
                 self._test_a_model(Model)
+
+    def test_generator(self):
+        Model = ModelGenerator('model', SingleLineModel)
+        model = Model()
+        model.eval()
+        self.assertEqual(model.training, False)
+        model.train()
+        self.assertEqual(model.training, True)

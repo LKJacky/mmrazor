@@ -9,12 +9,11 @@ from unittest import TestCase
 
 import torch
 import torch.multiprocessing as mp
+import torch.nn as nn
 
 from mmrazor.models.architectures.dynamic_ops.mixins import DynamicChannelMixin
 from mmrazor.models.mutables.mutable_channel.units import \
     SequentialMutableChannelUnit
-from mmrazor.models.mutators.channel_mutator.channel_mutator import \
-    is_dynamic_op_for_fx_tracer
 from mmrazor.models.task_modules.tracer.backward_tracer import BackwardTracer
 from mmrazor.structures.graph import ModuleGraph
 from ...data.tracer_passed_models import (PassedModelManager,
@@ -76,7 +75,11 @@ def time_limit(seconds, msg='', activated=(not DEBUG)):
 
 
 def is_dynamic_op_fx(module, name):
-    return isinstance(module, DynamicChannelMixin)
+    is_leaf = (
+        isinstance(module, DynamicChannelMixin)
+        or isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear)
+        or isinstance(module, nn.modules.batchnorm._BatchNorm))
+    return is_leaf
 
 
 class SumLoss:
@@ -97,7 +100,7 @@ class SumLoss:
         elif isinstance(output, dict):
             return self.get_loss(list(output.values()))
         else:
-            raise NotImplementedError()
+            raise NotImplementedError(f'{type(output)}')
 
 
 class ToyCNNPseudoLoss:
@@ -115,7 +118,7 @@ def _test_tracer_2_graph(model, tracer_type='fx'):
             model,
             dict(
                 type='RazorFxTracer',
-                is_extra_leaf_module=is_dynamic_op_for_fx_tracer,
+                is_extra_leaf_module=is_dynamic_op_fx,
                 concrete_args=dict(mode='tensor')))
         return graph
 
@@ -161,7 +164,8 @@ def _test_a_model(Model, tracer_type='fx'):
     start = time.time()
 
     try:
-        model = Model()
+        Model.init_model()
+        model = Model
         model.eval()
         print(f'test {Model} using {tracer_type} tracer.')
 
@@ -176,6 +180,7 @@ def _test_a_model(Model, tracer_type='fx'):
             # get unit
             mutable_units = _test_units(units, model)
         print(f'test {Model} successful.')
+        # return Model, True, '', time.time() - start, -1
         return Model, True, '', time.time() - start, len(mutable_units)
     except Exception as e:
         if DEBUG:

@@ -15,34 +15,60 @@ from .models import (AddCatModel, ConcatModel, ConvAttnModel, DwConvModel,
                      ResBlock, Xmodel, MultipleUseModel, Icep, SelfAttention)
 import json
 # model generator
+from mmdet.testing._utils import demo_mm_inputs
 
 
-class ModelGenerator:
+class ModelGenerator(nn.Module):
 
     def __init__(self, name: str, model_src) -> None:
+        super().__init__()
         self.name = name
         self.model_src = model_src
+        self._model = None
 
-    def __call__(self, ) -> nn.Module:
-        return self.model_src()
+    def init_model(self):
+        self._model = self.model_src()
+
+    def eval(self):
+        assert self._model is not None
+        self._model.eval()
+
+    def forward(self, x):
+        assert self._model is not None
+        return self._model(self.input())
+
+    def input(self):
+        return torch.ones([2, 3, 224, 224])
 
     def __repr__(self) -> str:
         return self.name
 
 
-class MMModelGenerator:
+class MMModelGenerator(ModelGenerator):
 
     def __init__(self, name, cfg) -> None:
-        self.name = name
         self.cfg = cfg
+        super().__init__(name, self.get_model_src)
 
-    def __call__(self):
+    def get_model_src(self):
         model = MODELS.build(self.cfg)
         model = revert_sync_batchnorm(model)
         return model
 
     def __repr__(self) -> str:
         return self.name
+
+
+class MMDetModelGenerator(MMModelGenerator):
+
+    def forward(self, x):
+        assert self._model is not None
+        input = self.input()
+        data = self._model.data_preprocessor(input, False)
+        return self._model(**data, mode='tensor')
+
+    def input(self):
+        return demo_mm_inputs(1, [[3, 224, 224]])
 
 
 # model library
@@ -75,7 +101,7 @@ class ModelLibrary:
     def uninclude_models(self):
         return self._uninclude_models
 
-    def is_include(self, name: str, includes: List[str], start_with=False):
+    def is_include(self, name: str, includes: List[str], start_with=True):
         for key in includes:
             if start_with:
                 if name.startswith(key):
@@ -112,9 +138,9 @@ class ModelLibrary:
         uninclude = []
         exclude = []
         for name in models:
-            if self.is_include(name, self.exclude_key):
+            if self.is_include(name, self.exclude_key, start_with=False):
                 exclude.append(models[name])
-            elif self.is_include(name, self.include_key):
+            elif self.is_include(name, self.include_key, start_with=True):
                 include.append(models[name])
             else:
                 uninclude.append(models[name])
@@ -232,10 +258,14 @@ class MMModelLibrary(ModelLibrary):
                         model_cfg = config['model']
                         model_cfg = cls._config_process(model_cfg)
                         if json.dumps(model_cfg) not in added_models:
-                            models[model_name] = MMModelGenerator(
+                            models[model_name] = cls.generator_type()(
                                 cls.repo + '.' + model_name, model_cfg)
                             added_models.add(json.dumps(model_cfg))
         return models
+
+    @classmethod
+    def generator_type(cls):
+        return MMModelGenerator
 
     @classmethod
     def _config_process(cls, config: Dict):
@@ -409,6 +439,10 @@ class MMDetModelLibrary(MMModelLibrary):
         if 'preprocess_cfg' in config:
             config.pop('preprocess_cfg')
         return config
+
+    @classmethod
+    def generator_type(cls):
+        return MMDetModelGenerator
 
 
 class MMSegModelLibrary(MMModelLibrary):
