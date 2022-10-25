@@ -24,6 +24,36 @@ from mmengine.model import BaseModel
 # this file includes models for tesing.
 
 
+class subnet(Module):
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def forward(self, x):
+        add = torch.arange(x.shape[-1]).unsqueeze(0)
+        # add = torch.arange(1000).unsqueeze(0)
+        end = torch.add(x, add)
+        return end
+
+
+class UnTracableModel(Module):
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Conv2d(3, 8, 3, 1, 1), nn.BatchNorm2d(8), nn.ReLU(),
+            nn.Conv2d(8, 16, 3, 1, 1), nn.BatchNorm2d(16),
+            nn.AdaptiveAvgPool2d(1))
+        self.linear = nn.Linear(16, 1000)
+        self.end = subnet()
+
+    def forward(self, x):
+        x1 = self.net(x)
+        x1 = x1.reshape([x1.shape[0], -1])
+        logit = self.linear(x1)
+        return self.end(logit)
+
+
 class ConvAttnModel(Module):
 
     def __init__(self) -> None:
