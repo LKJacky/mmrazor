@@ -204,7 +204,7 @@ class BaseGraph(Generic[BASENODE]):
             for node_name in in_degree:
                 if in_degree[node_name] == 0:
                     return node_name
-            return None
+            raise Exception(f'no zero degree node\n{in_degree}')
 
         in_degree = _in_degree(self)
 
