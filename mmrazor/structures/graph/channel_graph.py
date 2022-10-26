@@ -173,7 +173,7 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
     def _reset_channel_elem_cache(self):
         # may has bug, as some tensor not recorded by node.xxxx_tensors
         for node in self.topo_traverse():
-            assert node.in_channel_tensor is not None and \
-                node.out_channel_tensor is not None
+            assert (node.in_channel_tensor is not None
+                    and node.out_channel_tensor is not None), f'{node}'
             node.in_channel_tensor._reset_channel_elem_cache()
             node.out_channel_tensor._reset_channel_elem_cache()

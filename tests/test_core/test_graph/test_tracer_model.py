@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import logging
 import os
 import signal
 import time
@@ -31,6 +32,8 @@ except Exception:
     POOL_SIZE = mp.cpu_count()
 
 DEBUG = os.getenv('DEBUG') == 'true'
+if DEBUG:
+    logging.basicConfig(level=logging.DEBUG)
 
 print(f'FULL_TEST: {FULL_TEST}')
 print(f'POOL_SIZE: {POOL_SIZE}')
@@ -75,10 +78,14 @@ def time_limit(seconds, msg='', activated=(not DEBUG)):
 
 
 def is_dynamic_op_fx(module, name):
+    from mmcv.cnn.bricks import Scale
+
     is_leaf = (
         isinstance(module, DynamicChannelMixin)
         or isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear)
-        or isinstance(module, nn.modules.batchnorm._BatchNorm))
+        or isinstance(module, nn.modules.batchnorm._BatchNorm)
+        or isinstance(module, Scale))
+
     return is_leaf
 
 
@@ -172,16 +179,18 @@ def _test_a_model(Model, tracer_type='fx'):
         with time_limit(20, 'tracer2graph'):
             # trace a model and get graph
             graph: ModuleGraph = _test_tracer_2_graph(model, tracer_type)
+            num = len(graph)
         with time_limit(120, 'graph2units'):
             # graph 2 unit
             units = _test_graph2units(graph)
+            num = len(units)
 
         with time_limit(30, 'test units'):
             # get unit
             mutable_units = _test_units(units, model)
+            num = len(mutable_units)
         print(f'test {Model} successful.')
-        # return Model, True, '', time.time() - start, -1
-        return Model, True, '', time.time() - start, len(mutable_units)
+        return Model, True, '', time.time() - start, num
     except Exception as e:
         if DEBUG:
             raise e

@@ -37,6 +37,7 @@ class ChannelNode(ModuleNode):
         super().__init__(name, val, module_name)
         self.in_channel_tensor: Union[None, ChannelTensor] = None
         self.out_channel_tensor: Union[None, ChannelTensor] = None
+        self.return_tensor: Union[None, ChannelTensor] = None
 
     @classmethod
     def copy_from(cls, node):
@@ -55,10 +56,14 @@ class ChannelNode(ModuleNode):
         """Forward with ChannelTensors."""
         if in_channel_tensors is None:
             out_channel_tensors = [
-                node.out_channel_tensor for node in self.prev_nodes
+                node.return_tensor for node in self.prev_nodes
             ]
             in_channel_tensors = out_channel_tensors
-        self.channel_forward(in_channel_tensors)
+        try:
+            self.return_tensor = self.channel_forward(in_channel_tensors)
+        except Exception as e:
+            print(f'{e},{self.name}')
+            raise e
 
     @abstractmethod
     def channel_forward(self, channel_tensors: List[ChannelTensor]):
@@ -67,6 +72,7 @@ class ChannelNode(ModuleNode):
 
         self.in_channel_tensor = channel_tensors[0]
         self.out_channel_tensor = ChannelTensor(self.out_channels)
+        return self.out_channel_tensor
 
     # channels
 
@@ -124,8 +130,8 @@ class ChannelNode(ModuleNode):
 # basic nodes
 
 
-class PassChannelNode(ChannelNode):
-    """A PassChannelNode has the same number of input channels and output
+class PassUnionChannelNode(ChannelNode):
+    """A PassUnionChannelNode has the same number of input channels and output
     channels.
 
     Besides, the corresponding input channels and output channels belong to one
@@ -134,10 +140,10 @@ class PassChannelNode(ChannelNode):
 
     def channel_forward(self, channel_tensors: List[ChannelTensor]):
         """Channel forward."""
-        PassChannelNode._channel_forward(self, channel_tensors[0])
+        return PassUnionChannelNode._channel_forward(self, channel_tensors[0])
 
     def __repr__(self) -> str:
-        return super().__repr__() + '_pass'
+        return super().__repr__() + '_pass_uion'
 
     @staticmethod
     def _channel_forward(node: ChannelNode, tensor: ChannelTensor):
@@ -146,6 +152,24 @@ class PassChannelNode(ChannelNode):
         assert isinstance(tensor, ChannelTensor)
         node.in_channel_tensor = tensor
         node.out_channel_tensor = tensor
+        return node.out_channel_tensor
+
+
+class PassChannelNode(ChannelNode):
+
+    def _get_in_channels_by_prev_nodes(self, prev_nodes):
+        assert len(self.prev_nodes) == 1
+        node0: ChannelNode = self.prev_nodes[0]
+        return node0.out_channels
+
+    def channel_forward(self, channel_tensors: List[ChannelTensor]):
+        assert len(channel_tensors) == 1
+        self.in_channel_tensor = ChannelTensor(1)
+        self.out_channel_tensor = ChannelTensor(1)
+        return channel_tensors[0]
+
+    def __repr__(self) -> str:
+        return super().__repr__() + '_pass'
 
 
 class MixChannelNode(ChannelNode):
@@ -159,6 +183,7 @@ class MixChannelNode(ChannelNode):
             self.out_channel_tensor = ChannelTensor(self.out_channels)
         else:
             raise NotImplementedError()
+        return self.out_channel_tensor
 
     def __repr__(self) -> str:
         return super().__repr__() + '_mix'
@@ -176,9 +201,13 @@ class BindChannelNode(ChannelNode):
             channel_tensors[0].union(tensor)
         self.in_channel_tensor = channel_tensors[0]
         self.out_channel_tensor = channel_tensors[0]
+        return self.out_channel_tensor
 
     def __repr__(self) -> str:
         return super().__repr__() + '_bind'
+
+    def check_channel(self):
+        pass
 
 
 class CatChannelNode(ChannelNode):
@@ -188,6 +217,7 @@ class CatChannelNode(ChannelNode):
         tensor_cat = ChannelTensor.cat(channel_tensors)
         self.in_channel_tensor = tensor_cat
         self.out_channel_tensor = tensor_cat
+        return self.out_channel_tensor
 
     def check_channel(self):
         in_num = [node.out_channels for node in self.prev_nodes]
@@ -223,7 +253,26 @@ class ExpandChannelNode(ChannelNode):
         tensor0 = channel_tensors[0]
         self.in_channel_tensor = tensor0
         self.out_channel_tensor = tensor0.expand(self.expand_ratio)
+        return self.out_channel_tensor
 
+
+class EndNode(ChannelNode):
+
+    def channel_forward(self, channel_tensors: List[ChannelTensor]):
+        for channel in channel_tensors:
+            channel.union(ChannelTensor(len(channel)))
+        self.in_channel_tensor = ChannelTensor(1)
+        self.out_channel_tensor = ChannelTensor(1)
+        return self.out_channel_tensor
+
+    def check_channel(self):
+        pass
+
+    def __repr__(self) -> str:
+        return super().__repr__() + '_end'
+
+
+# class StackChannelNode(ChannelNode):
 
 # module nodes
 
@@ -254,7 +303,8 @@ class ConvNode(MixChannelNode):
         if self.conv_type == 'conv':
             return super().channel_forward(channel_tensors)
         elif self.conv_type == 'dwconv':
-            return PassChannelNode._channel_forward(self, channel_tensors[0])
+            return PassUnionChannelNode._channel_forward(
+                self, channel_tensors[0])
         elif self.conv_type == 'gwconv':
             return self._gw_conv_channel_forward(channel_tensors)
         else:
@@ -276,6 +326,7 @@ class ConvNode(MixChannelNode):
         self.in_channel_tensor = tensor0
         self.out_channel_tensor = ChannelTensor(self.out_channels)
         group_union(self.out_channel_tensor, conv.groups)
+        return self.out_channel_tensor
 
     @property
     def _in_channels(self) -> int:
@@ -311,7 +362,7 @@ class LinearNode(MixChannelNode):
         return super().__repr__() + 'linear'
 
 
-class NormNode(PassChannelNode):
+class NormNode(PassUnionChannelNode):
     """A NormNode corresponds to a BatchNorm2d module."""
 
     def __init__(self,
@@ -339,11 +390,15 @@ class NormNode(PassChannelNode):
 def default_channel_node_converter(node: ModuleNode) -> ChannelNode:
     """The default node converter for ChannelNode."""
 
-    def warn(default='PassChannelNode'):
-        logger = MMLogger('mmrazor', 'mmrazor')
-        logger.debug((f"{node.name}({node.val}) node can't find match type of"
-                      'channel_nodes,'
-                      f'replaced with {default} by default.'))
+    from mmcv.cnn.bricks import Scale
+    from mmdet.models.dense_heads.anchor_head import AnchorHead
+    from mmdet.models.dense_heads.base_dense_head import BaseDenseHead
+
+    def warn(default='PassUnionChannelNode'):
+        logger = MMLogger.get_current_instance()
+        logger.info((f"{node.name}({node.val}) node can't find match type of"
+                     'channel_nodes,'
+                     f'replaced with {default} by default.'))
 
     module_mapping = {
         nn.Conv2d: ConvNode,
@@ -356,15 +411,18 @@ def default_channel_node_converter(node: ModuleNode) -> ChannelNode:
         nn.modules.pooling._AdaptiveAvgPoolNd: PassChannelNode,
         nn.modules.pooling._MaxPoolNd: PassChannelNode,
         nn.modules.pooling._AdaptiveMaxPoolNd: PassChannelNode,
+        Scale: PassChannelNode,
     }
     function_mapping = {
         torch.add: BindChannelNode,
         torch.cat: CatChannelNode,
-        operator.add: BindChannelNode
+        operator.add: BindChannelNode,
+        AnchorHead.predict_by_feat: EndNode,
+        BaseDenseHead.predict_by_feat: EndNode,
     }
     name_mapping = {
         'bind_placeholder': BindChannelNode,
-        'pass_placeholder': PassChannelNode,
+        'pass_placeholder': PassUnionChannelNode,
         'cat_placeholder': CatChannelNode,
     }
     if isinstance(node.val, nn.Module):
@@ -386,5 +444,5 @@ def default_channel_node_converter(node: ModuleNode) -> ChannelNode:
         warn('BindChannelNode')
         return BindChannelNode.copy_from(node)
     else:
-        warn('PassChannelNode')
-        return PassChannelNode.copy_from(node)
+        warn('PassUnionChannelNode')
+        return PassUnionChannelNode.copy_from(node)

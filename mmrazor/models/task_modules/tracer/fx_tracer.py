@@ -88,7 +88,7 @@ class CostumTracer(Tracer):
 
     def __init__(self,
                  is_extra_leaf_module: Callable[[nn.Module, str], bool] = None,
-                 warp_method={torch: torch.arange},
+                 warp_method={},
                  concrete_args={}) -> None:
         """
         Args:
@@ -102,7 +102,13 @@ class CostumTracer(Tracer):
         )
         self.extra_is_leaf_module = is_extra_leaf_module
         self.concrete_args = concrete_args
-        self.warp_method = warp_method
+        from mmdet.models.dense_heads.base_dense_head import BaseDenseHead
+        from mmdet.models.dense_heads.rpn_head import RPNHead
+        self.warp_method = {
+            torch: torch.arange,
+            RPNHead: RPNHead.predict_by_feat,
+            BaseDenseHead: BaseDenseHead.predict_by_feat,
+        }
 
     def is_leaf_module(self, m: torch.nn.Module,
                        module_qualified_name: str) -> bool:

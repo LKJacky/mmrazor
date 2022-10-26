@@ -100,7 +100,7 @@ class ChannelTensor:
 
     @classmethod
     def union_two(cls, tensor1: 'ChannelTensor', tensor2: 'ChannelTensor'):
-        assert len(tensor1) == len(tensor2)
+        assert len(tensor1) == len(tensor2), f'{len(tensor1)}!={len(tensor2)}'
         for e1, e2 in zip(tensor1, tensor2):
             ChannelElem.union_two(e1, e2)
 
