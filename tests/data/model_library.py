@@ -246,7 +246,10 @@ class MMModelLibrary(ModelLibrary):
                 if filename.endswith('.py'):
 
                     cfg_path = dirpath + '/' + filename
-                    config = Config.fromfile(cfg_path)
+                    try:
+                        config = Config.fromfile(cfg_path)
+                    except:
+                        continue
                     if 'model' in config:
 
                         # get model_name
@@ -425,6 +428,7 @@ class MMDetModelLibrary(MMModelLibrary):
         'tridentnet',
         'dynamic',
         'yolox',
+        'albu',
     ]
     base_config_path = '/'
     repo = 'mmdet'
