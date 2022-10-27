@@ -16,9 +16,9 @@ from mmrazor.models.architectures.dynamic_ops.mixins import DynamicChannelMixin
 from mmrazor.models.mutables.mutable_channel.units import \
     SequentialMutableChannelUnit
 from mmrazor.models.task_modules.tracer.backward_tracer import BackwardTracer
-from mmrazor.models.task_modules.tracer.fx_tracer import (CostumTracer,
-                                                          FxBaseNode,
-                                                          RazorFxTracer)
+from mmrazor.models.task_modules.tracer.razor_tracer import (CostumFxTracer,
+                                                             FxBaseNode,
+                                                             RazorFxTracer)
 from mmrazor.structures.graph import BaseGraph, ModuleGraph
 from mmrazor.structures.graph.channel_graph import (
     ChannelGraph, default_channel_node_converter)
@@ -160,7 +160,7 @@ def is_dynamic_op_fx(module, name):
 def _test_tracer(model, tracer_type='fx'):
 
     def _test_fx_tracer(model):
-        tracer = CostumTracer(is_dynamic_op_fx, {}, {})
+        tracer = CostumFxTracer(is_dynamic_op_fx, {}, {})
         return tracer.trace(model)
 
     def _test_backward_tracer(model):

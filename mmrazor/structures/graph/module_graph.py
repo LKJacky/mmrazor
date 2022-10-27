@@ -11,12 +11,12 @@ import torch.nn as nn
 from torch.nn import Module
 
 from mmrazor.models.task_modules.tracer.backward_tracer import BackwardTracer
-from mmrazor.models.task_modules.tracer.fx_tracer import (FxBaseNode,
-                                                          RazorFxTracer)
 from mmrazor.models.task_modules.tracer.loss_calculator import \
     ImageClassifierPseudoLoss
 from mmrazor.models.task_modules.tracer.path import (Path, PathConcatNode,
                                                      PathList, PathNode)
+from mmrazor.models.task_modules.tracer.razor_tracer import (FxBaseNode,
+                                                             RazorFxTracer)
 from mmrazor.registry import TASK_UTILS
 from .base_graph import BaseGraph, BaseNode
 

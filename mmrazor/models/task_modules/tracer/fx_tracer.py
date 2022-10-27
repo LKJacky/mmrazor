@@ -14,77 +14,11 @@ from torch.fx._symbolic_trace import (Tracer, _autowrap_check,
                                       _patch_wrapped_functions, _Patcher)
 from torch.fx.graph import Graph
 from torch.fx.node import Argument
-from torch.fx.node import Node as FxNode
 from torch.fx.proxy import Proxy
 
-from mmrazor.registry import TASK_UTILS
-from mmrazor.structures.graph.base_graph import BaseGraph, BaseNode
 
-
-class FxBaseNode(BaseNode):
-    """Node to record FxNode."""
-
-    def __init__(self, name: str, val: FxNode) -> None:
-        super().__init__(name, val)
-
-    def module(self):
-        """Union[Module | None]: the module the fxnode corresponding to."""
-        self.val: FxNode
-        model = self.val.graph.owning_module
-        if self.val.op == 'call_module':
-            target = self.val.target
-            target = target.split('.')
-            obj = model
-            for t in target:
-                obj = getattr(obj, t)
-            return obj
-        else:
-            return None
-
-    def function(self):
-        """Union[Callable | Node]: the function the fxnode corresponding to."""
-        if self.is_function():
-            return self.val.target
-        else:
-            return None
-
-    # base type
-    # placeholder|call_method|call_module|call_function|get_attr|output
-
-    def is_function(self):
-        """Bool: if the fxnode represents 'call_function'"""
-        return self.val.op == 'call_function'
-
-    def is_module(self):
-        """Bool: if the fxnode represents 'call_module'"""
-        return self.val.op == 'call_module'
-
-    def is_Tensor(self):
-        """Bool: if the fxnode represents input or output tensors"""
-        return self.val.op == 'placeholder' or self.val.op == 'output'
-
-    def is_method(self):
-        """Bool: if the fxnode represents 'call_method'"""
-        return self.val.op == 'call_method'
-
-    def is_get_attr(self):
-        """Bool: if the fxnode represents 'get_attr'"""
-        return self.val.op == 'get_attr'
-
-    # extended type
-
-    def is_cat(self):
-        """Bool: if the fxnode represents a cat node"""
-        return self.is_function() and self.function() is torch.cat
-
-    # other
-
-    def __repr__(self) -> str:
-        return f'{self.name}({self.val.op})'
-
-
-class CostumTracer(Tracer):
-    """CostumTracer allow user to indicate leaf module."""
+class CostumFxTracer(Tracer):
+    """CostumFxTracer allow user to indicate leaf module."""
 
     def __init__(self,
                  is_extra_leaf_module: Callable[[nn.Module, str], bool] = None,
@@ -104,10 +38,14 @@ class CostumTracer(Tracer):
         self.concrete_args = concrete_args
         from mmdet.models.dense_heads.base_dense_head import BaseDenseHead
         from mmdet.models.dense_heads.rpn_head import RPNHead
+        from mmdet.models.roi_heads import StandardRoIHead
         self.warp_method = {
-            torch: torch.arange,
             RPNHead: RPNHead.predict_by_feat,
             BaseDenseHead: BaseDenseHead.predict_by_feat,
+            StandardRoIHead: StandardRoIHead.forward,
+        }
+        self.warp_fn = {
+            torch: torch.arange,
         }
 
     def is_leaf_module(self, m: torch.nn.Module,
@@ -212,6 +150,12 @@ class CostumTracer(Tracer):
                     mth.__name__,
                     self.warp_a_method(obj, mth),
                     deduplicate=False)
+            for obj, mth in self.warp_fn.items():
+                patcher.patch_method(
+                    obj,
+                    mth.__name__,
+                    self.warp_a_function(obj, mth),
+                    deduplicate=False)
             _patch_wrapped_functions(patcher)
             _autowrap_check(patcher, fn_globals, self._autowrap_function_ids)
             for module in self._autowrap_search:
@@ -222,11 +166,16 @@ class CostumTracer(Tracer):
                 'output', (self.create_arg(fn(*args)), ), {},
                 type_expr=fn.__annotations__.get('return', None))
 
-        self.submodule_paths = None
+        self.submodule_paths = None  # type: ignore
 
         return self.graph
 
-    def call_method(self, obj, origin_fn, name, args, kwargs):
+    def call_method(self, origin_fn, name, args: tuple, kwargs):
+        args = args[1:]
+        return self.create_proxy('call_function', origin_fn, args, kwargs,
+                                 name)
+
+    def call_function(self, origin_fn, name, args, kwargs):
         return self.create_proxy('call_function', origin_fn, args, kwargs,
                                  name)
 
@@ -234,23 +183,35 @@ class CostumTracer(Tracer):
 
         @functools.wraps(origin_fn)
         def fn_wrapper(*args, **kwargs):
-            return self.call_method(obj, origin_fn, origin_fn.__name__, args,
+            return self.call_method(origin_fn, origin_fn.__name__, args,
                                     kwargs)
+
+        return fn_wrapper
+
+    def warp_a_function(self, obj, origin_fn):
+
+        @functools.wraps(origin_fn)
+        def fn_wrapper(*args, **kwargs):
+            return self.call_function(origin_fn, origin_fn.__name__, args,
+                                      kwargs)
 
         return fn_wrapper
 
     def call_module(self, m: torch.nn.Module, forward: Callable[..., Any],
                     args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> Any:
+        module_qualified_name = self.path_of_module(m)
         try:
+            print(f'enter {module_qualified_name}')
             proxy = super().call_module(m, forward, args, kwargs)
+            print(f'exit {module_qualified_name}')
             return proxy
-        except Exception:
+        except Exception as e:
             module_qualified_name = self.path_of_module(m)
             from mmengine import MMLogger
             MMLogger.get_current_instance().warning(
                 f'{module_qualified_name}({type(m)}) encounter error when'
                 ' tracing. '
-                'It will be treated as a leaf module.')
+                f'It will be treated as a leaf module.\n {e}')
             return self.create_proxy('call_module', module_qualified_name,
                                      args, kwargs)
 
@@ -260,47 +221,3 @@ class CostumTracer(Tracer):
             return arg
         except Exception:
             return a
-
-
-@TASK_UTILS.register_module()
-class RazorFxTracer(CostumTracer):
-    """A wapper for torch.fx.tracer."""
-
-    def __init__(self,
-                 is_extra_leaf_module: Callable[[nn.Module, str], bool] = None,
-                 concrete_args={}) -> None:
-        if isinstance(is_extra_leaf_module, dict):
-            is_extra_leaf_module = TASK_UTILS.build(is_extra_leaf_module)
-        super().__init__(
-            is_extra_leaf_module=is_extra_leaf_module,
-            concrete_args=concrete_args)
-
-    def add_node(self, graph: BaseGraph[FxBaseNode], fxnode: FxNode):
-        """FxBaseNode: convert a torch FxNode to a FxBaseNode, and add it the
-        self.graph"""
-        node = graph.add_or_find_node(FxBaseNode(fxnode.name, fxnode))
-        return node
-
-    def parse_torch_graph(self, torch_graph: fx.graph.Graph):
-        """None: convert torch graph to self.graph"""
-
-        graph = BaseGraph[FxBaseNode]()
-        # copy_nodes
-        for fxnode in torch_graph.nodes:
-            self.add_node(graph, fxnode)
-
-        # connect nodes
-        for fxnode in torch_graph.nodes:
-            for pre_node in fxnode.all_input_nodes:
-                graph.connect(
-                    self.add_node(graph, pre_node),
-                    self.add_node(graph, fxnode))
-
-        return graph
-
-    def trace(self, model) -> BaseGraph[FxBaseNode]:
-        torch_graph = super().trace(model)
-        torch_graph.owning_module = model
-
-        self.graph = BaseGraph[FxBaseNode]()
-        return self.parse_torch_graph(torch_graph)
