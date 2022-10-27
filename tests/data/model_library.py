@@ -65,6 +65,7 @@ class MMDetModelGenerator(MMModelGenerator):
         assert self._model is not None
         input = self.input()
         data = self._model.data_preprocessor(input, False)
+        self._model.eval()
         return self._model(**data, mode='tensor')
 
     def input(self):

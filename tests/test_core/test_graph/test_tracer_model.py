@@ -16,32 +16,91 @@ from mmrazor.models.architectures.dynamic_ops.mixins import DynamicChannelMixin
 from mmrazor.models.mutables.mutable_channel.units import \
     SequentialMutableChannelUnit
 from mmrazor.models.task_modules.tracer.backward_tracer import BackwardTracer
-from mmrazor.structures.graph import ModuleGraph
+from mmrazor.models.task_modules.tracer.fx_tracer import (CostumTracer,
+                                                          FxBaseNode,
+                                                          RazorFxTracer)
+from mmrazor.structures.graph import BaseGraph, ModuleGraph
+from mmrazor.structures.graph.channel_graph import (
+    ChannelGraph, default_channel_node_converter)
+from mmrazor.structures.graph.module_graph import (FxTracerToGraphConverter,
+                                                   PathToGraphConverter)
 from ...data.tracer_passed_models import (PassedModelManager,
                                           backward_passed_library,
                                           fx_passed_library)
 from ...utils import SetTorchThread
 
-# sys.setrecursionlimit(int(1e8))
+# test config
 
 DEVICE = torch.device('cpu')
 FULL_TEST = os.getenv('FULL_TEST') == 'true'
-try:
-    POOL_SIZE = int(os.getenv('POOL_SIZE'))
-except Exception:
-    POOL_SIZE = mp.cpu_count()
 
 DEBUG = os.getenv('DEBUG') == 'true'
 if DEBUG:
     logging.basicConfig(level=logging.DEBUG)
+    POOL_SIZE = 1
+    TORCH_THREAD_SIZE = -1
+else:
+    POOL_SIZE = mp.cpu_count()
+    TORCH_THREAD_SIZE = 1
 
+print(f'DEBUG: {DEBUG}')
 print(f'FULL_TEST: {FULL_TEST}')
 print(f'POOL_SIZE: {POOL_SIZE}')
-print(f'DEBUG: {DEBUG}')
+print(f'TORCH_THREAD_SIZE: {TORCH_THREAD_SIZE}')
+
+# tools for tesing
 
 
-class TimeoutException(Exception):
-    pass
+@contextmanager
+def time_limit(seconds, msg='', activated=(not DEBUG)):
+
+    class TimeoutException(Exception):
+        pass
+
+    def signal_handler(signum, frame):
+        if activated:
+            raise TimeoutException(f'{msg} run over {seconds} s!')
+
+    signal.signal(signal.SIGALRM, signal_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+
+
+# functional functions (need move to code)
+
+
+def forward_units(model, try_units: List[SequentialMutableChannelUnit],
+                  units: List[SequentialMutableChannelUnit], template_output):
+    for unit in units:
+        unit.current_choice = 1.0
+    for unit in try_units:
+        unit.current_choice = min(0.5, unit.sample_choice())
+    x = torch.rand([2, 3, 224, 224]).to(DEVICE)
+    tensors = model(x)
+    assert get_shape(template_output) == get_shape(tensors)
+
+
+def find_mutable(model, try_units, units, template_tensors):
+    if len(try_units) == 0:
+        return []
+    try:
+        forward_units(model, try_units, units, template_tensors)
+        return try_units
+    except Exception as e:
+        if len(try_units) == 1:
+            print(f'{model} find an unmutable units.')
+            print(f'{e}')
+            print(try_units[0])
+            return []
+        else:
+            num = len(try_units)
+            return find_mutable(model, try_units[:num // 2], units,
+                                template_tensors) + find_mutable(
+                                    model, try_units[num // 2:], units,
+                                    template_tensors)
 
 
 def get_shape(tensor):
@@ -60,33 +119,6 @@ def get_shape(tensor):
     else:
         raise NotImplementedError(
             f'unsuppored type{type(tensor)} to get shape of tensors.')
-
-
-@contextmanager
-def time_limit(seconds, msg='', activated=(not DEBUG)):
-
-    def signal_handler(signum, frame):
-        if activated:
-            raise TimeoutException(f'{msg} run over {seconds} s!')
-
-    signal.signal(signal.SIGALRM, signal_handler)
-    signal.alarm(seconds)
-    try:
-        yield
-    finally:
-        signal.alarm(0)
-
-
-def is_dynamic_op_fx(module, name):
-    from mmcv.cnn.bricks import Scale
-
-    is_leaf = (
-        isinstance(module, DynamicChannelMixin)
-        or isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear)
-        or isinstance(module, nn.modules.batchnorm._BatchNorm)
-        or isinstance(module, Scale))
-
-    return is_leaf
 
 
 class SumLoss:
@@ -110,41 +142,61 @@ class SumLoss:
             raise NotImplementedError(f'{type(output)}')
 
 
-class ToyCNNPseudoLoss:
+def is_dynamic_op_fx(module, name):
+    from mmcv.cnn.bricks import Scale
 
-    def __call__(self, model):
-        pseudo_img = torch.rand(2, 3, 16, 16)
-        pseudo_output = model(pseudo_img)
-        return pseudo_output.sum()
+    is_leaf = (
+        isinstance(module, DynamicChannelMixin)
+        or isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear)
+        or isinstance(module, nn.modules.batchnorm._BatchNorm)
+        or isinstance(module, Scale))
+
+    return is_leaf
 
 
-def _test_tracer_2_graph(model, tracer_type='fx'):
+# test functions for mp
 
-    def _test_fx_tracer_2_graph(model):
-        graph = ModuleGraph.init_from_fx_tracer(
-            model,
-            dict(
-                type='RazorFxTracer',
-                is_extra_leaf_module=is_dynamic_op_fx,
-                concrete_args=dict(mode='tensor')))
-        return graph
 
-    def _test_backward_tracer_2_graph(model):
+def _test_tracer(model, tracer_type='fx'):
+
+    def _test_fx_tracer(model):
+        tracer = CostumTracer(is_dynamic_op_fx, {}, {})
+        return tracer.trace(model)
+
+    def _test_backward_tracer(model):
         model.eval()
-        graph = ModuleGraph.init_from_backward_tracer(
-            model, backward_tracer=BackwardTracer(SumLoss()))
-        return graph
+        tracer = BackwardTracer(loss_calculator=SumLoss())
+        return tracer.trace(model)
 
     if tracer_type == 'fx':
-        graph = _test_fx_tracer_2_graph(model)
+        graph = _test_fx_tracer(model)
     else:
-        graph = _test_backward_tracer_2_graph(model)
+        graph = _test_backward_tracer(model)
     return graph
 
 
-def _test_graph2units(graph: ModuleGraph):
-    units = SequentialMutableChannelUnit.init_from_graph(graph)
-    return units
+def _test_tracer_result_2_module_graph(model, tracer_res, tracer_type='fx'):
+
+    def _fx_graph_2_module_graph(model, fx_graph):
+        fx_graph.owning_module = model
+        fx_graph.graph = BaseGraph[FxBaseNode]()
+        base_graph = RazorFxTracer().parse_torch_graph(fx_graph)
+
+        module_graph = FxTracerToGraphConverter(base_graph, model).graph
+        module_graph._model = model
+        module_graph.refresh_module_name()
+        return module_graph
+
+    def _path_2_module_graph(model, path_list):
+        module_graph = PathToGraphConverter(path_list, model).graph
+        module_graph.refresh_module_name()
+        return module_graph
+
+    if tracer_type == 'fx':
+        graph = _fx_graph_2_module_graph(model, tracer_res)
+    else:
+        graph = _path_2_module_graph(model, tracer_res)
+    return graph
 
 
 def _test_units(units: List[SequentialMutableChannelUnit], model):
@@ -154,17 +206,12 @@ def _test_units(units: List[SequentialMutableChannelUnit], model):
     for unit in units:
         unit.prepare_for_pruning(model)
     mutable_units = [unit for unit in units if unit.is_mutable]
-    assert len(mutable_units) >= 1, \
+    found_mutable_units = find_mutable(model, mutable_units, units,
+                                       tensors_org)
+    assert len(found_mutable_units) >= 1, \
         'len of mutable units should greater or equal than 0.'
-    for unit in mutable_units:
-        choice = unit.sample_choice()
-        unit.current_choice = choice
-        assert abs(unit.current_choice - choice) < 0.1
-
-    x = torch.rand([2, 3, 224, 224]).to(DEVICE)
-    tensors = model(x)
-    assert get_shape(tensors_org) == get_shape(tensors)
-    return mutable_units
+    forward_units(model, found_mutable_units, units, tensors_org)
+    return found_mutable_units
 
 
 def _test_a_model(Model, tracer_type='fx'):
@@ -175,35 +222,59 @@ def _test_a_model(Model, tracer_type='fx'):
         model = Model
         model.eval()
         print(f'test {Model} using {tracer_type} tracer.')
+        """
+        model
+            -> fx_graph/path_list
+            -> module_graph
+            -> channel_graph
+            -> units
+        """
+        with time_limit(60, 'trace'):
+            tracer_result = _test_tracer(model, tracer_type)
+            out = None
 
-        with time_limit(20, 'tracer2graph'):
-            # trace a model and get graph
-            graph: ModuleGraph = _test_tracer_2_graph(model, tracer_type)
-            num = len(graph)
-        with time_limit(120, 'graph2units'):
-            # graph 2 unit
-            units = _test_graph2units(graph)
-            num = len(units)
+        with time_limit(60, 'to_module_graph'):
+            module_graph: ModuleGraph = _test_tracer_result_2_module_graph(
+                model, tracer_result, tracer_type)
+            out = len(module_graph)
 
-        with time_limit(30, 'test units'):
+        with time_limit(300, 'to channel graph'):
+            channel_graph = ChannelGraph.copy_from(
+                module_graph, default_channel_node_converter)
+            channel_graph.check()
+
+        with time_limit(60, 'to units'):
+            channel_graph.forward(3)
+            units_config = channel_graph.generate_units_config()
+            print(units_config)
+            units = [
+                SequentialMutableChannelUnit.init_from_cfg(model, cfg)
+                for cfg in units_config.values()
+            ]
+
+        with time_limit(600, 'test units'):
             # get unit
             mutable_units = _test_units(units, model)
-            num = len(mutable_units)
+            out = len(mutable_units)
+
         print(f'test {Model} successful.')
-        return Model, True, '', time.time() - start, num
+        return Model.name, True, '', time.time() - start, out
     except Exception as e:
         if DEBUG:
             raise e
         else:
             print(f'test {Model} failed.')
-            return Model, False, f'{e}', time.time() - start, -1
+            return Model.name, False, f'{e}', time.time() - start, -1
+
+
+# TestCase
 
 
 class TestTraceModel(TestCase):
 
     def test_init_from_fx_tracer(self) -> None:
         TestData = fx_passed_library.include_models(FULL_TEST)
-        with SetTorchThread(1):
+        with SetTorchThread(TORCH_THREAD_SIZE):
             with mp.Pool(POOL_SIZE) as p:
                 result = p.map(
                     partial(_test_a_model, tracer_type='fx'), TestData)
@@ -211,7 +282,7 @@ class TestTraceModel(TestCase):
 
     def test_init_from_backward_tracer(self) -> None:
         TestData = backward_passed_library.include_models(FULL_TEST)
-        with SetTorchThread(1) as _:
+        with SetTorchThread(TORCH_THREAD_SIZE):
             with mp.Pool(POOL_SIZE) as p:
                 result = p.map(
                     partial(_test_a_model, tracer_type='backward'), TestData)
@@ -228,15 +299,15 @@ class TestTraceModel(TestCase):
               f'{len(model_manager.uninclude_models(full_test=FULL_TEST))}')
 
         print('Passed:')
-        for model, passed, msg, used_time, len_mutable in passd_test:
+        for model, passed, msg, used_time, out in passd_test:
             with self.subTest(model=model):
-                print(f'\t{model}\t{int(used_time)}s\t{len_mutable}')
+                print(f'\t{model}\t{int(used_time)}s\t{out}')
                 self.assertTrue(passed, msg)
 
         print('UnPassed:')
-        for model, passed, msg, used_time, len_mutable in unpassd_test:
+        for model, passed, msg, used_time, out in unpassd_test:
             with self.subTest(model=model):
-                print(f'\t{model}\t{int(used_time)}s\t{len_mutable}')
+                print(f'\t{model}\t{int(used_time)}s\t{out}')
                 print(f'\t\t{msg}')
                 self.assertTrue(passed, msg)
 
