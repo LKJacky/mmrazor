@@ -5,6 +5,7 @@ from typing import Dict, List
 import torch.nn as nn
 from mmengine.model import BaseModule
 
+from mmrazor.models.architectures.dynamic_ops.mixins import DynamicChannelMixin
 from mmrazor.structures.graph import ModuleGraph
 from mmrazor.structures.graph.channel_graph import ChannelGraph
 from mmrazor.structures.graph.channel_nodes import \
@@ -35,7 +36,7 @@ class Channel(BaseModule):
                  is_output_channel=True) -> None:
         super().__init__()
         self.name = name
-        self.module = module
+        self.module: nn.Module = module
         self.index = index
         self.start = index[0]
         self.end = index[1]
@@ -81,7 +82,12 @@ class Channel(BaseModule):
     @property
     def is_mutable(self) -> bool:
         """If the channel is prunable."""
-        return True
+        if self.module is not None:
+            has_prama = len(list(self.module.parameters())) != 0
+            is_dynamic_op = isinstance(self.module, DynamicChannelMixin)
+            return (not has_prama) or is_dynamic_op
+        else:
+            return True
 
     def __repr__(self) -> str:
         return (f'{self.__class__.__name__}('
@@ -177,9 +183,11 @@ class ChannelUnit(BaseModule):
 
         unit_graph = ChannelGraph.copy_from(graph,
                                             default_channel_node_converter)
+        print(unit_graph)
         unit_graph.check()
         unit_graph.forward(num_input_channel)
         units_config = unit_graph.generate_units_config()
+        print(units_config)
         units = [
             cls.init_from_cfg(graph._model, unit_config)
             for unit_config in units_config.values()
