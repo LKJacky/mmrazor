@@ -201,9 +201,7 @@ class CostumFxTracer(Tracer):
                     args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> Any:
         module_qualified_name = self.path_of_module(m)
         try:
-            print(f'enter {module_qualified_name}')
             proxy = super().call_module(m, forward, args, kwargs)
-            print(f'exit {module_qualified_name}')
             return proxy
         except Exception as e:
             module_qualified_name = self.path_of_module(m)

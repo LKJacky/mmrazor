@@ -231,7 +231,8 @@ def _test_a_model(Model, tracer_type='fx'):
         """
         with time_limit(60, 'trace'):
             tracer_result = _test_tracer(model, tracer_type)
-            out = None
+            out = len(tracer_result.nodes if tracer_type ==
+                      'fx' else tracer_result)
 
         with time_limit(60, 'to_module_graph'):
             module_graph: ModuleGraph = _test_tracer_result_2_module_graph(
@@ -246,7 +247,6 @@ def _test_a_model(Model, tracer_type='fx'):
         with time_limit(60, 'to units'):
             channel_graph.forward(3)
             units_config = channel_graph.generate_units_config()
-            print(units_config)
             units = [
                 SequentialMutableChannelUnit.init_from_cfg(model, cfg)
                 for cfg in units_config.values()

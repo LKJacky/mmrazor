@@ -183,11 +183,9 @@ class ChannelUnit(BaseModule):
 
         unit_graph = ChannelGraph.copy_from(graph,
                                             default_channel_node_converter)
-        print(unit_graph)
         unit_graph.check()
         unit_graph.forward(num_input_channel)
         units_config = unit_graph.generate_units_config()
-        print(units_config)
         units = [
             cls.init_from_cfg(graph._model, unit_config)
             for unit_config in units_config.values()
