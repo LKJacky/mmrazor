@@ -1,12 +1,14 @@
-from typing import Dict, Optional, Union
+from typing import Union
 
 import torch
 import torch.nn as nn
 from torch.nn.common_types import _size_2_t
 
-from mmrazor.models.architectures.dynamic_op.bricks import DynamicConv2d
-from mmrazor.models.mutables.mutable_channel import MutableChannelGroup
-from mmrazor.models.mutables.mutable_channel import SimpleMutableChannel
+import mmrazor.models.architectures.dynamic_ops as dynamic_ops
+from mmrazor.models.architectures import DynamicConv2d
+from mmrazor.models.mutables.mutable_channel import (L1MutableChannelUnit,
+                                                     MutableChannelContainer,
+                                                     SimpleMutableChannel)
 from mmrazor.registry import MODELS
 
 
@@ -17,6 +19,22 @@ class MutableImportance(SimpleMutableChannel):
         super().__init__(num_channels, **kwargs)
         self.importance = nn.parameter.Parameter(torch.ones([num_channels]))
         self.importance.requires_grad_()
+
+
+@MODELS.register_module()
+class MutableImpChannelContainer(MutableChannelContainer):
+
+    @property
+    def imp(self):
+        imp = []
+        for mutable in self.mutable_channels.values():
+            mutable: MutableImportance
+            imp.append(mutable.importance)
+        imp: torch.Tensor = torch.cat(imp, dim=0)
+        mask = self.current_mask
+        imp = imp[mask]
+        imp = imp.unsqueeze(-1).unsqueeze(-1).unsqueeze(0)
+        return imp
 
 
 class ImportanceConv2d(DynamicConv2d):
@@ -36,88 +54,52 @@ class ImportanceConv2d(DynamicConv2d):
         super().__init__(in_channels, out_channels, kernel_size, stride,
                          padding, dilation, groups, bias, padding_mode, device,
                          dtype)
-        self._mutable_ins = nn.ModuleList()
-        self._mutable_outs = nn.ModuleList()
-
-    # importance manage
-
-    def add_in_imp(self, mutable):
-        self._mutable_ins.append(mutable)
-
-    def add_out_imp(self, mutable):
-        self._mutable_outs.append(mutable)
-
-    def mutable_in_imp(self):
-        if len(self._mutable_ins) == 0:
-            return torch.ones([self.in_channels])
-        else:
-            ins = [mutable.importance for mutable in self._mutable_ins]
-            ins = torch.cat(ins)
-            return ins
-
-    def mutable_out_imp(self):
-        if len(self._mutable_outs) == 0:
-            return torch.ones([self.out_channels])
-        else:
-            outs = [mutable.importance for mutable in self._mutable_outs]
-            outs = torch.cat(outs)
-            return outs
 
     # module function
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        imp_in = self.mutable_in_imp().reshape([1, -1, 1, 1])
-        imp_out = self.mutable_out_imp().reshape([1, -1, 1, 1])
-        x = input * imp_in
-        x = nn.Conv2d.forward(self, x)
-        x = x * imp_out
+        print(self.mutable_in_channels)
+        print(self.mutable_out_channels)
+        x = input * self.mutable_in_channels.imp
+
+        x = super().forward(x)
+
+        x = x * self.mutable_out_channels.imp
         return x
-
-    @classmethod
-    def copy_from(cls, conv: nn.Conv2d):
-        return cls(conv.in_channels, conv.out_channels, conv.kernel_size,
-                   conv.stride, conv.padding, conv.dilation, conv.groups)
-
-    def __repr__(self):
-        s = super().__repr__()
-        return s
-
-    # abstract methods
-
-    def to_static_op(self) -> nn.Module:
-        pass
 
 
 @MODELS.register_module()
-class ImpUnit(MutableChannelGroup):
+class ImpUnit(L1MutableChannelUnit):
 
     def __init__(self,
-                 num_channels,
-                 alias: Optional[str] = None,
-                 init_cfg: Optional[Dict] = None) -> None:
-        super().__init__(num_channels, alias, init_cfg)
-        self.mutable = MutableImportance(num_channels)
+                 num_channels: int,
+                 choice_mode='number',
+                 divisor=1,
+                 min_value=1,
+                 min_ratio=0.9) -> None:
+        super().__init__(num_channels, choice_mode, divisor, min_value,
+                         min_ratio)
+        self.mutable_channel = MutableImportance(num_channels)
 
-    def prepare_for_pruning(self):
-        for channel in self.input_related:
-            if isinstance(channel.module, ImportanceConv2d):
-                channel.module.add_in_imp(self.mutable)
-        for channel in self.output_related:
-            if isinstance(channel.module, ImportanceConv2d):
-                channel.module.add_out_imp(self.mutable)
+    def prepare_for_pruning(self, model: nn.Module):
+        self._replace_with_dynamic_ops(
+            model, {
+                nn.Conv2d: ImportanceConv2d,
+                nn.BatchNorm2d: dynamic_ops.DynamicBatchNorm2d,
+                nn.Linear: dynamic_ops.DynamicLinear
+            })
+        self._register_channel_container(model, MutableImpChannelContainer)
+        self._register_mutable_channel(self.mutable_channel)
 
-    @classmethod
-    def replace_with_dynamic_ops(cls, models: nn.Module):
-        return super().replace_with_dynamic_ops(models, [ImportanceConv2d])
+        # for channel in self.input_related:
+        #     if isinstance(channel.module, ImportanceConv2d):
+        #         channel.module.add_in_imp(self.mutable)
+        # for channel in self.output_related:
+        #     if isinstance(channel.module, ImportanceConv2d):
+        #         channel.module.add_out_imp(self.mutable)
 
-    def _generate_mask(self):
-        idx = self.mutable.importance.topk(self.num_channels)[1]
-        mask = torch.zeros_like(self.mutable.importance)
+    def _generate_mask(self, num: int):
+        idx = self.mutable_channel.importance.topk(num)[1]
+        mask = torch.zeros_like(self.mutable_channel.importance)
         mask.scatter_(0, idx, 1)
         return mask
-
-    def apply_mask(self):
-        pass
-
-    def set_choice(self, choice: Union[float, int]):
-        choice = self._get_int_choice(choice)
