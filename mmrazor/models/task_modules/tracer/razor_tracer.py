@@ -40,6 +40,12 @@ class FxBaseNode(BaseNode):
         else:
             return None
 
+    def method(self):
+        if self.is_method():
+            return self.val.target
+        else:
+            return None
+
     # base type
     # placeholder|call_method|call_module|call_function|get_attr|output
 
@@ -51,9 +57,12 @@ class FxBaseNode(BaseNode):
         """Bool: if the fxnode represents 'call_module'"""
         return self.val.op == 'call_module'
 
-    def is_Tensor(self):
+    def is_input(self):
         """Bool: if the fxnode represents input or output tensors"""
-        return self.val.op == 'placeholder' or self.val.op == 'output'
+        return self.val.op == 'placeholder'
+
+    def is_output(self):
+        return self.val.op == 'output'
 
     def is_method(self):
         """Bool: if the fxnode represents 'call_method'"""

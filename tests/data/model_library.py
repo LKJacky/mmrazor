@@ -35,10 +35,10 @@ class ModelGenerator(nn.Module):
 
     def forward(self, x):
         assert self._model is not None
-        return self._model(self.input())
+        return self._model(x, *self.input())
 
     def input(self):
-        return torch.ones([2, 3, 224, 224])
+        return []
 
     def __repr__(self) -> str:
         return self.name
@@ -63,13 +63,14 @@ class MMDetModelGenerator(MMModelGenerator):
 
     def forward(self, x):
         assert self._model is not None
-        input = self.input()
-        data = self._model.data_preprocessor(input, False)
         self._model.eval()
-        return self._model(**data, mode='tensor')
+        return self._model(x, **self.input(), mode='tensor')
 
     def input(self):
-        return demo_mm_inputs(1, [[3, 224, 224]])
+        data = demo_mm_inputs(1, [[3, 224, 224]])
+        data = self._model.data_preprocessor(data, False)
+        data.pop('inputs')
+        return data
 
 
 # model library

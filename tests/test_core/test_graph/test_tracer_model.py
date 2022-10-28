@@ -237,6 +237,8 @@ def _test_a_model(Model, tracer_type='fx'):
         with time_limit(60, 'to_module_graph'):
             module_graph: ModuleGraph = _test_tracer_result_2_module_graph(
                 model, tracer_result, tracer_type)
+            module_graph.check(fix=True)
+            module_graph.check()
             out = len(module_graph)
 
         with time_limit(300, 'to channel graph'):
@@ -275,8 +277,12 @@ class TestTraceModel(TestCase):
     def test_init_from_fx_tracer(self) -> None:
         TestData = fx_passed_library.include_models(FULL_TEST)
         with SetTorchThread(TORCH_THREAD_SIZE):
-            with mp.Pool(POOL_SIZE) as p:
-                result = p.map(
+            if POOL_SIZE != 1:
+                with mp.Pool(POOL_SIZE) as p:
+                    result = p.map(
+                        partial(_test_a_model, tracer_type='fx'), TestData)
+            else:
+                result = map(
                     partial(_test_a_model, tracer_type='fx'), TestData)
         self.report(result, fx_passed_library, 'fx')
 

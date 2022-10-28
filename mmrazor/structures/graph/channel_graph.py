@@ -148,7 +148,7 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
         for node in nodes:
             try:
                 node.check_channel()
-            except AssertionError:
+            except Exception:
                 for pre_node in node.prev_nodes:
                     pre_node: ChannelNode
                     if (pre_node.out_channels < node.in_channels

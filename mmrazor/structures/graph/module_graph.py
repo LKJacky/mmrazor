@@ -20,7 +20,27 @@ from mmrazor.models.task_modules.tracer.razor_tracer import (FxBaseNode,
 from mmrazor.registry import TASK_UTILS
 from .base_graph import BaseGraph, BaseNode
 
+
 # ModuleNode && ModuleGraph
+class NoOutputError(Exception):
+
+    def __init__(self, node, *args: object) -> None:
+        super().__init__(f'{node}', *args)
+        self.node = node
+
+    pass
+
+
+class NoInputError(Exception):
+
+    def __init__(self, node, *args: object) -> None:
+        super().__init__(f'{node}', *args)
+        self.node = node
+
+
+def my_assert(condiion, exception):
+    if not condiion:
+        raise exception
 
 
 class ModuleNode(BaseNode):
@@ -66,7 +86,10 @@ class ModuleNode(BaseNode):
         return isinstance(self.val, nn.Module)
 
     def __repr__(self) -> str:
-        return f'{self.name}({self.module_name})'
+        repr = f'{self.name}'
+        if self.module_name != '':
+            repr += f'({self.module_name})'
+        return repr
 
     # node type
 
@@ -118,6 +141,24 @@ class ModuleNode(BaseNode):
         """mix node represents a module that mixs all input channels and
         generete new output channels, such as conv and linear."""
         return self.basic_type in ['conv2d', 'linear', 'gwconv2d']
+
+    def is_input(self):
+        return self.val == 'input_placeholder'
+
+    def is_output(self):
+        return self.val == 'output_placeholder'
+
+    def check(self, fix=False):
+
+        if self.is_input():
+            assert len(self.prev_nodes) == 0, f'{self}'
+            my_assert(len(self.next_nodes) > 0, NoOutputError(self))
+        elif self.is_output():
+            my_assert(len(self.prev_nodes) > 0, NoInputError(self))
+            assert len(self.next_nodes) == 0, f'{self}'
+        else:
+            my_assert(len(self.prev_nodes) > 0, NoInputError(self))
+            my_assert(len(self.next_nodes) > 0, NoOutputError(self))
 
 
 MODULENODE = TypeVar('MODULENODE', bound=ModuleNode)
@@ -178,6 +219,46 @@ class ModuleGraph(BaseGraph[MODULENODE]):
         for node in self:
             if isinstance(node.val, nn.Module):
                 node.module_name = module2name[node.val]
+
+    def check(self, fix=False):
+        for node in copy.copy(list(self.topo_traverse())):
+            self._check(node, fix=fix)
+
+    def _check(self, node, fix=False):
+        try:
+            node.check()
+        except NoInputError as e:
+            if fix:
+                from mmengine import MMLogger
+                MMLogger.get_current_instance().warn(
+                    f'add a input before {node}')
+                self.add_input_before(node)
+                self._check(node, fix=fix)
+            else:
+                raise e
+        except NoOutputError as e:
+            if fix:
+                from mmengine import MMLogger
+                MMLogger.get_current_instance().warn(
+                    f'add a output after {node}')
+                self.add_output_after(node)
+                self._check(node, fix=fix)
+            else:
+                raise e
+        except Exception as e:
+            raise e
+
+    def add_input_before(self, node: MODULENODE):
+        input_node: MODULENODE = ModuleNode(
+            'auto_input', 'input_placeholder')  # type: ignore
+        input_node = self.add_or_find_node(input_node)
+        self.connect(input_node, node)
+
+    def add_output_after(self, node: MODULENODE):
+        output_node: MODULENODE = ModuleNode(
+            'auto_output', 'output_placeholder')  # type: ignore
+        output_node = self.add_or_find_node(output_node)
+        self.connect(node, output_node)
 
 
 # Converter
@@ -413,10 +494,12 @@ class FxTracerToGraphConverter(GraphConverter):
         """Convert a fxnode to a module-node."""
         if node.is_function():
             val = node.function()
-        elif node.is_Tensor():
-            val = 'tensor'
+        elif node.is_input():
+            val = 'input_placeholder'
+        elif node.is_output():
+            val = 'output_placeholder'
         elif node.is_method():
-            val = 'method'
+            val = node.method()
         elif node.is_get_attr():
             val = 'get_attr'
         elif node.is_module():
@@ -427,30 +510,8 @@ class FxTracerToGraphConverter(GraphConverter):
         new_node = ModuleNode(node.name, val)
         return new_node
 
-    def _delete_useless_nodes(self):
-        """delete useless nodes in torch-graph."""
-        base_graph = self.base_graph
-        # delete input and output nodes
-        for node in copy.copy(list(base_graph)):
-            if node.is_function():
-                pass
-            elif node.is_Tensor():
-                base_graph.delete_node(node)
-            elif node.is_method():
-                pass
-            elif node.is_get_attr():
-                pass
-            elif node.is_module():
-                if len(list(node.module().parameters())) == 0:
-                    pass
-                else:
-                    pass
-            else:
-                raise NotImplementedError(f'{node} is unsupported')
-
     def _convert_graph(self):
         """Convert a torch-graph to a module-graph."""
-        self._delete_useless_nodes()
         base_graph = self.base_graph
         # copy_nodes and connect
         module_graph = ModuleGraph.copy_from(base_graph, self._node_converter)
