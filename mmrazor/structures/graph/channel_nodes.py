@@ -208,7 +208,8 @@ class BindChannelNode(ChannelNode):
         return super().__repr__() + '_bind'
 
     def check_channel(self):
-        pass
+        for node in self.prev_nodes:
+            assert node.out_channels == self.in_channels
 
 
 class CatChannelNode(ChannelNode):
