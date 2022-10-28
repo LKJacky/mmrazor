@@ -98,7 +98,8 @@ class ChannelNode(ModuleNode):
     def check_channel(self):
         for node in self.prev_nodes:
             assert node.out_channels == self.in_channels, \
-                f'{self} and {node} dismatch'
+                (f'{self.name}({self.in_channels}) '
+                    f'and {node.name}({node.out_channels}) dismatch')
 
     @property
     def _in_channels(self) -> int:
@@ -142,9 +143,6 @@ class PassUnionChannelNode(ChannelNode):
         """Channel forward."""
         return PassUnionChannelNode._channel_forward(self, channel_tensors[0])
 
-    def __repr__(self) -> str:
-        return super().__repr__() + '_pass_uion'
-
     @staticmethod
     def _channel_forward(node: ChannelNode, tensor: ChannelTensor):
         """Channel forward."""
@@ -153,6 +151,9 @@ class PassUnionChannelNode(ChannelNode):
         node.in_channel_tensor = tensor
         node.out_channel_tensor = tensor
         return node.out_channel_tensor
+
+    def __repr__(self) -> str:
+        return super().__repr__() + '_uion'
 
 
 class PassChannelNode(ChannelNode):
@@ -255,6 +256,33 @@ class ExpandChannelNode(ChannelNode):
         self.out_channel_tensor = tensor0.expand(self.expand_ratio)
         return self.out_channel_tensor
 
+    def __repr__(self) -> str:
+        return super().__repr__() + f'_expand({self.expand_ratio})'
+
+
+class InputChannelNode(ChannelNode):
+
+    def __init__(self,
+                 name: str,
+                 val: Union[nn.Module, str],
+                 module_name='',
+                 input_channels=3) -> None:
+        super().__init__(name, val, module_name)
+        self._input_channels = input_channels
+
+    def channel_forward(self, channel_tensors: List[ChannelTensor]):
+        input_tensor = ChannelTensor(self._input_channels)
+        self.in_channel_tensor = input_tensor
+        self.out_channel_tensor = input_tensor
+        return input_tensor
+
+    @property
+    def _in_channels(self) -> int:
+        return self._input_channels
+
+    def __repr__(self) -> str:
+        return super().__repr__() + '_input'
+
 
 class EndNode(ChannelNode):
 
@@ -312,13 +340,6 @@ class ConvNode(MixChannelNode):
 
     def _gw_conv_channel_forward(self, channel_tensors: List[ChannelTensor]):
 
-        def group_union(tensor: ChannelTensor, groups: int):
-            c_per_group = len(tensor) // groups
-            group_tensor = ChannelTensor(c_per_group)
-            for i in range(groups):
-                tensor[i * c_per_group:(i + 1) *
-                       c_per_group].union(group_tensor)
-
         assert len(channel_tensors) == 1
         tensor0 = channel_tensors[0]
         conv: nn.Conv2d = self.val
@@ -359,10 +380,10 @@ class LinearNode(MixChannelNode):
         return self.val.out_features
 
     def __repr__(self) -> str:
-        return super().__repr__() + 'linear'
+        return super().__repr__() + '_linear'
 
 
-class NormNode(PassUnionChannelNode):
+class BnNode(PassUnionChannelNode):
     """A NormNode corresponds to a BatchNorm2d module."""
 
     def __init__(self,
@@ -384,6 +405,34 @@ class NormNode(PassUnionChannelNode):
         return super().__repr__() + '_bn'
 
 
+class GroupNormNode(PassUnionChannelNode):
+
+    def __init__(self,
+                 name: str,
+                 val: Union[nn.Module, str],
+                 module_name='') -> None:
+        super().__init__(name, val, module_name)
+        assert isinstance(self.val, nn.GroupNorm)
+        self.val: nn.GroupNorm
+
+    @property
+    def _in_channels(self) -> int:
+        return self.val.num_channels
+
+    @property
+    def _out_channels(self) -> int:
+        return self.val.num_channels
+
+    def channel_forward(self, channel_tensors: List[ChannelTensor]):
+        out_tensor = super().channel_forward(channel_tensors)
+        group_tensor = ChannelTensor(self.in_channels // self.val.num_groups)
+        group_union(out_tensor, self.val.num_groups, group_tensor)
+        return out_tensor
+
+    def __repr__(self) -> str:
+        return super().__repr__() + '_gn'
+
+
 # converter
 
 
@@ -393,16 +442,18 @@ def default_channel_node_converter(node: ModuleNode) -> ChannelNode:
     from mmcv.cnn.bricks import Scale
     from mmdet.models.dense_heads.anchor_head import AnchorHead
     from mmdet.models.dense_heads.base_dense_head import BaseDenseHead
+    from mmdet.models.roi_heads import StandardRoIHead
 
     def warn(default='PassUnionChannelNode'):
         logger = MMLogger.get_current_instance()
-        logger.info((f"{node.name}({node.val}) node can't find match type of"
-                     'channel_nodes,'
-                     f'replaced with {default} by default.'))
+        logger.info(
+            (f"{node.name}({node.module_name}) node can't find match type of"
+             'channel_nodes,'
+             f'replaced with {default} by default.'))
 
     module_mapping = {
         nn.Conv2d: ConvNode,
-        nn.BatchNorm2d: NormNode,
+        nn.BatchNorm2d: BnNode,
         nn.Linear: LinearNode,
         nn.modules.ReLU: PassChannelNode,
         nn.modules.Hardtanh: PassChannelNode,
@@ -412,6 +463,7 @@ def default_channel_node_converter(node: ModuleNode) -> ChannelNode:
         nn.modules.pooling._MaxPoolNd: PassChannelNode,
         nn.modules.pooling._AdaptiveMaxPoolNd: PassChannelNode,
         Scale: PassChannelNode,
+        nn.modules.GroupNorm: GroupNormNode,
     }
     function_mapping = {
         torch.add: BindChannelNode,
@@ -419,11 +471,14 @@ def default_channel_node_converter(node: ModuleNode) -> ChannelNode:
         operator.add: BindChannelNode,
         AnchorHead.predict_by_feat: EndNode,
         BaseDenseHead.predict_by_feat: EndNode,
+        StandardRoIHead.forward: EndNode,
     }
     name_mapping = {
         'bind_placeholder': BindChannelNode,
         'pass_placeholder': PassUnionChannelNode,
         'cat_placeholder': CatChannelNode,
+        'input_placeholder': InputChannelNode,
+        'output_placeholder': EndNode
     }
     if isinstance(node.val, nn.Module):
         # module_mapping
@@ -446,3 +501,15 @@ def default_channel_node_converter(node: ModuleNode) -> ChannelNode:
     else:
         warn('PassUnionChannelNode')
         return PassUnionChannelNode.copy_from(node)
+
+
+# helper functions
+
+
+def group_union(tensor: ChannelTensor, groups: int, group_tensor=None):
+    c_per_group = len(tensor) // groups
+    if group_tensor is None:
+        group_tensor = ChannelTensor(c_per_group)
+    assert groups * len(group_tensor) == len(tensor)
+    for i in range(groups):
+        tensor[i * c_per_group:(i + 1) * c_per_group].union(group_tensor)

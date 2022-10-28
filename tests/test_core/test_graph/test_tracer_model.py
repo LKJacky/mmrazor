@@ -244,6 +244,7 @@ def _test_a_model(Model, tracer_type='fx'):
         with time_limit(300, 'to channel graph'):
             channel_graph = ChannelGraph.copy_from(
                 module_graph, default_channel_node_converter)
+            channel_graph.check(fix=True)
             channel_graph.check()
 
         with time_limit(60, 'to units'):

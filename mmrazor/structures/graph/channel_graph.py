@@ -6,7 +6,7 @@ from torch.nn import Module
 
 from .base_graph import BaseGraph
 from .channel_flow import ChannelTensor
-from .channel_nodes import (ChannelNode, ExpandChannelNode,
+from .channel_nodes import (ChannelNode, EndNode, ExpandChannelNode,
                             default_channel_node_converter)
 from .module_graph import ModuleGraph
 
@@ -118,9 +118,30 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
                 node.forward()
         self._merge_same_module()
 
-    def check(self):
-        for node in self.topo_traverse():
-            node.check_channel()
+    def check(self, fix=False):
+        for node in copy.copy(list(self.topo_traverse())):
+            try:
+                node.check_channel()
+
+            except Exception as e:
+                if fix:
+                    from mmengine import MMLogger
+                    MMLogger.get_current_instance().warn(
+                        (f'{node} has channel error, so'
+                         f'we convert it to a EndNode. error: {e}'))
+                    self._convert_a_node_to_end_node(node)
+                else:
+                    raise e
+
+    def _convert_a_node_to_end_node(self, node: ChannelNode):
+
+        end_node = EndNode('auto_end', 'output_placeholder')
+        end_node = self.add_or_find_node(end_node)
+        for prev in copy.copy(node.prev_nodes):
+            self.disconnect(prev, node)
+            self.connect(prev, end_node)
+        for next in copy.copy(node.next_nodes):
+            self.disconnect(node, next)
 
     def _merge_same_module(self):
         """Union all nodes with the same module to the same unit."""
@@ -155,8 +176,8 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
                             and node.in_channels % pre_node.out_channels == 0):
                         from mmengine import MMLogger
                         MMLogger.get_current_instance().warning(
-                            f'As the channels of {pre_node} and {node} '
-                            'dismatch, we add an ExpandNode between them.')
+                            (f'As the channels of {pre_node} and {node} '
+                             'dismatch, we add an ExpandNode between them.'))
                         expand_ratio = (
                             node.in_channels // pre_node.out_channels)
                         # insert a expand node
