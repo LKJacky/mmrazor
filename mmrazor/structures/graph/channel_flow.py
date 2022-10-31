@@ -20,8 +20,10 @@ class ChannelElem:
 
     @classmethod
     def union_two(cls, elem1: 'ChannelElem', elem2: 'ChannelElem'):
-        if elem1.root is not elem2.root:
-            elem2.root._set_parent(elem1)
+        root1 = elem1.root
+        root2 = elem2.root
+        if root1 is not root2:
+            root2._set_parent(root1)
 
     def union(self, elem: 'ChannelElem'):
         ChannelElem.union_two(self, elem)
@@ -72,7 +74,10 @@ class ChannelElem:
         if self._parent is None:
             return self
         else:
-            return self._parent.root
+            root = self._parent.root
+            self._unset_parent()
+            self._set_parent(root)
+            return root
 
     @property
     def subs(self):
@@ -84,8 +89,15 @@ class ChannelElem:
 
     def _set_parent(self, parent: 'ChannelElem'):
         assert self._parent is None
+        assert parent.root is not self
         self._parent = parent
         parent._subs.add(self)
+
+    def _unset_parent(self):
+        assert self._parent is not None
+        old_parent = self._parent
+        old_parent._subs.remove(self)
+        self._parent = None
 
 
 class ChannelTensor:

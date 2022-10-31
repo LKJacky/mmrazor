@@ -17,6 +17,32 @@ import json
 # model generator
 from mmdet.testing._utils import demo_mm_inputs
 
+# helper functions
+
+
+def get_shape(tensor, only_length=False):
+    if isinstance(tensor, torch.Tensor):
+        if only_length:
+            return len(tensor.shape)
+        else:
+            return tensor.shape
+    elif isinstance(tensor, list) or isinstance(tensor, tuple):
+        shapes = []
+        for x in tensor:
+            shapes.append(get_shape(x, only_length))
+        return shapes
+    elif isinstance(tensor, dict):
+        shapes = {}
+        for key in tensor:
+            shapes[key] = get_shape(tensor[key], only_length)
+        return shapes
+    else:
+        raise NotImplementedError(
+            f'unsuppored type{type(tensor)} to get shape of tensors.')
+
+
+# generators
+
 
 class ModelGenerator(nn.Module):
 
@@ -39,6 +65,11 @@ class ModelGenerator(nn.Module):
 
     def input(self):
         return []
+
+    def assert_model_is_changed(self, tensors_org, tensors_new):
+        shape1 = get_shape(tensors_org)
+        shape2 = get_shape(tensors_new)
+        assert shape1 == shape2, f'{shape1}!={shape2}'
 
     def __repr__(self) -> str:
         return self.name
@@ -71,6 +102,12 @@ class MMDetModelGenerator(MMModelGenerator):
         data = self._model.data_preprocessor(data, False)
         data.pop('inputs')
         return data
+
+    def assert_model_is_changed(self, tensors_org, tensors_new):
+        if 'rcnn' in self.name:
+            assert get_shape(tensors_org, True) == get_shape(tensors_new, True)
+        else:
+            super().assert_model_is_changed(tensors_org, tensors_new)
 
 
 # model library
@@ -434,9 +471,15 @@ class MMDetModelLibrary(MMModelLibrary):
     base_config_path = '/'
     repo = 'mmdet'
 
-    def __init__(self,
-                 include=default_includes,
-                 exclude=['lad', 'ld']) -> None:
+    def __init__(
+        self,
+        include=default_includes,
+        exclude=[
+            'lad',
+            'ld',
+            'faster_rcnn_faster-rcnn_r50-caffe-c4_ms-1x_coco',
+        ]
+    ) -> None:
         super().__init__(include=include, exclude=exclude)
 
     @classmethod

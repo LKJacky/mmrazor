@@ -1,7 +1,10 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import logging
+# import torch.multiprocessing as mp
+import multiprocessing as mp
 import os
 import signal
+import sys
 import time
 from contextlib import contextmanager
 from functools import partial
@@ -9,7 +12,6 @@ from typing import List
 from unittest import TestCase
 
 import torch
-import torch.multiprocessing as mp
 import torch.nn as nn
 
 from mmrazor.models.architectures.dynamic_ops.mixins import DynamicChannelMixin
@@ -24,11 +26,13 @@ from mmrazor.structures.graph.channel_graph import (
     ChannelGraph, default_channel_node_converter)
 from mmrazor.structures.graph.module_graph import (FxTracerToGraphConverter,
                                                    PathToGraphConverter)
+from ...data.model_library import ModelGenerator
 from ...data.tracer_passed_models import (PassedModelManager,
                                           backward_passed_library,
                                           fx_passed_library)
 from ...utils import SetTorchThread
 
+sys.setrecursionlimit(int(pow(2, 20)))
 # test config
 
 DEVICE = torch.device('cpu')
@@ -40,8 +44,9 @@ if DEBUG:
     POOL_SIZE = 1
     TORCH_THREAD_SIZE = -1
 else:
-    POOL_SIZE = mp.cpu_count()
+    POOL_SIZE = mp.cpu_count() // 2
     TORCH_THREAD_SIZE = 1
+    torch.set_num_interop_threads(1)
 
 print(f'DEBUG: {DEBUG}')
 print(f'FULL_TEST: {FULL_TEST}')
@@ -72,15 +77,16 @@ def time_limit(seconds, msg='', activated=(not DEBUG)):
 # functional functions (need move to code)
 
 
-def forward_units(model, try_units: List[SequentialMutableChannelUnit],
+def forward_units(model: ModelGenerator,
+                  try_units: List[SequentialMutableChannelUnit],
                   units: List[SequentialMutableChannelUnit], template_output):
     for unit in units:
         unit.current_choice = 1.0
     for unit in try_units:
-        unit.current_choice = min(0.5, unit.sample_choice())
+        unit.current_choice = unit.sample_choice()
     x = torch.rand([2, 3, 224, 224]).to(DEVICE)
     tensors = model(x)
-    assert get_shape(template_output) == get_shape(tensors)
+    model.assert_model_is_changed(template_output, tensors)
 
 
 def find_mutable(model, try_units, units, template_tensors):
@@ -101,24 +107,6 @@ def find_mutable(model, try_units, units, template_tensors):
                                 template_tensors) + find_mutable(
                                     model, try_units[num // 2:], units,
                                     template_tensors)
-
-
-def get_shape(tensor):
-    if isinstance(tensor, torch.Tensor):
-        return tensor.shape
-    elif isinstance(tensor, list) or isinstance(tensor, tuple):
-        shapes = []
-        for x in tensor:
-            shapes.append(get_shape(x))
-        return shapes
-    elif isinstance(tensor, dict):
-        shapes = {}
-        for key in tensor:
-            shapes[key] = get_shape[tensor[key]]
-        return shapes
-    else:
-        raise NotImplementedError(
-            f'unsuppored type{type(tensor)} to get shape of tensors.')
 
 
 class SumLoss:
@@ -229,25 +217,25 @@ def _test_a_model(Model, tracer_type='fx'):
             -> channel_graph
             -> units
         """
-        with time_limit(60, 'trace'):
+        with time_limit(10, 'trace'):
             tracer_result = _test_tracer(model, tracer_type)
             out = len(tracer_result.nodes if tracer_type ==
                       'fx' else tracer_result)
 
-        with time_limit(60, 'to_module_graph'):
+        with time_limit(10, 'to_module_graph'):
             module_graph: ModuleGraph = _test_tracer_result_2_module_graph(
                 model, tracer_result, tracer_type)
             module_graph.check(fix=True)
             module_graph.check()
             out = len(module_graph)
 
-        with time_limit(300, 'to channel graph'):
+        with time_limit(10, 'to channel graph'):
             channel_graph = ChannelGraph.copy_from(
                 module_graph, default_channel_node_converter)
             channel_graph.check(fix=True)
             channel_graph.check()
 
-        with time_limit(60, 'to units'):
+        with time_limit(20, 'to units'):
             channel_graph.forward(3)
             units_config = channel_graph.generate_units_config()
             units = [
@@ -255,7 +243,7 @@ def _test_a_model(Model, tracer_type='fx'):
                 for cfg in units_config.values()
             ]
 
-        with time_limit(600, 'test units'):
+        with time_limit(20, 'test units'):
             # get unit
             mutable_units = _test_units(units, model)
             out = len(mutable_units)

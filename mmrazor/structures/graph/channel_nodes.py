@@ -2,7 +2,7 @@
 
 import operator
 from abc import abstractmethod
-from typing import List, Union
+from typing import Dict, List, Type, Union
 
 import torch
 import torch.nn as nn
@@ -62,8 +62,7 @@ class ChannelNode(ModuleNode):
         try:
             self.return_tensor = self.channel_forward(in_channel_tensors)
         except Exception as e:
-            print(f'{e},{self.name}')
-            raise e
+            raise Exception(f'{e},{self.name}')
 
     @abstractmethod
     def channel_forward(self, channel_tensors: List[ChannelTensor]):
@@ -288,17 +287,18 @@ class InputChannelNode(ChannelNode):
 class EndNode(ChannelNode):
 
     def channel_forward(self, channel_tensors: List[ChannelTensor]):
+        tensor_end = ChannelTensor(1)
+        self.in_channel_tensor = tensor_end
+        self.out_channel_tensor = tensor_end
         for channel in channel_tensors:
-            channel.union(ChannelTensor(len(channel)))
-        self.in_channel_tensor = ChannelTensor(1)
-        self.out_channel_tensor = ChannelTensor(1)
+            channel.union(tensor_end.expand(len(channel)))
         return self.out_channel_tensor
-
-    def check_channel(self):
-        pass
 
     def __repr__(self) -> str:
         return super().__repr__() + '_end'
+
+    def check_channel(self):
+        pass
 
 
 # class StackChannelNode(ChannelNode):
@@ -441,9 +441,6 @@ def default_channel_node_converter(node: ModuleNode) -> ChannelNode:
     """The default node converter for ChannelNode."""
 
     from mmcv.cnn.bricks import Scale
-    from mmdet.models.dense_heads.anchor_head import AnchorHead
-    from mmdet.models.dense_heads.base_dense_head import BaseDenseHead
-    from mmdet.models.roi_heads import StandardRoIHead
 
     def warn(default='PassUnionChannelNode'):
         logger = MMLogger.get_current_instance()
@@ -470,11 +467,8 @@ def default_channel_node_converter(node: ModuleNode) -> ChannelNode:
         torch.add: BindChannelNode,
         torch.cat: CatChannelNode,
         operator.add: BindChannelNode,
-        AnchorHead.predict_by_feat: EndNode,
-        BaseDenseHead.predict_by_feat: EndNode,
-        StandardRoIHead.forward: EndNode,
     }
-    name_mapping = {
+    name_mapping: Dict[str, Type[ChannelNode]] = {
         'bind_placeholder': BindChannelNode,
         'pass_placeholder': PassUnionChannelNode,
         'cat_placeholder': CatChannelNode,

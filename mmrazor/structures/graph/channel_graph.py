@@ -142,6 +142,7 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
             self.connect(prev, end_node)
         for next in copy.copy(node.next_nodes):
             self.disconnect(node, next)
+        self.delete_node(node)
 
     def _merge_same_module(self):
         """Union all nodes with the same module to the same unit."""
