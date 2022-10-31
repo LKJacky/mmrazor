@@ -87,7 +87,10 @@ class Channel(BaseModule):
             is_dynamic_op = isinstance(self.module, DynamicChannelMixin)
             return (not has_prama) or is_dynamic_op
         else:
-            return True
+            is_unmutable = self.name in [
+                'input_placeholder', 'output_placeholder'
+            ]
+            return not is_unmutable
 
     def __repr__(self) -> str:
         return (f'{self.__class__.__name__}('

@@ -125,13 +125,23 @@ class BaseGraph(Generic[BASENODE]):
 
     def connect(self, pre_node: BASENODE, next_node: BASENODE):
         """Add an edge from pre_node to next_node."""
-        assert pre_node in self and next_node in self
+        pre_node_ = self.find_node(pre_node)
+        next_node_ = self.find_node(next_node)
+        assert pre_node_ is not None and next_node_ is not None, \
+            f"{pre_node},{next_node} don't exist in the graph."
+        pre_node = pre_node_
+        next_node = next_node_
         pre_node.add_next_node(next_node)
         next_node.add_prev_node(pre_node)
 
     def disconnect(self, pre_node: BASENODE, next_node: BASENODE):
         """Remove the edge form pre_node to next_node."""
-        assert pre_node in self and next_node in self
+        pre_node_ = self.find_node(pre_node)
+        next_node_ = self.find_node(next_node)
+        assert pre_node_ is not None and next_node_ is not None, \
+            f"{pre_node},{next_node} don't exist in the graph."
+        pre_node = pre_node_
+        next_node = next_node_
         if next_node in pre_node.next_nodes:
             pre_node.next_nodes.remove(next_node)
         if pre_node in next_node.prev_nodes:

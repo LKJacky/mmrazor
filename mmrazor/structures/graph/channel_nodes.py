@@ -12,6 +12,15 @@ from .channel_flow import ChannelTensor
 from .module_graph import ModuleNode
 
 
+class ChannelDismatchError(Exception):
+    pass
+
+
+def assert_channel(condition, node):
+    if not condition:
+        raise ChannelDismatchError(node.name)
+
+
 class ChannelNode(ModuleNode):
     """A ChannelNode is like a torch module. It accepts  a ChannelTensor and
     output a ChannelTensor. The difference is that the torch module transforms
@@ -96,9 +105,7 @@ class ChannelNode(ModuleNode):
 
     def check_channel(self):
         for node in self.prev_nodes:
-            assert node.out_channels == self.in_channels, \
-                (f'{self.name}({self.in_channels}) '
-                    f'and {node.name}({node.out_channels}) dismatch')
+            assert_channel(node.out_channels == self.in_channels, self)
 
     @property
     def _in_channels(self) -> int:
@@ -208,7 +215,7 @@ class BindChannelNode(ChannelNode):
 
     def check_channel(self):
         for node in self.prev_nodes:
-            assert node.out_channels == self.in_channels
+            assert_channel(node.out_channels == self.in_channels, self)
 
 
 class CatChannelNode(ChannelNode):
@@ -222,8 +229,7 @@ class CatChannelNode(ChannelNode):
 
     def check_channel(self):
         in_num = [node.out_channels for node in self.prev_nodes]
-        assert sum(in_num) == self.in_channels, (
-            f'the channel of {self} dismatched with prev nodes')
+        assert_channel(sum(in_num) == self.in_channels, self)
 
     def _get_in_channels_by_prev_nodes(self, prev_nodes):
         assert len(prev_nodes) > 0

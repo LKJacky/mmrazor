@@ -2,13 +2,15 @@
 import copy
 from typing import Callable, Dict, List
 
+from mmengine import MMLogger
 from torch.nn import Module
 
 from .base_graph import BaseGraph
 from .channel_flow import ChannelTensor
-from .channel_nodes import (ChannelNode, EndNode, ExpandChannelNode,
+from .channel_nodes import (ChannelDismatchError, ChannelNode, EndNode,
+                            ExpandChannelNode, InputChannelNode,
                             default_channel_node_converter)
-from .module_graph import ModuleGraph
+from .module_graph import ModuleGraph, NoInputError, NoOutputError
 
 
 class ChannelGraph(ModuleGraph[ChannelNode]):
@@ -69,7 +71,7 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
             assert tensor is not None
             for (start, end), hash in tensor.elems_hash_dict.items():
                 channel_config = {
-                    'name': node.module_name if node.is_module else node.name,
+                    'name': node.module_name if node.is_module else node.val,
                     'start': start,
                     'end': end,
                     'is_output_channel': is_output_tensor
@@ -118,20 +120,50 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
                 node.forward()
         self._merge_same_module()
 
-    def check(self, fix=False):
-        for node in copy.copy(list(self.topo_traverse())):
-            try:
-                node.check_channel()
+    def _check(self, node: ChannelNode, fix=False):
 
-            except Exception as e:
-                if fix:
-                    from mmengine import MMLogger
+        try:
+            node.check_channel()
+            node.check()
+        except Exception as e:
+            if not fix:
+                raise e
+            else:
+                try:
+                    raise e
+                except NoOutputError as e:
+                    MMLogger.get_current_instance().warn(
+                        f'add a output after {node}, error: {e}')
+                    self._add_output_after(node)
+                except NoInputError as e:
+                    MMLogger.get_current_instance().warn(
+                        f'add a input before {node}, error: {e}')
+                    self._add_input_before(node)
+                except ChannelDismatchError as e:
                     MMLogger.get_current_instance().warn(
                         (f'{node} has channel error, so'
                          f'we convert it to a EndNode. error: {e}'))
                     self._convert_a_node_to_end_node(node)
-                else:
-                    raise e
+
+                self._check(node, fix=True)
+
+    def _add_input_before(self, node: ChannelNode):
+        try:
+            in_channels = node.in_channels
+        except Exception:
+            in_channels = 3
+        input_node = InputChannelNode(
+            f'auto_input_{in_channels}',
+            'input_placeholder',
+            input_channels=in_channels)  # type: ignore
+        input_node = self.add_or_find_node(input_node)
+        self.connect(input_node, node)
+
+    def _add_output_after(self, node: ChannelNode):
+        output_node = EndNode('auto_output',
+                              'output_placeholder')  # type: ignore
+        output_node = self.add_or_find_node(output_node)
+        self.connect(node, output_node)
 
     def _convert_a_node_to_end_node(self, node: ChannelNode):
 
@@ -140,9 +172,7 @@ class ChannelGraph(ModuleGraph[ChannelNode]):
         for prev in copy.copy(node.prev_nodes):
             self.disconnect(prev, node)
             self.connect(prev, end_node)
-        for next in copy.copy(node.next_nodes):
-            self.disconnect(node, next)
-        self.delete_node(node)
+        self._add_input_before(node)
 
     def _merge_same_module(self):
         """Union all nodes with the same module to the same unit."""

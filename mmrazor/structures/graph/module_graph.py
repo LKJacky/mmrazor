@@ -8,6 +8,7 @@ from collections import OrderedDict
 from typing import Dict, List, TypeVar, Union
 
 import torch.nn as nn
+from mmengine import MMLogger
 from torch.nn import Module
 
 from mmrazor.models.task_modules.tracer.backward_tracer import BackwardTracer
@@ -227,34 +228,30 @@ class ModuleGraph(BaseGraph[MODULENODE]):
     def _check(self, node, fix=False):
         try:
             node.check()
-        except NoInputError as e:
-            if fix:
-                from mmengine import MMLogger
-                MMLogger.get_current_instance().warn(
-                    f'add a input before {node}')
-                self.add_input_before(node)
-                self._check(node, fix=fix)
-            else:
-                raise e
-        except NoOutputError as e:
-            if fix:
-                from mmengine import MMLogger
-                MMLogger.get_current_instance().warn(
-                    f'add a output after {node}')
-                self.add_output_after(node)
-                self._check(node, fix=fix)
-            else:
-                raise e
         except Exception as e:
-            raise e
+            if not fix:
+                raise e
+            else:
+                try:
+                    raise e
+                except NoOutputError as e:
+                    MMLogger.get_current_instance().warn(
+                        f'add a output after {node}, error: {e}')
+                    self._add_output_after(node)
+                except NoInputError as e:
+                    MMLogger.get_current_instance().warn(
+                        f'add a input before {node}, error: {e}')
+                    self._add_input_before(node)
 
-    def add_input_before(self, node: MODULENODE):
+                self._check(node, fix=True)
+
+    def _add_input_before(self, node: MODULENODE):
         input_node: MODULENODE = ModuleNode(
             'auto_input', 'input_placeholder')  # type: ignore
         input_node = self.add_or_find_node(input_node)
         self.connect(input_node, node)
 
-    def add_output_after(self, node: MODULENODE):
+    def _add_output_after(self, node: MODULENODE):
         output_node: MODULENODE = ModuleNode(
             'auto_output', 'output_placeholder')  # type: ignore
         output_node = self.add_or_find_node(output_node)
