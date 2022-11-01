@@ -121,7 +121,7 @@ class BaseGraph(Generic[BASENODE]):
         if node.name not in self.nodes:
             self.nodes[node.name] = node
         else:
-            raise BaseException(f'{node.name} already exists in graph')
+            raise Exception(f'{node.name} already exists in graph')
 
     def connect(self, pre_node: BASENODE, next_node: BASENODE):
         """Add an edge from pre_node to next_node."""
