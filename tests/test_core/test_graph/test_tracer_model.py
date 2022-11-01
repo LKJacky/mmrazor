@@ -278,9 +278,14 @@ class TestTraceModel(TestCase):
     def test_init_from_backward_tracer(self) -> None:
         TestData = backward_passed_library.include_models(FULL_TEST)
         with SetTorchThread(TORCH_THREAD_SIZE):
-            with mp.Pool(POOL_SIZE) as p:
-                result = p.map(
-                    partial(_test_a_model, tracer_type='backward'), TestData)
+            if POOL_SIZE != 1:
+                with mp.Pool(POOL_SIZE) as p:
+                    result = p.map(
+                        partial(_test_a_model, tracer_type='backward'),
+                        TestData)
+            else:
+                result = map(
+                    partial(_test_a_model, tracer_type='fx'), TestData)
         self.report(result, backward_passed_library, 'backward')
 
     def report(self, result, model_manager: PassedModelManager, fx_type='fx'):

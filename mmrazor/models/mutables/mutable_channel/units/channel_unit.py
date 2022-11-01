@@ -184,9 +184,10 @@ class ChannelUnit(BaseModule):
                         num_input_channel=3) -> List['ChannelUnit']:
         """Parse a module-graph and get ChannelUnits."""
 
+        graph.check(fix=True)
         unit_graph = ChannelGraph.copy_from(graph,
                                             default_channel_node_converter)
-        unit_graph.check()
+        unit_graph.check(fix=True)
         unit_graph.forward(num_input_channel)
         units_config = unit_graph.generate_units_config()
         units = [

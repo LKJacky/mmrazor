@@ -149,7 +149,7 @@ class ModuleNode(BaseNode):
     def is_output(self):
         return self.val == 'output_placeholder'
 
-    def check(self, fix=False):
+    def check(self):
 
         if self.is_input():
             assert len(self.prev_nodes) == 0, f'{self}'
