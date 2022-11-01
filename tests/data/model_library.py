@@ -74,6 +74,17 @@ class ModelGenerator(nn.Module):
     def __repr__(self) -> str:
         return self.name
 
+    @classmethod
+    def get_base_name(cls, name: str):
+        names = name.split('.')
+        return '.'.join(names[1:])
+
+    @classmethod
+    def get_short_name(cls, name: str):
+        base_name = cls.get_base_name(name)
+        names = base_name.replace('-', '.').replace('_', '.').split('.')
+        return names[0]
+
 
 class MMModelGenerator(ModelGenerator):
 
@@ -104,10 +115,7 @@ class MMDetModelGenerator(MMModelGenerator):
         return data
 
     def assert_model_is_changed(self, tensors_org, tensors_new):
-        if 'rcnn' in self.name:
-            assert get_shape(tensors_org, True) == get_shape(tensors_new, True)
-        else:
-            super().assert_model_is_changed(tensors_org, tensors_new)
+        assert get_shape(tensors_org, True) == get_shape(tensors_new, True)
 
 
 # model library
@@ -163,13 +171,9 @@ class ModelLibrary:
 
     def short_names(self):
 
-        def get_short_name(name: str):
-            names = name.replace('-', '.').replace('_', '.').split('.')
-            return names[0]
-
         short_names = set()
         for name in self._models:
-            short_names.add(get_short_name(name))
+            short_names.add(ModelGenerator.get_short_name(name))
         return short_names
 
     def _classify_models(self, models: Dict):
@@ -184,6 +188,10 @@ class ModelLibrary:
             else:
                 uninclude.append(models[name])
         return include, uninclude, exclude
+
+    def get_short_name_of_model(self, name: str):
+        names = name.replace('-', '.').replace('_', '.').split('.')
+        return names[0]
 
 
 class DefaultModelLibrary(ModelLibrary):
@@ -362,7 +370,6 @@ class MMClsModelLibrary(MMModelLibrary):
         'mvit',
         'seresnet',
         'repvgg',
-        'seresnext',
         'seresnext',
     ]
     base_config_path = '_base_/models/'

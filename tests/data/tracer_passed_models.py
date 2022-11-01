@@ -84,13 +84,14 @@ class FxPassedModelManager(PassedModelManager):
             'regnet',
             'resnet',
             'resnext',
-            # 'shufflenet', # bug
             'squeezenet',
             'vgg',
             'wide_resnet',
-            # "vit",
-            # "swin",
-            # "convnext"
+            "vit",
+            "swin",
+            "convnext",
+            # error
+            # 'shufflenet',  # bug
         ]
         if cls._torch_library is None:
             cls._torch_library = TorchModelLibrary(include=torch_includes)
@@ -112,30 +113,33 @@ class FxPassedModelManager(PassedModelManager):
             'mobilenet',
             'resnext',
             'wide-resnet',
-            # 'shufflenet', # bug
             'hrnet',
-            # 'resnest',  # bug
             'inception',
-            # 'res2net',  # bug
             'densenet',
-            # 'convnext',  # bug
             'regnet',
-            # transformer and mlp
-            # # 'van', # bug
-            # # 'swin_transformer', # bug
-            # 'convmixer', # bug
-            # # 't2t', # bug
-            # # 'twins', # bug
-            # # 'repmlp', # bug
-            # # 'tnt', # bug
-            # # 't2t', # bug
-            # # 'mlp_mixer', # bug
-            # # 'conformer', # bug
-            # # 'poolformer', # bug
-            # # 'vit', # bug
-            # 'efficientformer',
-            # 'mobileone',
-            # 'edgenext'
+            'convmixer',
+            'efficientformer',
+            'mobileone',
+            'edgenext',
+            'seresnet',
+            'repvgg',
+            'seresnext',
+            'conformer',
+            'poolformer',
+            'res2net',
+            'resnest',
+            'convnext',
+            # errors
+            # 'mvit', # error
+            # 'van',  # bug
+            # 'twins',  # bug
+            # 'tnt',  # bug
+            # 'repmlp',  # bug
+            # 't2t',  # bug
+            # 'swin',  # bug
+            # 'shufflenet',  # bug
+            # 'vit',  # bug
+            # 'mlp',  # bug
         ]
         if cls._mmcls_library is None:
             cls._mmcls_library = MMClsModelLibrary(include=mmcls_include)
@@ -145,97 +149,91 @@ class FxPassedModelManager(PassedModelManager):
     def mmdet_library(cls):
         mmdet_include = [
             'retinanet',
-            'faster-rcnn',
-            'mask-rcnn',
+            'faster_rcnn',
+            'mask_rcnn',
             'fcos',
-            # '_base',
-            # 'gfl',
-            # 'sparse',
-            # 'simple',
-            # 'pisa',
-            # 'lvis',
-            # 'carafe',
-            # 'selfsup',
-            # 'solo',
-            # 'ssd',
-            # 'res2net',
-            # 'yolof',
-            # 'reppoints',
-            # 'htc',
-            # 'groie',
-            # 'dyhead',
-            # 'grid',
-            # 'soft',
-            # 'swin',
-            # 'regnet',
-            # 'gcnet',
-            # 'ddod',
-            # 'instaboost',
-            # 'point',
-            # 'vfnet',
-            # 'pafpn',
-            # 'ghm',
-            # 'mask',
-            # 'resnest',
-            # 'tood',
-            # 'detectors',
-            # 'cornernet',
-            # 'convnext',
-            # 'cascade',
-            # 'paa',
-            # 'detr',
-            # 'rpn',
-            # 'ld',
-            # 'lad',
-            # 'ms',
-            # 'faster',
-            # 'centripetalnet',
-            # 'gn',
-            # 'dcnv2',
-            # 'legacy',
-            # 'panoptic',
-            # 'strong',
-            # 'fpg',
-            # 'deformable',
-            # 'free',
-            # 'scratch',
-            # 'openimages',
-            # 'fsaf',
-            # 'rtmdet',
-            # 'solov2',
-            # 'yolact',
-            # 'empirical',
-            # 'centernet',
-            # 'hrnet',
-            # 'guided',
-            # 'deepfashion',
-            # 'fast',
-            # 'mask2former',
-            # 'retinanet',
-            # 'autoassign',
-            # 'gn+ws',
-            # 'dcn',
-            # 'foveabox',
-            # 'libra',
-            # 'double',
-            # 'queryinst',
-            # 'resnet',
-            # 'nas',
-            # 'sabl',
-            # 'fcos',
-            # 'scnet',
-            # 'maskformer',
-            # 'pascal',
-            # 'cityscapes',
-            # 'timm',
-            # 'seesaw',
-            # 'pvt',
-            # 'atss',
-            # 'efficientnet',
-            # 'wider',
-            # 'tridentnet',
-            # 'dynamic',
-            # 'yolox',
+            'yolo',
+            'gfl',
+            'simple',
+            'lvis',
+            'selfsup',
+            'solo',
+            'soft',
+            'instaboost',
+            'point',
+            'pafpn',
+            'ghm',
+            'paa',
+            'rpn',
+            'faster',
+            'centripetalnet',
+            'gn',
+            'free',
+            'scratch',
+            'centernet',
+            'deepfashion',
+            'autoassign',
+            'gn+ws',
+            'foveabox',
+            'resnet',
+            'cityscapes',
+            'timm',
+            'atss',
+            'dynamic',
+            'panoptic',
+            'solov2',
+            'fsaf',
+            'double',
+            'cornernet',
+            # 'vfnet',  # error
+            # 'carafe',  # error
+            # 'sparse',  # error
+            # '_base', # error
+            # 'ssd', # error
+            # 'res2net',  # error
+            # 'reppoints', # error
+            # 'groie',  # error
+            # 'dyhead',  # error
+            # 'ms', # error
+            # 'detr',  # error
+            # 'swin', # error
+            # 'regnet',  # error
+            # 'gcnet', # error
+            # 'ddod', # error
+            # 'resnest',  # error
+            # 'tood',  # error
+            # 'cascade', # error
+            # 'dcnv2',  # error
+            # 'strong',  # error
+            # 'fpg',  # error
+            # 'deformable',  # error
+            # 'mask2former',  # error
+            # 'hrnet',  # error
+            # 'guided',  # error
+            # 'nas',  # error
+            # 'yolact',  # error
+            # 'empirical',  # error
+            # 'dcn',  # error
+            # 'fast', # error
+            # 'queryinst',  # error
+            # 'pascal',  # error
+            # 'efficientnet',  # error
+            # 'tridentnet',  # error
+            # 'rtmdet', # error
+            # 'seesaw', # error
+            # 'pvt',# error
+            # 'detectors',# error
+            # 'htc',# error
+            # 'wider',# error
+            # 'maskformer',# error
+            # 'grid',# error
+            # 'openimages',# error
+            # 'legacy',# error
+            # 'pisa',# error
+            # 'libra',# error
+            # 'convnext',# error
+            # 'scnet',# error
+            # 'sabl',# error
         ]
         if cls._mmdet_library is None:
             cls._mmdet_library = MMDetModelLibrary(mmdet_include)
@@ -243,41 +241,41 @@ class FxPassedModelManager(PassedModelManager):
 
     @classmethod
     def mmseg_library(cls):
+        # a common error: unet related models
         include = [
-            # 'cgnet',
-            # 'gcnet',
-            # 'setr',
-            # 'deeplabv3',
-            # 'twins',
-            # 'fastfcn',
-            # 'fpn',
-            # 'upernet',
-            # 'dnl',
-            # 'icnet',
-            # 'segmenter',
-            # 'encnet',
-            # 'erfnet',
-            # 'segformer',
-            # 'apcnet',
-            # 'fast',
-            # 'ocrnet',
-            # 'lraspp',
-            # 'dpt',
-            # 'fcn',
-            # 'psanet',
-            # 'bisenetv2',
-            # 'pointrend',
-            # 'ccnet',
+            'deeplabv3',
             'pspnet',
-            # 'dmnet',
-            # 'stdc',
-            # 'ann',
-            # 'nonlocal',
-            # 'isanet',
-            # 'danet',
-            # 'emanet',
-            # 'deeplabv3plus',
-            # 'bisenetv1',
+            'cgnet',
+            'gcnet',
+            'fastfcn',
+            'dnl',
+            'icnet',
+            'erfnet',
+            'apcnet',
+            'fast',
+            'ocrnet',
+            'fcn',
+            'ccnet',
+            'dmnet',
+            'stdc',
+            'ann',
+            'nonlocal',
+            'isanet',
+            'danet',
+            'emanet',
+            'bisenetv1',
+            # 'bisenetv2', # error
+            # 'psanet', # error
+            # 'setr',  # error
+            # 'twins',  # error
+            # 'fpn',  # error
+            # 'upernet',  # error
+            # 'segformer',  # error
+            # 'segmenter',  # error
+            # 'encnet',  # error
+            # 'lraspp', # error
+            # 'dpt', # error
+            # 'pointrend', # error
         ]
         if cls._mmseg_library is None:
             cls._mmseg_library = MMSegModelLibrary(include=include)
@@ -310,7 +308,7 @@ class BackwardPassedModelManager(PassedModelManager):
     def default_library(cls):
         if cls._default_library is None:
             cls._default_library = DefaultModelLibrary(include=[
-                'LineModel',
+                'SingleLineModel',
                 'ResBlock',
                 'AddCatModel',
                 'ConcatModel',

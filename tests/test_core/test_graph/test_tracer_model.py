@@ -1,6 +1,4 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import logging
-# import torch.multiprocessing as mp
 import multiprocessing as mp
 import os
 import signal
@@ -37,16 +35,17 @@ sys.setrecursionlimit(int(pow(2, 20)))
 
 DEVICE = torch.device('cpu')
 FULL_TEST = os.getenv('FULL_TEST') == 'true'
+MP = os.getenv('MP') == 'true'
 
 DEBUG = os.getenv('DEBUG') == 'true'
-if DEBUG:
-    logging.basicConfig(level=logging.DEBUG)
-    POOL_SIZE = 1
-    TORCH_THREAD_SIZE = -1
-else:
-    POOL_SIZE = mp.cpu_count() // 2
+
+if MP:
+    POOL_SIZE = mp.cpu_count()
     TORCH_THREAD_SIZE = 1
     torch.set_num_interop_threads(1)
+else:
+    POOL_SIZE = 1
+    TORCH_THREAD_SIZE = -1
 
 print(f'DEBUG: {DEBUG}')
 print(f'FULL_TEST: {FULL_TEST}')
@@ -83,7 +82,7 @@ def forward_units(model: ModelGenerator,
     for unit in units:
         unit.current_choice = 1.0
     for unit in try_units:
-        unit.current_choice = unit.sample_choice()
+        unit.current_choice = min(max(0.1, unit.sample_choice()), 0.9)
     x = torch.rand([2, 3, 224, 224]).to(DEVICE)
     tensors = model(x)
     model.assert_model_is_changed(template_output, tensors)
@@ -194,8 +193,9 @@ def _test_units(units: List[SequentialMutableChannelUnit], model):
     for unit in units:
         unit.prepare_for_pruning(model)
     mutable_units = [unit for unit in units if unit.is_mutable]
-    found_mutable_units = find_mutable(model, mutable_units, units,
-                                       tensors_org)
+    found_mutable_units = mutable_units
+    # found_mutable_units = find_mutable(model, mutable_units, units,
+    #                                    tensors_org)
     assert len(found_mutable_units) >= 1, \
         'len of mutable units should greater or equal than 0.'
     forward_units(model, found_mutable_units, units, tensors_org)
@@ -235,7 +235,7 @@ def _test_a_model(Model, tracer_type='fx'):
             channel_graph.check(fix=True)
             channel_graph.check()
 
-        with time_limit(20, 'to units'):
+        with time_limit(80, 'to units'):
             channel_graph.forward(3)
             units_config = channel_graph.generate_units_config()
             units = [
@@ -243,7 +243,7 @@ def _test_a_model(Model, tracer_type='fx'):
                 for cfg in units_config.values()
             ]
 
-        with time_limit(20, 'test units'):
+        with time_limit(80, 'test units'):
             # get unit
             mutable_units = _test_units(units, model)
             out = len(mutable_units)
@@ -290,10 +290,13 @@ class TestTraceModel(TestCase):
         passd_test = [res for res in result if res[1] is True]
         unpassd_test = [res for res in result if res[1] is False]
 
+        # long summary
+
         print(f'{len(passd_test)},{len(unpassd_test)},'
               f'{len(model_manager.uninclude_models(full_test=FULL_TEST))}')
 
         print('Passed:')
+        print('\tmodel\ttime\tlen(mutable)')
         for model, passed, msg, used_time, out in passd_test:
             with self.subTest(model=model):
                 print(f'\t{model}\t{int(used_time)}s\t{out}')
@@ -309,3 +312,14 @@ class TestTraceModel(TestCase):
         print('UnTest:')
         for model in model_manager.uninclude_models(full_test=FULL_TEST):
             print(f'\t{model}')
+
+        # short summary
+        print('Short Summary:')
+        short_passed = set(
+            [ModelGenerator.get_short_name(res[0]) for res in passd_test])
+
+        print('Passed\n', short_passed)
+
+        short_unpassed = set(
+            [ModelGenerator.get_short_name(res[0]) for res in unpassd_test])
+        print('Unpassed\n', short_unpassed)
