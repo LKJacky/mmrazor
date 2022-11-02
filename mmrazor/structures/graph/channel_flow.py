@@ -1,9 +1,12 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import copy
 import itertools
+import sys
 from typing import List, Set, Union
 
 from mmrazor.utils import IndexDict
+
+sys.setrecursionlimit(int(pow(2, 20)))
 
 
 class ChannelElem:
