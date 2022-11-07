@@ -2,9 +2,10 @@
 from .darts_backbone import DartsBackbone
 from .searchable_mobilenet import SearchableMobileNet
 from .searchable_shufflenet_v2 import SearchableShuffleNetV2
+from .vgg_cifar import VGGCifar
 from .wideresnet import WideResNet
 
 __all__ = [
     'SearchableMobileNet', 'SearchableShuffleNetV2', 'DartsBackbone',
-    'WideResNet'
+    'WideResNet', 'VGGCifar'
 ]

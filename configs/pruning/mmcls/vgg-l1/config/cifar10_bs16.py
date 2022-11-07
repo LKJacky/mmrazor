@@ -22,7 +22,7 @@ train_dataloader = dict(
     num_workers=2,
     dataset=dict(
         type=dataset_type,
-        data_prefix='/home/liukai/Documents/datasets/cifar10',
+        data_prefix='data/cifar10',
         test_mode=False,
         pipeline=train_pipeline),
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -34,7 +34,7 @@ val_dataloader = dict(
     num_workers=2,
     dataset=dict(
         type=dataset_type,
-        data_prefix='/home/liukai/Documents/datasets/cifar10/',
+        data_prefix='data/cifar10/',
         test_mode=True,
         pipeline=test_pipeline),
     sampler=dict(type='DefaultSampler', shuffle=False),
