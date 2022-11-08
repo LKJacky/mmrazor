@@ -10,10 +10,15 @@ from mmrazor.registry import MODELS
 
 
 def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('config')
-    parser.add_argument('checkpoint')
-    parser.add_argument('-o', type=str, default='./prune.py')
+    parser = argparse.ArgumentParser(
+        description='Get the config to prune a model.')
+    parser.add_argument('config', help='config of the model')
+    parser.add_argument('checkpoint', help='checkpoint path of the model')
+    parser.add_argument(
+        '-o',
+        type=str,
+        default='./prune.py',
+        help='output path to store the pruning config.')
     args = parser.parse_args()
     return args
 

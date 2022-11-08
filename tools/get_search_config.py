@@ -7,12 +7,20 @@ from mmengine import Config
 
 
 def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('config')
-    parser.add_argument('checkpoint')
-    parser.add_argument('--flops-min', type=float, default=0.45)
-    parser.add_argument('--flops-max', type=float, default=0.55)
-    parser.add_argument('-o', type=str, default='./search.py')
+    parser = argparse.ArgumentParser(
+        description='Get the config to search the pruning structure of a model'
+    )
+    parser.add_argument('config', help='config of the model')
+    parser.add_argument('checkpoint', help='checkpoint path of the model')
+    parser.add_argument(
+        '--flops-min', type=float, default=0.45, help='minimal flops')
+    parser.add_argument(
+        '--flops-max', type=float, default=0.55, help='maximal flops')
+    parser.add_argument(
+        '-o',
+        type=str,
+        default='./search.py',
+        help='output path to store the search config.')
     args = parser.parse_args()
     return args
 
@@ -45,7 +53,7 @@ def wrap_search_config(config: Config, checkpoint_path: str,
                 type='BackwardTracer',
                 loss_calculator=dict(
                     type='ImageClassifierPseudoLoss',
-                    input_shape=(2, 3, 32, 32)))))
+                    input_shape=(2, 3, 224, 224)))))
 
     config['model'] = model_config
     config['data_preprocessor'] = None
