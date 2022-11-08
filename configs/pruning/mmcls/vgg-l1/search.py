@@ -22,7 +22,7 @@ model = dict(
             type='BackwardTracer',
             loss_calculator=dict(
                 type='ImageClassifierPseudoLoss',
-                input_shape=(2, 3, 224, 224)))))
+                input_shape=(2, 3, 32, 32)))))
 dataset_type = 'CIFAR10'
 preprocess_cfg = dict(
     mean=[125.307, 122.961, 113.8575],
@@ -94,6 +94,8 @@ train_cfg = dict(
     num_crossover=10,
     mutate_prob=0.2,
     flops_range=(0.45, 0.55),
+    resource_estimator_cfg=dict(
+        flops_params_cfg=dict(input_shape=(1, 3, 32, 32))),
     score_key='accuracy/top1')
 val_cfg = dict()
 test_cfg = dict()

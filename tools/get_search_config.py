@@ -76,6 +76,8 @@ def wrap_search_config(config: Config, checkpoint_path: str,
         num_crossover=10,
         mutate_prob=0.2,
         flops_range=flop_range,
+        resource_estimator_cfg=dict(
+            flops_params_cfg=dict(input_shape=(1, 3, 224, 224))),
         score_key='accuracy/top1')
     config['train_cfg'] = searcher_config
     return config

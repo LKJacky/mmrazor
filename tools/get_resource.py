@@ -25,7 +25,7 @@ if __name__ == '__main__':
     model_config = config['model']
     model = MODELS.build(model_config)
 
-    estimator = ResourceEstimator()
-    result = estimator.estimate(
-        model, flops_params_cfg={'input_shape': (1, 3, H, W)})
+    estimator = ResourceEstimator(
+        flops_params_cfg={'input_shape': (1, 3, H, W)})
+    result = estimator.estimate(model)
     print(result)
