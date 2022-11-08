@@ -5,8 +5,8 @@ import nbformat
 from nbconvert.preprocessors import ExecutePreprocessor
 
 notebook_paths = [
-    './docs/pruning/READMEs/mutable_channel_unit.ipynb',
-    './docs/pruning/READMEs/channel_mutator.ipynb'
+    './mmrazor/models/mutators/channel_mutator/channel_mutator.ipynb',
+    './mmrazor/models/mutables/mutable_channel/units/mutable_channel_unit.ipynb'  # noqa
 ]
 
 
