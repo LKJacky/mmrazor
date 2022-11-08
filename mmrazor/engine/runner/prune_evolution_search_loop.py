@@ -193,6 +193,7 @@ class PruneEvolutionSearchLoop(EvolutionSearchLoop):
         for _ in range(auto_scale_times + 1):
             flops = get_flops(self.model, random_subnet, self.estimator)
             if self.check_subnet_flops(flops):
+                is_pass = True
                 break
             else:
                 random_subnet = auto_scale(
