@@ -12,6 +12,7 @@ from mmrazor.registry import MODELS
 from ..mutable_channel_container import MutableChannelContainer
 from .l1_mutable_channel_unit import L1MutableChannelUnit
 from .lsp import quick_back_cssp
+from .mutable_channel_unit import Channel
 
 
 @MODELS.register_module()
@@ -133,3 +134,36 @@ class LSPMutableChannelUnit(L1MutableChannelUnit):
         mask = torch.zeros([self.num_channels]).to(idx.device)
         mask.scatter_(0, idx, 1)
         return mask
+
+    @property
+    def is_mutable(self) -> bool:
+
+        def traverse(channels: List[Channel]):
+            has_dynamic_op = False
+            all_channel_prunable = True
+            for channel in channels:
+                if channel.is_mutable is False:
+                    all_channel_prunable = False
+                    break
+
+                if isinstance(channel.module, dynamic_ops.DynamicChannelMixin):
+                    has_dynamic_op = True
+            return has_dynamic_op, all_channel_prunable
+
+        input_has_dynamic_op, input_all_prunable = traverse(self.input_related)
+        output_has_dynamic_op, output_all_prunable = traverse(
+            self.output_related)
+        for channel in self.input_related:
+            if (isinstance(channel.module, nn.Linear)
+                    and channel.num_channels != channel.module.in_features):
+                input_all_prunable = False
+            if (isinstance(channel.module, nn.Conv2d)
+                    and channel.num_channels != channel.module.in_channels):
+                input_all_prunable = False
+
+        return len(self.output_related) > 0 \
+            and len(self.input_related) > 0 \
+            and input_has_dynamic_op \
+            and input_all_prunable \
+            and output_has_dynamic_op \
+            and output_all_prunable
