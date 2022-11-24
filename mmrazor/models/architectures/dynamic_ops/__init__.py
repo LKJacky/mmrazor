@@ -1,7 +1,8 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from .bricks.dynamic_conv import (BigNasConv2d, DynamicConv2d,
-                                  DynamicConv2dAdaptivePadding, OFAConv2d)
-from .bricks.dynamic_linear import DynamicLinear
+                                  DynamicConv2dAdaptivePadding,
+                                  LSPDynamicConv2d, OFAConv2d)
+from .bricks.dynamic_linear import DynamicLinear, LSPDynamicLinear
 from .bricks.dynamic_norm import (DynamicBatchNorm1d, DynamicBatchNorm2d,
                                   DynamicBatchNorm3d, DynamicBatchNormXd,
                                   DynamicSyncBatchNorm, SwitchableBatchNorm2d)
@@ -15,5 +16,5 @@ __all__ = [
     'DynamicMixin', 'DynamicChannelMixin', 'DynamicBatchNormMixin',
     'DynamicLinearMixin', 'SwitchableBatchNorm2d', 'DynamicConvMixin',
     'DynamicConv2dAdaptivePadding', 'DynamicSyncBatchNorm',
-    'DynamicBatchNormXd'
+    'DynamicBatchNormXd', 'LSPDynamicConv2d', 'LSPDynamicLinear'
 ]

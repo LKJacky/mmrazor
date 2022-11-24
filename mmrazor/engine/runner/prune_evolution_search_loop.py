@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 
 from mmrazor.models.task_modules import ResourceEstimator
 from mmrazor.registry import LOOPS
-from mmrazor.structures import Candidates, export_fix_subnet, load_fix_subnet
+from mmrazor.structures import Candidates
 from mmrazor.utils import SupportRandomSubnet
 from .evolution_search_loop import EvolutionSearchLoop
 
@@ -27,10 +27,8 @@ def get_flops(model: nn.Module, subnet: SupportRandomSubnet,
     """
 
     assert hasattr(model, 'set_subnet') and hasattr(model, 'architecture')
+    model = copy.deepcopy(model)
     model.set_subnet(subnet)
-    fix_mutable = export_fix_subnet(model)
-    copied_model = copy.deepcopy(model)
-    load_fix_subnet(copied_model, fix_mutable)
 
     model_to_check = model.architecture
 
@@ -112,14 +110,31 @@ class PruneEvolutionSearchLoop(EvolutionSearchLoop):
                 bn_dataloader, seed=runner.seed, diff_rank_seed=diff_rank_seed)
         else:
             self.bn_dataloader = bn_dataloader
-        self.flops_range: Tuple[float, float] = self._update_flop_range()
-        self.min_flops = self._min_flops()
-        assert self.min_flops < self.flops_range[0], 'Cannot reach flop targe.'
 
         if self.runner.distributed:
             self.search_wrapper = runner.model.module
         else:
             self.search_wrapper = runner.model
+
+        # bn rescale
+
+    def run(self) -> None:
+        max_iter = 100
+        iter = 0
+        self.search_wrapper.eval()
+        for _, data_batch in enumerate(self.bn_dataloader):
+            data = self.search_wrapper.data_preprocessor(data_batch, True)
+            self.search_wrapper._run_forward(
+                data, mode='tensor')  # type: ignore
+            iter += 1
+            if iter > max_iter:
+                break
+
+        self.flops_range: Tuple[float, float] = self._update_flop_range()
+        self.min_flops = self._min_flops()
+        assert self.min_flops < self.flops_range[0], 'Cannot reach flop targe.'
+
+        return super().run()
 
     def _min_flops(self):
         subnet = self.model.sample_subnet()

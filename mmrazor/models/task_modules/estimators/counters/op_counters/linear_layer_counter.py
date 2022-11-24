@@ -23,3 +23,8 @@ class LinearCounter(BaseCounter):
 @TASK_UTILS.register_module()
 class DynamicLinearCounter(LinearCounter):
     pass
+
+
+@TASK_UTILS.register_module()
+class LSPDynamicLinearCounter(DynamicLinearCounter):
+    pass

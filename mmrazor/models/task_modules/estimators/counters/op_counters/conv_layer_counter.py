@@ -99,3 +99,8 @@ class DynamicConv2dCounter(ConvCounter):
 
         module.__flops__ += overall_flops
         module.__params__ += int(overall_params)
+
+
+@TASK_UTILS.register_module()
+class LSPDynamicConv2dCounter(DynamicConv2dCounter):
+    pass

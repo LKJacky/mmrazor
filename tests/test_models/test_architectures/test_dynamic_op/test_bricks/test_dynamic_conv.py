@@ -10,6 +10,8 @@ from torch import nn
 
 from mmrazor.models.architectures.dynamic_ops import (BigNasConv2d,
                                                       DynamicConv2d, OFAConv2d)
+from mmrazor.models.architectures.dynamic_ops.bricks.dynamic_conv import \
+    LSPDynamicConv2d
 from mmrazor.models.mutables import (OneShotMutableValue,
                                      SquentialMutableChannel)
 from mmrazor.structures.subnet import export_fix_subnet, load_fix_subnet
@@ -70,6 +72,24 @@ class TestDynamicConv2d(TestCase):
         out2 = s_conv2d(x)
 
         assert torch.equal(out1, out2)
+
+
+class TestLSPDynamicConv(TestCase):
+
+    def test_LSPDynamicConv(self):
+        conv = LSPDynamicConv2d(8, 16, 3, 3)
+        x = torch.rand([1, 8, 32, 32])
+        _ = conv(x)
+        in_mutable_channel = SquentialMutableChannel(8)
+        in_mutable_channel.current_choice = 3
+        out_mutable_channel = SquentialMutableChannel(16)
+        out_mutable_channel.current_choice = 8
+        conv.register_mutable_attr('in_channels', in_mutable_channel)
+        conv.register_mutable_attr('out_channels', out_mutable_channel)
+
+        x = torch.rand([1, 3, 32, 32])
+        conv.refresh_weight(torch.rand([8, 32]))
+        _ = conv(x)
 
 
 @pytest.mark.parametrize('bias', [True, False])

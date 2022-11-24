@@ -199,3 +199,111 @@ class DynamicConv2dAdaptivePadding(DynamicConv2d):
                 pad_w // 2, pad_w - pad_w // 2, pad_h // 2, pad_h - pad_h // 2
             ])
         return super().forward(x)
+
+
+def normal_equation(X: torch.Tensor, Y: torch.Tensor):
+    '''
+    X: M * N
+    Y: M * K
+    R: N * K
+    X@R=Y
+    '''
+    origin_x = X
+    X = X.double()
+    Y = Y.double()
+    try:
+        R = (X.T @ X).inverse() @ X.T @ Y
+    except Exception:
+        R = (X.T @ X).pinverse() @ X.T @ Y
+    return R.to(origin_x)
+
+
+@MODELS.register_module()
+class LSPDynamicConv2d(DynamicConv2d):
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.p_weight = self.weight.clone().detach()
+
+    def get_dynamic_params(self):
+        """Get dynamic parameters that will be used in forward process.
+
+        Returns:
+            Tuple[Tensor, Optional[Tensor], Tuple[int]]: Sliced weight, bias
+                and padding.
+        """
+        # slice in/out channel of weight according to
+        # mutable in_channels/out_channels
+        self.p_weight = self.p_weight.to(self.weight)
+        weight, bias = self._get_dynamic_params_by_mutable_channels(
+            self.p_weight, self.bias)
+        return weight, bias, self.padding
+
+    def _get_dynamic_params_by_mutable_channels(self, weight: Tensor, bias):
+        if 'in_channels' not in self.mutable_attrs and \
+                'out_channels' not in self.mutable_attrs:
+            return weight, bias
+
+        if 'out_channels' in self.mutable_attrs:
+            mutable_out_channels = self.mutable_attrs['out_channels']
+            out_mask = mutable_out_channels.current_mask.to(weight.device)
+        else:
+            out_mask = torch.ones(weight.size(0)).bool().to(weight.device)
+
+        if self.groups == 1:
+            weight = weight[out_mask]
+        elif self.groups == self.in_channels == self.out_channels:
+            # depth-wise conv
+            weight = weight[out_mask]
+        else:
+            # group-wise conv
+            raise NotImplementedError()
+
+        bias = self.bias[out_mask] if self.bias is not None else None
+        return weight, bias
+
+    def refresh_weight(self, in_feature=None):
+
+        with torch.no_grad():
+            weight = self.p_weight
+
+            if 'in_channels' in self.mutable_attrs:
+                mutable_in_channels = self.mutable_attrs['in_channels']
+                in_mask = mutable_in_channels.current_mask.to(weight.device)
+            else:
+                in_mask = torch.ones(weight.size(1)).bool().to(weight.device)
+
+            if self.groups == 1:
+                weight = self.get_linear_proj(in_feature, in_mask)
+            elif self.groups == self.in_channels == self.out_channels:
+                # depth-wise conv
+                pass
+            else:
+                raise NotImplementedError()
+
+            self.p_weight.data = weight
+
+    def get_linear_proj(self, in_feature: torch.Tensor,
+                        select_mask: torch.Tensor):
+        with torch.no_grad():
+            fileted_feature = in_feature[select_mask]
+            proj = normal_equation(
+                fileted_feature.transpose(-1, -2),
+                in_feature.transpose(-1, -2),
+            )  # in' in
+            proj = proj.T
+            weight = self.weight.permute([0, 2, 3, 1]).flatten(0,
+                                                               2)  # out in k k
+            weight = weight @ proj.to(weight.device)  #
+            weight = weight.reshape([
+                self.out_channels, self.kernel_size[0], self.kernel_size[1], -1
+            ]).permute([0, 3, 1, 2])
+            return weight
+
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
+                              missing_keys, unexpected_keys, error_msgs):
+        res = super()._load_from_state_dict(state_dict, prefix, local_metadata,
+                                            strict, missing_keys,
+                                            unexpected_keys, error_msgs)
+        self.p_weight.data = self.weight.data
+        return res
