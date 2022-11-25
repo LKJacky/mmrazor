@@ -196,6 +196,7 @@ class SwitchableBatchNorm2d(DynamicBatchNorm2d):
 
 
 class DynamicSyncBatchNorm(nn.SyncBatchNorm, DynamicBatchNormMixin):
+    """DynamicOp for sync bn."""
 
     def __init__(self,
                  num_features: int,
@@ -318,6 +319,7 @@ class DynamicSyncBatchNorm(nn.SyncBatchNorm, DynamicBatchNormMixin):
 
 
 class DynamicBatchNormXd(_DynamicBatchNorm):
+    """Dynamic op for _DynamicBatchNorm."""
 
     @property
     def static_op_factory(self):
