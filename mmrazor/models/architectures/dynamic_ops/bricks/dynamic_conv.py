@@ -282,6 +282,8 @@ class LSPDynamicConv2d(DynamicConv2d):
                 raise NotImplementedError()
 
             self.p_weight.data = weight
+            from mmengine import dist
+            dist.broadcast(self.p_weight)
 
     def get_linear_proj(self, in_feature: torch.Tensor,
                         select_mask: torch.Tensor):

@@ -43,6 +43,8 @@ class LSPMutableChannelUnit(L1MutableChannelUnit):
         if int_choice == self.mutable_channel.activated_channels:
             return
         mask = self._generate_mask(int_choice)
+        from mmengine import dist
+        dist.broadcast(mask)
         self.mutable_channel.current_choice = mask
         assert self.input_fm is not None
         for channel in self.input_related:

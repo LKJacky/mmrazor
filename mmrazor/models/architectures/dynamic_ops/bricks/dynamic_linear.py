@@ -68,6 +68,8 @@ class LSPDynamicLinear(DynamicLinear):
             in_feature, self.mutable_attrs['in_features'].current_choice)
 
         self.p_weight.data = weight
+        from mmengine import dist
+        dist.broadcast(self.p_weight)
 
     def get_linear_proj(self, in_feature: torch.Tensor,
                         select_mask: torch.Tensor):

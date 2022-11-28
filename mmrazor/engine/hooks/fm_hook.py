@@ -2,15 +2,21 @@
 from mmengine import HOOKS
 from mmengine.hooks import Hook
 from mmengine.runner import Runner
+from mmengine import dist
 
 
 @HOOKS.register_module()
 class FmHook(Hook):
 
-    def before_run(self, runner: Runner) -> None:
+
+    def before_train(self, runner: Runner) -> None:
         max_iter = 100
         iter = 0
-        model = runner.model.architecture
+        if dist.is_distributed():
+            model = runner.model.module.architecture
+        else:
+            model = runner.model.architecture
+
         runner.train_dataloader
         model.eval()
         for _, data_batch in enumerate(runner.train_dataloader):
