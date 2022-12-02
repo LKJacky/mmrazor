@@ -1,6 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from .dynamic_conv import (BigNasConv2d, DynamicConv2d,
-                           DynamicConv2dAdaptivePadding, FuseConv2d, OFAConv2d)
+                           DynamicConv2dAdaptivePadding, OFAConv2d)
 from .dynamic_linear import DynamicLinear
 from .dynamic_norm import (DynamicBatchNorm1d, DynamicBatchNorm2d,
                            DynamicBatchNorm3d, DynamicBatchNormXd,
@@ -9,6 +9,6 @@ from .dynamic_norm import (DynamicBatchNorm1d, DynamicBatchNorm2d,
 __all__ = [
     'BigNasConv2d', 'DynamicConv2d', 'OFAConv2d', 'DynamicLinear',
     'DynamicBatchNorm1d', 'DynamicBatchNorm2d', 'DynamicBatchNorm3d',
-    'SwitchableBatchNorm2d', 'FuseConv2d', 'DynamicSyncBatchNorm',
+    'SwitchableBatchNorm2d', 'DynamicSyncBatchNorm',
     'DynamicConv2dAdaptivePadding', 'DynamicBatchNormXd'
 ]
