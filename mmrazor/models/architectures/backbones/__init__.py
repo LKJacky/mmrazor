@@ -9,7 +9,5 @@ from .wideresnet import WideResNet
 
 __all__ = [
     'DartsBackbone', 'AutoformerBackbone', 'SearchableMobileNetV2',
-    'AttentiveMobileNetV3', 'SearchableShuffleNetV2', 'WideResNet'
-    'SearchableMobileNet', 'SearchableShuffleNetV2', 'DartsBackbone',
-    'WideResNet', 'VGGCifar'
+    'AttentiveMobileNetV3', 'SearchableShuffleNetV2', 'WideResNet', 'VGGCifar'
 ]
