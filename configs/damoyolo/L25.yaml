@@ -1,0 +1,32 @@
+block_list:
+  '0':
+    mutable_in: 3
+    mutable_out: 32
+  '1':
+    mutable_block_type: k1kx
+    mutable_depth: 1
+    mutable_mid: 24
+    mutable_out: 128
+  '2':
+    mutable_block_type: k1kx
+    mutable_depth: 5
+    mutable_mid: 88
+    mutable_out: 128
+  '3':
+    mutable_block_type: k1kx
+    mutable_depth: 3
+    mutable_mid: 128
+    mutable_out: 256
+  '4':
+    mutable_block_type: k1kx
+    mutable_depth: 2
+    mutable_mid: 120
+    mutable_out: 256
+  '5':
+    block_list:
+      '1':
+        mutable_mid: 256
+    mutable_block_type: k1kx
+    mutable_depth: 2
+    mutable_mid: 144
+    mutable_out: 512
