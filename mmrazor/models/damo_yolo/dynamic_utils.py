@@ -229,8 +229,6 @@ def SearchAableModelDeployWrapper(architecture,
         subnet_dict = fileio.load(subnet_dict)
     if subnet_dict is not None:
         architecture.load(subnet_dict)
-    import json
-    print(json.dumps(architecture.dump(), indent=4))
     if to_static:
         # subnet = export_fix_subnet(architecture)[0]
         # load_fix_subnet(architecture, subnet)
