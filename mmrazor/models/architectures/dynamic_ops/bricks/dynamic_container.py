@@ -27,7 +27,12 @@ class DynamicSequential(Sequential, DynamicMixin):
     def mutable_depth(self):
         """Mutable depth."""
         assert hasattr(self, 'mutable_attrs')
-        return self.mutable_attrs['depth']
+        self.mutable_attrs: nn.ModuleDict
+
+        if 'depth' in self.mutable_attrs:
+            return self.mutable_attrs['depth']
+        else:
+            return None
 
     def register_mutable_attr(self: Sequential, attr: str,
                               mutable: BaseMutable):
@@ -56,15 +61,14 @@ class DynamicSequential(Sequential, DynamicMixin):
     def to_static_op(self: Sequential) -> Sequential:
         """Convert dynamic Sequential to static one."""
         self.check_if_mutables_fixed()
-
         if self.mutable_depth is None:
             fixed_depth = len(self)
         else:
             fixed_depth = self.get_current_choice(self.mutable_depth)
 
-        modules = []
+        modules = Sequential()
         passed_module_nums = 0
-        for module in self:
+        for name, module in self.named_children():
             if isinstance(module, self.forward_ignored_module):
                 continue
             else:
@@ -72,16 +76,15 @@ class DynamicSequential(Sequential, DynamicMixin):
             if passed_module_nums > fixed_depth:
                 break
 
-            modules.append(module)
-
-        return Sequential(*modules)
+            modules.add_module(name, module)
+        return modules
 
     def forward(self, x: Tensor) -> Tensor:
         """Forward of Dynamic Sequential."""
         if self.mutable_depth is None:
-            return self(x)
-
-        current_depth = self.get_current_choice(self.mutable_depth)
+            current_depth = self.pure_module_nums
+        else:
+            current_depth = self.get_current_choice(self.mutable_depth)
         passed_module_nums = 0
         for module in self.pure_modules():
             passed_module_nums += 1
