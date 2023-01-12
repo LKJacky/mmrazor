@@ -22,61 +22,62 @@ SUPERNET = [
     dict(
         type='SearchableFocus',
         in_channels=3,
-        out_channels=32,
+        out_channels=1024,
         ksize=3,
         stride=1,
+        act='relu',
     ),
     dict(
         type='SuperResStem',
         block_setting=dict(
-            in_channels=32,
-            out_channels=128,
-            bottleneck_channels=64,
+            in_channels=1024,
+            out_channels=1024,
+            bottleneck_channels=1024,
             reparam=True,
-            block_type='kxkx'),
-        depth=2,
+            block_type='k1kx'),
+        depth=5,
     ),
     dict(
         type='SuperResStem',
         block_setting=dict(
-            in_channels=128,
-            out_channels=128,
-            bottleneck_channels=64,
+            in_channels=1024,
+            out_channels=1024,
+            bottleneck_channels=1024,
             reparam=True,
-            block_type='kxkx'),
-        depth=4,
+            block_type='k1kx'),
+        depth=5,
     ),
     dict(
         type='SuperResStem',
         block_setting=dict(
-            in_channels=128,
-            out_channels=256,
-            bottleneck_channels=256,
+            in_channels=1024,
+            out_channels=1024,
+            bottleneck_channels=1024,
             reparam=True,
-            block_type='kxkx'),
-        depth=4,
+            block_type='k1kx'),
+        depth=5,
     ),
     dict(
         type='SuperResStem',
         block_setting=dict(
-            in_channels=256,
-            out_channels=256,
-            bottleneck_channels=256,
+            in_channels=1024,
+            out_channels=1024,
+            bottleneck_channels=1024,
             reparam=True,
-            block_type='kxkx'),
-        depth=4,
+            stride=1,
+            block_type='k1kx'),
+        depth=5,
+    ),
+    dict(
+        type='SuperResStem',
+        block_setting=dict(
+            in_channels=1024,
+            out_channels=1024,
+            bottleneck_channels=1024,
+            reparam=True,
+            block_type='k1kx'),
+        depth=5,
         with_spp=True,
-    ),
-    dict(
-        type='SuperResStem',
-        block_setting=dict(
-            in_channels=256,
-            out_channels=512,
-            bottleneck_channels=256,
-            reparam=True,
-            block_type='kxkx'),
-        depth=3,
-        # with_spp=True,
     )
 ]
 
@@ -102,6 +103,7 @@ class TestDamoYolo(unittest.TestCase):
         if hasattr(module, 'mutable_in'):
             module.mutable_in.fix_chosen()
         mutator.sample_subnet()
+        print(module)
         module(x)
 
         search_space_dict = module.dump()

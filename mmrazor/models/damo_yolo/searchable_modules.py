@@ -463,7 +463,7 @@ class SearchableResConvBlock(BaseModule, SearchableModuleMinin):
                 stride=stride,
                 act='identity')
 
-        if in_channels != out_channels and stride != 2:
+        if stride != 2:
             self.residual_proj = SearchableConvKXBN(in_channels, out_channels,
                                                     1, 1)
         else:
@@ -472,7 +472,6 @@ class SearchableResConvBlock(BaseModule, SearchableModuleMinin):
         self.activation_function = get_activation(act)
 
     def forward(self, x):
-        reslink = self.residual_proj(x)
 
         y = self.conv1(x)
         # lack dropout
@@ -484,7 +483,10 @@ class SearchableResConvBlock(BaseModule, SearchableModuleMinin):
         # drop layer
 
         if self.stride != 2:
-            y = y + reslink
+            if y.shape[1] != x.shape[1]:
+                y = y + self.residual_proj(x)
+            else:
+                y = y + x
 
         y = self.activation_function(y)
         return y
