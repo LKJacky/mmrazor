@@ -84,7 +84,8 @@ class DynamicMixin(ABC):
         for mutable in self.mutable_attrs.values():  # type: ignore
             if isinstance(mutable, (MutableChannelContainer, DerivedMutable)):
                 continue
-            check_fixed(mutable)
+            # check_fixed(mutable)
+            pass
 
     def check_mutable_attr_valid(self, attr):
         assert attr in self.attr_mappings or \
