@@ -1,4 +1,5 @@
 _base_ = ['mmcls::resnet/resnet50_8xb32_in1k.py']
+custom_imports = dict(imports=['projects'])
 
 target_pruning_ratio = {
     'backbone.conv1_(0, 64)_64': 63,
