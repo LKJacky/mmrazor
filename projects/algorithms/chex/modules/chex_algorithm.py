@@ -45,7 +45,7 @@ class ChexAlgorithm(BaseAlgorithm):
         if self.training:  #
             if RuntimeInfo.epoch() == 0 and RuntimeInfo.iter_by_epoch() == 0:
                 with torch.no_grad():
-                    init_ratio = self.mutator.channel_ratio - self.init_growth_rate  # noqa
+                    init_ratio = self.mutator.channel_ratio  # noqa
                     self.mutator.init_channel_mask(init_ratio)
                     print_log(f'init channel mask with {init_ratio}')
                     self.log_choices()
