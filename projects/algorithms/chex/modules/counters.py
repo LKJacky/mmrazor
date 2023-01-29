@@ -11,5 +11,5 @@ class ChexLinearCounter(DynamicLinearCounter):
 
 
 @TASK_UTILS.register_module()
-class ChexConv2Counter(DynamicConv2dCounter):
+class ChexConv2dCounter(DynamicConv2dCounter):
     pass
