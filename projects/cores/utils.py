@@ -49,3 +49,8 @@ class RuntimeInfo():
     def iter_by_epoch(cls):
         iter_per_epoch = math.ceil(cls.max_iters() / cls.max_epochs())
         return cls.iter() % iter_per_epoch
+
+    @classmethod
+    def iter_pre_epoch(cls):
+        iter_per_epoch = math.ceil(cls.max_iters() / cls.max_epochs())
+        return iter_per_epoch
