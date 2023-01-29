@@ -17,7 +17,7 @@ model = dict(
         type='ChexMutator',
         channel_unit_cfg=dict(
             type='ChexUnit', default_args=dict(choice_mode='number', )),
-        channel_ratio=0.5,
+        channel_ratio=0.3,
     ),
     delta_t=1,
     total_steps=100,
