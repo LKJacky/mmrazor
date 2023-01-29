@@ -3,6 +3,7 @@ import torch
 
 from mmrazor.models.architectures.dynamic_ops import (DynamicConv2d,
                                                       DynamicLinear)
+from mmrazor.registry import TASK_UTILS
 
 
 class ChexMixin:
@@ -54,12 +55,14 @@ class ChexMixin:
         return all_errors
 
 
+@TASK_UTILS.register_module()
 class ChexConv2d(DynamicConv2d, ChexMixin):
 
     def get_weight_matrix(self):
         return self.weight.flatten(1)
 
 
+@TASK_UTILS.register_module()
 class ChexLinear(DynamicLinear, ChexMixin):
 
     def get_weight_matrix(self):

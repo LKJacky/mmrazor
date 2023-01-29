@@ -12,8 +12,8 @@ from mmengine.model.utils import convert_sync_batchnorm
 from mmrazor.models.algorithms import BaseAlgorithm
 from mmrazor.registry import MODELS
 from mmrazor.utils import print_log
+from ....cores.utils import RuntimeInfo
 from .chex_mutator import ChexMutator
-from .utils import RuntimeInfo
 
 
 @MODELS.register_module()
@@ -21,13 +21,13 @@ class ChexAlgorithm(BaseAlgorithm):
 
     def __init__(self,
                  architecture: Union[BaseModel, Dict],
-                 data_preprocessor: Optional[Union[Dict, nn.Module]] = None,
                  mutator_cfg=dict(
                      type='ChexMutator',
                      channel_unit_cfg=dict(type='ChexUnit')),
                  delta_t=2,
                  total_steps=10,
                  init_growth_rate=0.3,
+                 data_preprocessor: Optional[Union[Dict, nn.Module]] = None,
                  init_cfg: Optional[Dict] = None):
         super().__init__(architecture, data_preprocessor, init_cfg)
 
