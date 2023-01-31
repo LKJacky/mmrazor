@@ -6,7 +6,7 @@ pretrained_path = './work_dirs/pretrained/vgg_pretrained.pth'  # noqa
 architecture = _base_.model
 architecture.init_cfg = dict(type='Pretrained', checkpoint=pretrained_path)
 architecture.update({'data_preprocessor': _base_.data_preprocessor})
-data_preprocessor = None
+data_preprocessor = {'_delete_': True}
 
 model = dict(
     _delete_=True,

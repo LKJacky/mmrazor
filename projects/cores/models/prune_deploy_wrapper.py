@@ -24,7 +24,7 @@ def empty_init_weights(model):
 
 
 @MODELS.register_module()
-def PruneDeployWrapper(algorithm):
+def PruneDeployWrapper(algorithm, data_preprocessor=None):
     algorithm: BaseAlgorithm = MODELS.build(algorithm)
     algorithm.init_weights()
     clean_params_init_info(algorithm)
