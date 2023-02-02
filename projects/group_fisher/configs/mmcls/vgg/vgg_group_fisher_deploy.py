@@ -24,5 +24,5 @@ model = dict(
         'backbone.features.conv14_(0, 512)_512': 94,
         'backbone.features.conv15_(0, 512)_512': 108
     },
-    divisor=1,
+    divisor=8,
 )

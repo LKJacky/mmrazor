@@ -15,7 +15,6 @@ train_pipeline = [
 ]
 
 test_pipeline = [
-    dict(type='LoadImageFromFile'),
     dict(type='CenterCrop', crop_size=32),
     dict(type='PackClsInputs'),
 ]

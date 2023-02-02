@@ -16,3 +16,9 @@ python mmdeploy/tools/profiler.py \
     --device cpu \
     --warmup 50 \
     --num-iter 200
+
+python mmdeploy/tools/test.py \
+    mmdeploy/configs/mmcls/classification_onnxruntime_static.py \
+    projects/group_fisher/configs/mmcls/vgg/vgg_group_fisher_deploy.py \
+    --model ./work_dirs/mmdeploy_model/end2end.onnx \
+    --device cpu \
