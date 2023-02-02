@@ -1,5 +1,6 @@
+
 python mmdeploy/tools/deploy.py \
-    mmdeploy/configs/mmcls/classification_openvino_dynamic-224x224.py \
+    mmdeploy/configs/mmcls/classification_onnxruntime_static.py \
    ./projects/models/vgg/configs/vgg_pretrain.py \
    ./work_dirs/pretrained/vgg_pretrained.pth \
     ./mmdeploy/demo/resources/face.png  \
@@ -7,10 +8,12 @@ python mmdeploy/tools/deploy.py \
     --device cpu \
     --dump-info
 
-python mmdeploy/tools/test.py \
-    mmdeploy/configs/mmcls/classification_openvino_dynamic-224x224.py \
+python mmdeploy/tools/profiler.py \
+    mmdeploy/configs/mmcls/classification_onnxruntime_static.py \
    ./projects/models/vgg/configs/vgg_pretrain.py \
-    --model ./work_dirs/mmdeploy_model/end2end.xml \
-    --batch-size=1 \
+    mmdeploy/resources/ \
+    --model ./work_dirs/mmdeploy_model/end2end.onnx \
+    --shape 32x32 \
     --device cpu \
-    --speed-test
+    --warmup 50 \
+    --num-iter 200
