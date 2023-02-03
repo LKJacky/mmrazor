@@ -26,11 +26,13 @@ def expand_model(model: nn.Module, zero=False) -> None:
         traverse_children(model._modules)
 
 
-def expand_static_model(model, divisor):
+def expand_static_model(model: nn.Module, divisor):
 
     from projects.cores.expandable_modules.unit import ExpandUnit, expand_model
+    state_dict = model.state_dict()
     mutator = ChannelMutator[ExpandUnit](channel_unit_cfg=ExpandUnit)
     mutator.prepare_from_supernet(model)
+    model.load_state_dict(state_dict)
     for unit in mutator.mutable_units:
         num = unit.current_choice
         if num % divisor == 0:
@@ -39,7 +41,7 @@ def expand_static_model(model, divisor):
             num = (num // divisor + 1) * divisor
             num = max(num, unit.num_channels)
             unit.expand_to(num)
-    expand_model(model)
+    expand_model(model, zero=True)
 
     mutator = ChannelMutator[ExpandUnit](channel_unit_cfg=ExpandUnit)
     mutator.prepare_from_supernet(copy.deepcopy(model))

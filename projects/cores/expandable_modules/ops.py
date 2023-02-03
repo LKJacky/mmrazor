@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 from mmrazor.models.architectures import dynamic_ops
@@ -7,6 +8,13 @@ from mmrazor.models.mutables import MutableChannelContainer
 class ExpandMixin:
 
     def expand(self, zero=False):
+        return self.get_expand_op(
+            self.mutable_in_channel,
+            self.mutable_out_channel,
+            zero=zero,
+        )
+
+    def get_expand_op(self, in_c, out_c, zero=False):
         pass
 
     @property
@@ -32,6 +40,26 @@ class ExpandMixin:
             return self._mutable_out_channel
 
     @property
+    def mutable_in_mask(self):
+        if self.in_mutable is not None:
+            return self.in_mutable.current_mask
+        else:
+            if hasattr(self, 'weight'):
+                return self.weight.new_ones([self.mutable_in_channel])
+            else:
+                return torch.ones([self.mutable_in_channel])
+
+    @property
+    def mutable_out_mask(self):
+        if self.out_mutable is not None:
+            return self.out_mutable.current_mask
+        else:
+            if hasattr(self, 'weight'):
+                return self.weight.new_ones([self.mutable_out_channel])
+            else:
+                return torch.ones([self.mutable_out_channel])
+
+    @property
     def in_mutable(self) -> MutableChannelContainer:
         return self.get_mutable_attr('in_channels')  # type: ignore
 
@@ -42,6 +70,32 @@ class ExpandMixin:
     def zero_weight_(self: nn.Module):
         for p in self.parameters():
             p.data.zero_()
+
+    @torch.no_grad()
+    def expand_matrix(self, weight: torch.Tensor, old_weight: torch.Tensor):
+        assert len(weight.shape) == 3  # out in c
+        assert len(old_weight.shape) == 3  # out in c
+        mask = self.mutable_out_mask.float().unsqueeze(
+            -1) * self.mutable_in_mask.float().unsqueeze(0)
+        mask = mask.unsqueeze(-1).expand(*weight.shape)
+        weight.data.masked_scatter_(mask.bool(), old_weight)
+        return weight
+
+    @torch.no_grad()
+    def expand_vector(self, weight: torch.Tensor, old_weight: torch.Tensor):
+        assert len(weight.shape) == 2  # out c
+        assert len(old_weight.shape) == 2  # out c
+        mask = self.mutable_out_mask
+        mask = mask.unsqueeze(-1).expand(*weight.shape)
+        weight.data.masked_scatter_(mask.bool(), old_weight)
+        return weight
+
+    @torch.no_grad()
+    def expand_bias(self, bias: torch.Tensor, old_bias: torch.Tensor):
+        assert len(bias.shape) == 1  # out c
+        assert len(old_bias.shape) == 1  # out c
+        return self.expand_vector(bias.unsqueeze(-1),
+                                  old_bias.unsqueeze(-1)).squeeze(1)
 
 
 class ExpandConv2d(dynamic_ops.DynamicConv2d, ExpandMixin):
@@ -54,17 +108,20 @@ class ExpandConv2d(dynamic_ops.DynamicConv2d, ExpandMixin):
     def _mutable_out_channel(self):
         return self.out_channels
 
-    def expand(self, zero=False):
-        module = nn.Conv2d(self.mutable_in_channel, self.mutable_out_channel,
-                           self.kernel_size, self.stride, self.padding,
-                           self.dilation, self.groups, self.bias is not None,
-                           self.padding_mode)
+    def get_expand_op(self, in_c, out_c, zero=False):
+        module = nn.Conv2d(in_c, out_c, self.kernel_size, self.stride,
+                           self.padding, self.dilation, self.groups, self.bias
+                           is not None, self.padding_mode)
         if zero:
-            self.zero_weight_()
-        module.weight.data[:self.out_channels, :self.
-                           in_channels] = self.weight  # out,in
-        if module.bias is not None:
-            module.bias.data[:self.out_channels] = self.bias
+            ExpandMixin.zero_weight_(module)
+
+        weight = self.expand_matrix(
+            module.weight.flatten(2), self.weight.flatten(2))
+        module.weight.data = weight.reshape(module.weight.shape)
+        if module.bias is not None and self.bias is not None:
+            bias = self.expand_vector(
+                module.bias.unsqueeze(-1), self.bias.unsqueeze(-1))
+            module.bias.data = bias.reshape(module.bias.shape)
         return module
 
 
@@ -78,14 +135,18 @@ class ExpandLinear(dynamic_ops.DynamicLinear, ExpandMixin):
     def _mutable_out_channel(self):
         return self.out_features
 
-    def expand(self, zero=False):
-        module = nn.Linear(self.mutable_in_channel, self.mutable_out_channel,
-                           self.bias is not None)
+    def get_expand_op(self, in_c, out_c, zero=False):
+        module = nn.Linear(in_c, out_c, self.bias is not None)
         if zero:
-            self.zero_weight_()
-        module.weight.data[:self.out_features, :self.in_features] = self.weight
+            ExpandMixin.zero_weight_(module)
+
+        weight = self.expand_matrix(
+            module.weight.unsqueeze(-1), self.weight.unsqueeze(-1))
+        module.weight.data = weight.reshape(module.weight.shape)
         if module.bias is not None:
-            module.bias.data[:self.out_features] = self.bias
+            bias = self.expand_vector(
+                module.bias.unsqueeze(-1), self.bias.unsqueeze(-1))
+            module.bias.data = bias.reshape(module.bias.shape)
         return module
 
 
@@ -99,16 +160,20 @@ class ExpandBn2d(dynamic_ops.DynamicBatchNorm2d, ExpandMixin):
     def _mutable_out_channel(self):
         return self.num_features
 
-    def expand(self, zero=False):
-        module = nn.BatchNorm2d(self.mutable_in_channel, self.eps,
-                                self.momentum, self.affine,
+    def get_expand_op(self, in_c, out_c, zero=False):
+        assert in_c == out_c
+        module = nn.BatchNorm2d(in_c, self.eps, self.momentum, self.affine,
                                 self.track_running_stats)
         if zero:
-            self.zero_weight_
+            ExpandMixin.zero_weight_(module)
+
         if module.running_mean is not None:
-            module.running_mean.data[:self.num_features] = self.running_mean
+            module.running_mean.data = self.expand_bias(
+                module.running_mean, self.running_mean)
+
         if module.running_var is not None:
-            module.running_var.data[:self.num_features] = self.running_var
-        self.weight.data[:self.num_features] = self.weight
-        self.bias.data[:self.num_features] = self.bias
+            module.running_var.data = self.expand_bias(module.running_var,
+                                                       self.running_var)
+        module.weight.data = self.expand_bias(module.weight, self.weight)
+        module.bias.data = self.expand_bias(module.bias, self.bias)
         return module
