@@ -15,6 +15,10 @@ relucfg = [2, 6, 9, 13, 16, 19, 23, 26, 29, 33, 36, 39]
 
 @MODELS.register_module()
 class VGGCifar(BaseModel):
+    """VGG16 with bn for pruning on cifar10 .
+
+    It's modified from https://github.com/lmbxmu/HRank.
+    """
 
     def __init__(self, cfg=None, num_classes=10):
         super().__init__()

@@ -25,6 +25,7 @@ class GroupFisherChannelUnit(L1MutableChannelUnit):
         num_channels (int): Number of channels.
         detla_type (str): Type of delta, which is one of 'flop', 'act' or
             'none'. Defaults to 'flop'.
+        mutate_linear (bool): Whether to prune linear layers.
     """
 
     def __init__(self,
@@ -75,6 +76,7 @@ class GroupFisherChannelUnit(L1MutableChannelUnit):
 
     @property
     def is_mutable(self) -> bool:
+        """Whether the unit is mutable."""
         mutable = super().is_mutable
         if self.mutate_linear:
             return mutable
@@ -111,6 +113,7 @@ class GroupFisherChannelUnit(L1MutableChannelUnit):
     # fisher related computation
 
     def importance(self):
+        """The importance of each channel."""
         fisher = self.normalized_fisher_info.clone()
         mask = self.mutable_channel.current_mask
         n_mask = (1 - mask.float()).bool()

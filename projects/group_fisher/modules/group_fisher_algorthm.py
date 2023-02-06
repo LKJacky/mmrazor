@@ -75,6 +75,7 @@ class GroupFisherAlgorithm(BaseAlgorithm):
 
 @MODEL_WRAPPERS.register_module()
 class GroupFisherDDP(MMDistributedDataParallel):
+    """Train step for group fisher."""
 
     def train_step(self, data: Union[dict, tuple, list],
                    optim_wrapper) -> Dict[str, torch.Tensor]:
