@@ -1,7 +1,7 @@
 #############################################################################
 # where you have to fill
-_base_ = ['../../../../../models/vgg/configs/vgg_pretrain.py']
-pretrained_path = './work_dirs/pretrained/vgg_pretrained.pth'  # path of pretrained model # noqa
+_base_ = ['']
+pretrained_path = ''  # path of pretrained model
 
 input_shape = [1, 3, 32, 32]
 ##############################################################################
