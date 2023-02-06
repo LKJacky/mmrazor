@@ -49,7 +49,7 @@ def to_static_model(algorithm: BaseAlgorithm):
 
 
 @MODELS.register_module()
-def PruneDeployWrapper(algorithm, data_preprocessor=None):
+def PruneFinetuneWrapper(algorithm, data_preprocessor=None):
     """A model wrapper for pruning algorithm.
 
     Args:
@@ -78,16 +78,12 @@ def PruneDeployWrapper(algorithm, data_preprocessor=None):
     return model
 
 
-FinetuneWrapper = PruneDeployWrapper
-MODELS.register_module('FinetuneWrapper', module=FinetuneWrapper)
-
-
 @MODELS.register_module()
-def PruneDeployWrapper2(architecture,
-                        mutable_cfg={},
-                        divisor=1,
-                        data_preprocessor=None,
-                        init_cfg=None):
+def PruneDeployWrapper(architecture,
+                       mutable_cfg={},
+                       divisor=1,
+                       data_preprocessor=None,
+                       init_cfg=None):
     """A deploy wrapper for a pruned model.
 
     Args:

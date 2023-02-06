@@ -1,3 +1,3 @@
-from .prune_deploy_wrapper import PruneDeployWrapper
+from .prune_deploy_wrapper import PruneDeployWrapper, PruneFinetuneWrapper
 
-__all__ = ['PruneDeployWrapper']
+__all__ = ['PruneDeployWrapper', 'PruneFinetuneWrapper']
