@@ -6,31 +6,23 @@ import torch.nn as nn
 from mmrazor.models.mutables import (L1MutableChannelUnit,
                                      MutableChannelContainer)
 from mmrazor.models.mutators import ChannelMutator
-from .ops import ExpandBn2d, ExpandConv2d, ExpandLinear, ExpandMixin
-
-
-def expand_model(model: nn.Module, zero=False) -> None:
-    # Avoid circular import
-
-    def traverse_children(module: nn.Module) -> None:
-        for name, mutable in module.items():
-            if isinstance(mutable, ExpandMixin):
-                module[name] = mutable.expand(zero=zero)
-            if hasattr(mutable, '_modules'):
-                traverse_children(mutable._modules)
-
-    if isinstance(model, ExpandMixin):
-        raise RuntimeError('Root model can not be dynamic op.')
-
-    if hasattr(model, '_modules'):
-        traverse_children(model._modules)
+from .ops import (ExpandableBatchNorm2d, ExpandableConv2d, ExpandableMixin,
+                  ExpandLinear)
 
 
 def expand_static_model(model: nn.Module, divisor):
+    """Expand the channels of a model.
 
-    from projects.cores.expandable_modules.unit import ExpandUnit, expand_model
+    Args:
+        model (nn.Module): the model to be expanded.
+        divisor (_type_): the divisor to make the channels divisible.
+
+    Returns:
+        nn.Module: an expanded model.
+    """
+    from projects.cores.expandable_ops.unit import ExpandableUnit, expand_model
     state_dict = model.state_dict()
-    mutator = ChannelMutator[ExpandUnit](channel_unit_cfg=ExpandUnit)
+    mutator = ChannelMutator[ExpandableUnit](channel_unit_cfg=ExpandableUnit)
     mutator.prepare_from_supernet(model)
     model.load_state_dict(state_dict)
     for unit in mutator.mutable_units:
@@ -43,19 +35,35 @@ def expand_static_model(model: nn.Module, divisor):
             unit.expand_to(num)
     expand_model(model, zero=True)
 
-    mutator = ChannelMutator[ExpandUnit](channel_unit_cfg=ExpandUnit)
+    mutator = ChannelMutator[ExpandableUnit](channel_unit_cfg=ExpandableUnit)
     mutator.prepare_from_supernet(copy.deepcopy(model))
     structure = mutator.choice_template
     return structure
 
 
-class ExpandUnit(L1MutableChannelUnit):
+def expand_model(model: nn.Module, zero=False) -> None:
+
+    def traverse_children(module: nn.Module) -> None:
+        for name, mutable in module.items():
+            if isinstance(mutable, ExpandableMixin):
+                module[name] = mutable.expand(zero=zero)
+            if hasattr(mutable, '_modules'):
+                traverse_children(mutable._modules)
+
+    if isinstance(model, ExpandableMixin):
+        raise RuntimeError('Root model can not be dynamic op.')
+
+    if hasattr(model, '_modules'):
+        traverse_children(model._modules)
+
+
+class ExpandableUnit(L1MutableChannelUnit):
 
     def prepare_for_pruning(self, model: nn.Module):
         self._replace_with_dynamic_ops(
             model, {
-                nn.Conv2d: ExpandConv2d,
-                nn.BatchNorm2d: ExpandBn2d,
+                nn.Conv2d: ExpandableConv2d,
+                nn.BatchNorm2d: ExpandableBatchNorm2d,
                 nn.Linear: ExpandLinear,
             })
         self._register_channel_container(model, MutableChannelContainer)

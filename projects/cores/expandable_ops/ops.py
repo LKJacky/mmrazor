@@ -5,9 +5,20 @@ from mmrazor.models.architectures import dynamic_ops
 from mmrazor.models.mutables import MutableChannelContainer
 
 
-class ExpandMixin:
+class ExpandableMixin:
+    """This minin coroperates with dynamic ops.
+
+    It defines interfaces to expand the channels of ops. We can get a wider
+    network than original supernet with it.
+    """
 
     def expand(self, zero=False):
+        """Expand the op.
+
+        Args:
+            zero (bool, optional): whether to set new weights to zero. Defaults
+                to False.
+        """
         return self.get_expand_op(
             self.mutable_in_channel,
             self.mutable_out_channel,
@@ -98,7 +109,7 @@ class ExpandMixin:
                                   old_bias.unsqueeze(-1)).squeeze(1)
 
 
-class ExpandConv2d(dynamic_ops.DynamicConv2d, ExpandMixin):
+class ExpandableConv2d(dynamic_ops.DynamicConv2d, ExpandableMixin):
 
     @property
     def _mutable_in_channel(self):
@@ -113,7 +124,7 @@ class ExpandConv2d(dynamic_ops.DynamicConv2d, ExpandMixin):
                            self.padding, self.dilation, self.groups, self.bias
                            is not None, self.padding_mode)
         if zero:
-            ExpandMixin.zero_weight_(module)
+            ExpandableMixin.zero_weight_(module)
 
         weight = self.expand_matrix(
             module.weight.flatten(2), self.weight.flatten(2))
@@ -125,7 +136,7 @@ class ExpandConv2d(dynamic_ops.DynamicConv2d, ExpandMixin):
         return module
 
 
-class ExpandLinear(dynamic_ops.DynamicLinear, ExpandMixin):
+class ExpandLinear(dynamic_ops.DynamicLinear, ExpandableMixin):
 
     @property
     def _mutable_in_channel(self):
@@ -138,7 +149,7 @@ class ExpandLinear(dynamic_ops.DynamicLinear, ExpandMixin):
     def get_expand_op(self, in_c, out_c, zero=False):
         module = nn.Linear(in_c, out_c, self.bias is not None)
         if zero:
-            ExpandMixin.zero_weight_(module)
+            ExpandableMixin.zero_weight_(module)
 
         weight = self.expand_matrix(
             module.weight.unsqueeze(-1), self.weight.unsqueeze(-1))
@@ -150,7 +161,7 @@ class ExpandLinear(dynamic_ops.DynamicLinear, ExpandMixin):
         return module
 
 
-class ExpandBn2d(dynamic_ops.DynamicBatchNorm2d, ExpandMixin):
+class ExpandableBatchNorm2d(dynamic_ops.DynamicBatchNorm2d, ExpandableMixin):
 
     @property
     def _mutable_in_channel(self):
@@ -165,7 +176,7 @@ class ExpandBn2d(dynamic_ops.DynamicBatchNorm2d, ExpandMixin):
         module = nn.BatchNorm2d(in_c, self.eps, self.momentum, self.affine,
                                 self.track_running_stats)
         if zero:
-            ExpandMixin.zero_weight_(module)
+            ExpandableMixin.zero_weight_(module)
 
         if module.running_mean is not None:
             module.running_mean.data = self.expand_bias(

@@ -10,7 +10,7 @@ from mmrazor.registry import MODELS
 from mmrazor.structures.subnet.fix_subnet import (export_fix_subnet,
                                                   load_fix_subnet)
 from mmrazor.utils import print_log
-from ..expandable_modules.unit import ExpandUnit
+from ..expandable_ops.unit import ExpandableUnit
 
 
 def clean_params_init_info(model: nn.Module):
@@ -50,6 +50,15 @@ def to_static_model(algorithm: BaseAlgorithm):
 
 @MODELS.register_module()
 def PruneDeployWrapper(algorithm, data_preprocessor=None):
+    """A model wrapper for pruning algorithm.
+
+    Args:
+        algorithm (_type_): _description_
+        data_preprocessor (_type_, optional): _description_. Defaults to None.
+
+    Returns:
+        _type_: _description_
+    """
     algorithm: BaseAlgorithm = MODELS.build(algorithm)
     algorithm.init_weights()
     clean_params_init_info(algorithm)
@@ -79,12 +88,26 @@ def PruneDeployWrapper2(architecture,
                         divisor=1,
                         data_preprocessor=None,
                         init_cfg=None):
+    """A deploy wrapper for a pruned model.
+
+    Args:
+        architecture (_type_): the model to be pruned.
+        mutable_cfg (dict, optional): the channel remaining ratio for each
+            unit. Defaults to {}.
+        divisor (int, optional): the divisor to make the channel number
+            divisible. Defaults to 1.
+        data_preprocessor (_type_, optional): Defaults to None.
+        init_cfg (_type_, optional):  Defaults to None.
+
+    Returns:
+        BaseModel: a BaseModel of mmengine.
+    """
     if isinstance(architecture, dict):
         architecture = MODELS.build(architecture)
     assert isinstance(architecture, nn.Module)
 
     # to dynamic model
-    mutator = ChannelMutator[ExpandUnit](channel_unit_cfg=ExpandUnit)
+    mutator = ChannelMutator[ExpandableUnit](channel_unit_cfg=ExpandableUnit)
     mutator.prepare_from_supernet(architecture)
     for unit in mutator.mutable_units:
         if unit.name in mutable_cfg:

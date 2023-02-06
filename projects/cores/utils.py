@@ -8,11 +8,13 @@ from mmrazor.models.mutators import ChannelMutator
 
 
 def is_pruning_algorithm(algorithm):
-    return isinstance(algorithm, BaseAlgorithm) and \
-            isinstance(getattr(algorithm, 'mutator', None), ChannelMutator)
+    """Check whether a model is a pruning algorithm."""
+    return isinstance(algorithm, BaseAlgorithm) \
+             and isinstance(getattr(algorithm, 'mutator', None), ChannelMutator) # noqa
 
 
 def get_model_from_runner(runner):
+    """Get the model from a runner."""
     if torch_dist.is_initialized():
         return runner.model.module
     else:
@@ -20,6 +22,7 @@ def get_model_from_runner(runner):
 
 
 class RuntimeInfo():
+    """A tools to get runtime info in MessageHub."""
 
     @classmethod
     def get_info(cls, key):

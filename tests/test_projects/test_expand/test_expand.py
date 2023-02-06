@@ -5,9 +5,9 @@ import torch
 
 from mmrazor.models.mutables import SimpleMutableChannel
 from mmrazor.models.mutators import ChannelMutator
-from projects.cores.expandable_modules.ops import ExpandLinear
-from projects.cores.expandable_modules.unit import (ExpandUnit, expand_model,
-                                                    expand_static_model)
+from projects.cores.expandable_ops.ops import ExpandLinear
+from projects.cores.expandable_ops.unit import (ExpandableUnit, expand_model,
+                                                expand_static_model)
 from ...data.models import MultiConcatModel, SingleLineModel
 
 
@@ -17,7 +17,8 @@ class TestExpand(unittest.TestCase):
         x = torch.rand([1, 3, 224, 224])
         model = MultiConcatModel()
         print(model)
-        mutator = ChannelMutator[ExpandUnit](channel_unit_cfg=ExpandUnit)
+        mutator = ChannelMutator[ExpandableUnit](
+            channel_unit_cfg=ExpandableUnit)
         mutator.prepare_from_supernet(model)
         print(mutator.choice_template)
         print(model)

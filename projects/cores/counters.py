@@ -12,6 +12,7 @@ from mmrazor.registry import TASK_UTILS
 
 @TASK_UTILS.register_module()
 class DynamicConv2dCounter(Conv2dCounter):
+    """Flop counter for DynamicCon2d."""
 
     @staticmethod
     def add_count_hook(module: nn.Conv2d, input: Tuple[torch.Tensor],
