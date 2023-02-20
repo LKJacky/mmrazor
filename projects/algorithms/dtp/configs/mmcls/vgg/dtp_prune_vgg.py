@@ -61,19 +61,6 @@ custom_hooks = getattr(_base_, 'custom_hooks', []) + [
     ),
 ]
 
-paramwise_cfg = dict(bias_decay_mult=0.0, norm_decay_mult=0.0)
-
-optim_wrapper = dict(
-    constructor='mmrazor.SeparateOptimWrapperConstructor',
-    architecture=dict(
-        optimizer=dict(
-            type='mmcls.SGD', lr=0.5, momentum=0.9, weight_decay=4e-5),
-        paramwise_cfg=paramwise_cfg),
-    mutator=dict(
-        optimizer=dict(
-            type='mmcls.Adam', lr=0.001, weight_decay=0.0, betas=(0.5,
-                                                                  0.999))))
-
 paramwise_cfg = dict(custom_keys={
     'mutable_channel': dict(decay_mult=0.0),
 })
