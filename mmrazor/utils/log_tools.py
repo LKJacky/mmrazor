@@ -1,7 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import logging
 
-from mmengine import MMLogger
+from mmengine import MMLogger, dist
 from mmengine import print_log as engine_print_log
 
 
@@ -17,8 +17,13 @@ def get_level(level='info'):
     return level
 
 
-def print_log(msg, logger='current', level='info'):
-    engine_print_log(msg, logger, get_level(level))
+def print_log(msg, logger='current', level='info', only_rank_zero=True):
+    should_print = True
+    if only_rank_zero:
+        if dist.get_rank() != 0:
+            should_print = False
+    if should_print:
+        engine_print_log(msg, logger, get_level(level))
 
 
 def set_log_level(level='debug'):
