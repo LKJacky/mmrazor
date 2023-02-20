@@ -74,6 +74,7 @@ class DTPAlgorithm(BaseAlgorithm):
                 res['flop_loss'] = self.flop_loss(
                     current_flops) * self.flop_loss_weight
                 res['soft_flop'] = current_flops.detach()
+                res['target'] = torch.tensor(self.current_target)
             else:
                 pass
 
@@ -99,6 +100,6 @@ class DTPAlgorithm(BaseAlgorithm):
         iter = RuntimeInfo().iter()
         total_iter = int(self.prune_iter_ratio * RuntimeInfo().max_iters())
         if iter > total_iter:
-            return -1
+            return self.target_flop
         else:
             return 1 - (1 - self.target_flop) * (iter / total_iter)

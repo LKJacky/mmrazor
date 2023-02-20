@@ -4,10 +4,10 @@ pretrained_path = './work_dirs/pretrained/vgg_pretrained.pth'
 
 imp_type = 'dtp'
 grad_clip = -1
-prune_iter_ratio = 0.3
+prune_iter_ratio = 0.1
 
 target_flop_ratio = 0.3
-flop_loss_weight = 2
+flop_loss_weight = 10
 input_shape = (1, 3, 32, 32)
 ##############################################################################
 

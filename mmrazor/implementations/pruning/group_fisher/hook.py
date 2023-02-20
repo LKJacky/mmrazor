@@ -157,7 +157,7 @@ class ResourceInfoHook(Hook):
         model = get_model_from_runner(runner)
         current_delta = self._evaluate(model)[self.resource_type]
         print_log(
-            f'current {self.resource_type}: {current_delta} / {self.origin_delta}'  # noqa
+            f'current {self.resource_type}: {current_delta} / {self.origin_delta} ({current_delta/self.origin_delta})'  # noqa
         )
 
     #
