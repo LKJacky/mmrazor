@@ -37,6 +37,7 @@ class DTPAlgorithm(BaseAlgorithm):
             ),
             target_flop=0.5,
             flop_loss_weight=1.0,
+            prune_iter_ratio=0.6,
             #
             data_preprocessor: Optional[Union[Dict, nn.Module]] = None,
             init_cfg: Optional[Dict] = None) -> None:
@@ -44,6 +45,7 @@ class DTPAlgorithm(BaseAlgorithm):
 
         self.target_flop = target_flop
         self.flop_loss_weight = flop_loss_weight
+        self.prune_iter_ratio = prune_iter_ratio
 
         self.mutator: ImpMutator = MODELS.build(mutator_cfg)
         self.mutator.prepare_from_supernet(self.architecture)
@@ -67,10 +69,13 @@ class DTPAlgorithm(BaseAlgorithm):
 
         if self.training and mode == 'loss':
             # flop_loss
-            current_flops = self.mutator.get_soft_flop(self.architecture)
-            res['flop_loss'] = self.flop_loss(
-                current_flops) * self.flop_loss_weight
-            res['soft_flop'] = current_flops.detach()
+            if self.current_target > 0:
+                current_flops = self.mutator.get_soft_flop(self.architecture)
+                res['flop_loss'] = self.flop_loss(
+                    current_flops) * self.flop_loss_weight
+                res['soft_flop'] = current_flops.detach()
+            else:
+                pass
 
         return res
 
@@ -84,5 +89,16 @@ class DTPAlgorithm(BaseAlgorithm):
     def _train_step(self, algorithm):
         algorithm.mutator.limit_value()
 
+    #
+
     def flop_loss(self, current_flop):
-        return (current_flop / self.original_flops - self.target_flop)**2
+        return (current_flop / self.original_flops - self.current_target)**2
+
+    @property
+    def current_target(self):
+        iter = RuntimeInfo().iter()
+        total_iter = int(self.prune_iter_ratio * RuntimeInfo().max_iters())
+        if iter > total_iter:
+            return -1
+        else:
+            return 1 - (1 - self.target_flop) * (iter / total_iter)

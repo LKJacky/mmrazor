@@ -4,6 +4,7 @@ pretrained_path = './work_dirs/pretrained/vgg_pretrained.pth'
 
 imp_type = 'dtp'
 grad_clip = -1
+prune_iter_ratio = 0.3
 
 target_flop_ratio = 0.3
 flop_loss_weight = 2
@@ -45,7 +46,7 @@ model = dict(
     ),
     target_flop=target_flop_ratio,
     flop_loss_weight=flop_loss_weight,
-)
+    prune_iter_ratio=prune_iter_ratio)
 
 custom_hooks = getattr(_base_, 'custom_hooks', []) + [
     dict(type='mmrazor.PruningStructureHook'),
