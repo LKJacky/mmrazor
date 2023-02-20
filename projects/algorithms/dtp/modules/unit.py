@@ -54,8 +54,10 @@ class ImpUnit(L1MutableChannelUnit):
             norm = self._get_unit_norm()
             imp = norm
 
-            index = imp.sort(descending=True)[1]
-            new_index = self.mutable_channel.index.gather(0, index)
+            index = imp.sort(descending=True)[1]  # index of big to small
+            index_space = torch.linspace(
+                0, 1, self.num_channels, device=index.device)  # 0 -> 1
+            new_index = torch.zeros_like(imp).scatter(0, index, index_space)
             self.mutable_channel.index.data = new_index
 
     @torch.no_grad()
