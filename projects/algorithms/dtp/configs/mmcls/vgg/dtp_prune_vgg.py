@@ -32,7 +32,7 @@ model = dict(
         channel_unit_cfg=dict(
             type='ImpUnit',
             default_args=dict(
-                imp_type='dtp',
+                imp_type=imp_type,
                 grad_clip=grad_clip,
             )),
         parse_cfg=dict(

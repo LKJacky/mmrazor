@@ -60,7 +60,12 @@ class ImpUnit(L1MutableChannelUnit):
 
     @torch.no_grad()
     def importance(self):
-        return self.mutable_channel.current_imp
+        if self.imp_type == 'dtp':
+            return self.mutable_channel.current_imp
+        elif self.imp_type == 'pas':
+            return self.mutable_channel.imp.detach()
+        else:
+            raise NotImplementedError()
 
     def activate_grad(self):
         self.requires_grad_(True)
