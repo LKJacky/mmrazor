@@ -81,8 +81,8 @@ class ImpModuleMixin():
         return x
 
     def soft_flop(self):
-        # input_imp = self.input_imp()
-        # output_imp = self.output_imp()
+        # input_imp = self.input_imp
+        # output_imp = self.output_imp
         # flop = input_imp.sum() * output_imp.sum()
         return 0.0
 
@@ -98,8 +98,8 @@ class ImpConv2d(dynamic_ops.DynamicConv2d, ImpModuleMixin, QuickFlopMixin):
         return nn.Conv2d.forward(self, x)
 
     def soft_flop(self):
-        in_c = soft_ceil(self.input_imp().sum())
-        out_c = soft_ceil(self.output_imp().sum())
+        in_c = soft_ceil(self.input_imp.sum())
+        out_c = soft_ceil(self.output_imp.sum())
         conv_per_pos = self.kernel_size[0] * self.kernel_size[
             1] * in_c * out_c / self.groups
         h, w = self.recorded_out_shape[0][2:]
@@ -119,8 +119,8 @@ class ImpLinear(dynamic_ops.DynamicLinear, ImpModuleMixin, QuickFlopMixin):
         return nn.Linear.forward(self, x)
 
     def soft_flop(self):
-        in_c = soft_ceil(self.input_imp().sum())
-        out_c = soft_ceil(self.output_imp().sum())
+        in_c = soft_ceil(self.input_imp.sum())
+        out_c = soft_ceil(self.output_imp.sum())
         return in_c * out_c
 
 

@@ -66,4 +66,4 @@ class ImpUnit(L1MutableChannelUnit):
         self.requires_grad_(True)
         if isinstance(self.mutable_channel, DTPMutableChannelImp):
             self.mutable_channel.e.register_hook(
-                grad_clip_wrapper(self.grad_clip, self.mutable_channel))
+                grad_clip_wrapper(self.grad_clip))

@@ -3,11 +3,12 @@ from torch import nn
 
 from mmrazor.models.mutators import ChannelMutator
 from mmrazor.models.task_modules.demo_inputs import DefaultDemoInput
-from mmrazor.registry import TASK_UTILS
+from mmrazor.registry import MODELS, TASK_UTILS
 from .ops import QuickFlopMixin
 from .unit import ImpUnit
 
 
+@MODELS.register_module()
 class ImpMutator(ChannelMutator[ImpUnit]):
 
     def __init__(
