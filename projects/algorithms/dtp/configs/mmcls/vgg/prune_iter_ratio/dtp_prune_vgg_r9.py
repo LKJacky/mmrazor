@@ -7,7 +7,7 @@ grad_clip = -1
 prune_iter_ratio = 0.9
 
 target_flop_ratio = 0.3
-flop_loss_weight = 10
+flop_loss_weight = 100
 input_shape = (1, 3, 32, 32)
 ##############################################################################
 
