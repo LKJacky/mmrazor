@@ -20,6 +20,7 @@ class ImpUnit(L1MutableChannelUnit):
         num_channels: int,
         imp_type='l1',
         grad_clip=-1,
+        index_revert=False,
     ) -> None:
         super().__init__(num_channels, choice_mode='number')
 
@@ -36,6 +37,8 @@ class ImpUnit(L1MutableChannelUnit):
         self.requires_grad_(False)
 
         self.grad_clip = grad_clip
+
+        self.index_revert = index_revert
 
     def prepare_for_pruning(self, model: nn.Module):
         self._replace_with_dynamic_ops(
@@ -54,7 +57,8 @@ class ImpUnit(L1MutableChannelUnit):
             norm = self._get_unit_norm()
             imp = norm
 
-            index = imp.sort(descending=True)[1]  # index of big to small
+            index = imp.sort(
+                descending=(not self.index_revert))[1]  # index of big to small
             index_space = torch.linspace(
                 0, 1, self.num_channels, device=index.device)  # 0 -> 1
             new_index = torch.zeros_like(imp).scatter(0, index, index_space)
