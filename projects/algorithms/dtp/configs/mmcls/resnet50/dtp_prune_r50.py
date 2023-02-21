@@ -1,6 +1,6 @@
 #############################################################################
 _base_ = '../../../../../models/resnet50/resnet50_pretrain_cos_smooth.py'
-pretrained_path = 'https://download.openmmlab.com/mmclassification/v0/resnet/resnet50_8xb32_in1k_20210831-ea4938fc.pth'  # noqa
+pretrained_path = 'work_dirs/pretrained/resnet50_cos_smooth_140.pth'  # noqa
 
 imp_type = 'dtp'
 grad_clip = -1
@@ -8,7 +8,7 @@ prune_iter_ratio = 0.1
 index_revert = False
 
 target_flop_ratio = 0.5
-flop_loss_weight = 1e-1
+flop_loss_weight = 10
 input_shape = (1, 3, 224, 224)
 ##############################################################################
 
