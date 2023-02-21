@@ -1,6 +1,8 @@
 #############################################################################
+import os
+
 _base_ = './dtp_prune_vgg.py'
-pruned_path = './work_dirs/dtp_prune_vgg/flops_0.30.pth'
+pruned_path = f"./work_dirs/{os.environ['JOB_NAME']}/flops_0.30.pth"
 ##############################################################################
 
 algorithm = _base_.model
