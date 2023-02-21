@@ -5,6 +5,7 @@ pretrained_path = './work_dirs/pretrained/vgg_pretrained.pth'
 imp_type = 'dtp'
 grad_clip = -1
 prune_iter_ratio = 0.3
+index_revert = False
 
 target_flop_ratio = 0.3
 flop_loss_weight = 1
@@ -34,6 +35,7 @@ model = dict(
             default_args=dict(
                 imp_type=imp_type,
                 grad_clip=grad_clip,
+                index_revert=index_revert,
             )),
         parse_cfg=dict(
             _scope_='mmrazor',
