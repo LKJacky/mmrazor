@@ -9,6 +9,10 @@ prune_iter_ratio = 0.9
 target_flop_ratio = 0.3
 flop_loss_weight = 100
 input_shape = (1, 3, 32, 32)
+
+if hasattr(_base_, 'param_scheduler'):
+    delattr(_base_, 'param_scheduler')
+
 ##############################################################################
 
 custom_imports = dict(imports=['projects'])
@@ -67,6 +71,3 @@ paramwise_cfg = dict(custom_keys={
 })
 optim_wrapper = _base_.optim_wrapper
 optim_wrapper.update({'paramwise_cfg': paramwise_cfg})
-
-if hasattr(_base_, 'param_scheduler'):
-    delattr(_base_, 'param_scheduler')
