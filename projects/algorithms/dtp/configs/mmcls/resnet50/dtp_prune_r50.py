@@ -66,14 +66,15 @@ custom_hooks = getattr(_base_, 'custom_hooks', []) + [
     dict(type='mmrazor.PruningStructureHook', by_epoch=False, interval=1000),
     dict(
         type='mmrazor.ResourceInfoHook',
-        interval=10,
+        interval=-1,
         demo_input=dict(
             type='mmrazor.DefaultDemoInput',
             input_shape=input_shape,
         ),
         early_stop=False,
         save_ckpt_thr=[],
-    ),
+        log_interval=1000,
+        log_by_epoch=False),
 ]
 
 paramwise_cfg = dict(custom_keys={

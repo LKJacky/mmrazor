@@ -102,7 +102,9 @@ class ResourceInfoHook(Hook):
                  interval=10,
                  resource_type='flops',
                  save_ckpt_thr=[0.5],
-                 early_stop=True) -> None:
+                 early_stop=True,
+                 log_interval=1,
+                 log_by_epoch=True) -> None:
 
         super().__init__()
         if isinstance(demo_input, dict):
@@ -121,6 +123,9 @@ class ResourceInfoHook(Hook):
                     input_shape=tuple(demo_input.input_shape), )))
         self.interval = interval
         self.origin_delta = None
+
+        self.log_interval = log_interval
+        self.log_by_epoch = log_by_epoch
 
     def before_run(self, runner) -> None:
         """Init original_resource."""
@@ -149,11 +154,19 @@ class ResourceInfoHook(Hook):
         if self.early_stop and len(self.save_ckpt_thr) == 0:
             exit()
 
+        if self.log_by_epoch is False and RuntimeInfo().iter(
+        ) % self.log_interval == 0:
+            self.show_resource(runner)
+
     # show info
 
     @master_only
     def after_train_epoch(self, runner) -> None:
         """Check resource after train epoch."""
+        if self.log_by_epoch and RuntimeInfo.epoch() % self.log_interval == 0:
+            self.show_resource(runner)
+
+    def show_resource(self, runner):
         model = get_model_from_runner(runner)
         current_delta = self._evaluate(model)[self.resource_type]
         print_log(
