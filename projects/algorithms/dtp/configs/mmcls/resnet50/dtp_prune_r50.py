@@ -4,12 +4,24 @@ pretrained_path = 'work_dirs/pretrained/resnet50_cos_smooth_140.pth'  # noqa
 
 imp_type = 'dtp'
 grad_clip = -1
-prune_iter_ratio = 0.1
+prune_iter_ratio = 0.6
 index_revert = False
 
 target_flop_ratio = 0.5
-flop_loss_weight = 10
+flop_loss_weight = 1
 input_shape = (1, 3, 224, 224)
+
+epoch = 20
+
+# optimizer setting
+param_scheduler = dict(
+    type='CosineAnnealingLR',
+    T_max=epoch,
+    by_epoch=True,
+    begin=0,
+    end=epoch,
+    _scope_='mmcls')
+train_cfg = dict(by_epoch=True, max_epochs=epoch, val_interval=1)
 ##############################################################################
 
 custom_imports = dict(imports=['projects'])
@@ -51,7 +63,7 @@ model = dict(
     prune_iter_ratio=prune_iter_ratio)
 
 custom_hooks = getattr(_base_, 'custom_hooks', []) + [
-    dict(type='mmrazor.PruningStructureHook'),
+    dict(type='mmrazor.PruningStructureHook', by_epoch=False, interval=1000),
     dict(
         type='mmrazor.ResourceInfoHook',
         interval=10,
@@ -59,8 +71,8 @@ custom_hooks = getattr(_base_, 'custom_hooks', []) + [
             type='mmrazor.DefaultDemoInput',
             input_shape=input_shape,
         ),
-        early_stop=True,
-        save_ckpt_thr=[target_flop_ratio],
+        early_stop=False,
+        save_ckpt_thr=[],
     ),
 ]
 

@@ -2,7 +2,17 @@
 import os
 
 _base_ = './dtp_prune_r50.py'
-pruned_path = f"./work_dirs/{os.environ['JOB_NAME']}/flops_0.50.pth"
+pruned_path = f"./work_dirs/{os.environ['JOB_NAME']}/epoch_20.pth"
+
+epoch = 140
+param_scheduler = dict(
+    type='CosineAnnealingLR',
+    T_max=epoch,
+    by_epoch=True,
+    begin=0,
+    end=epoch,
+    _scope_='mmcls')
+train_cfg = dict(by_epoch=True, max_epochs=epoch, val_interval=1)
 ##############################################################################
 
 algorithm = _base_.model
