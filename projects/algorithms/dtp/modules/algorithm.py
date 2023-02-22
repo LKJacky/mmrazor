@@ -3,11 +3,11 @@ from typing import Dict, List, Optional, Union
 
 import torch
 import torch.nn as nn
-from mmengine.model import BaseModel
+from mmengine.model import BaseModel, MMDistributedDataParallel
 from mmengine.structures import BaseDataElement
 
 from mmrazor.models import BaseAlgorithm
-from mmrazor.registry import MODELS
+from mmrazor.registry import MODEL_WRAPPERS, MODELS
 from mmrazor.utils import RuntimeInfo, print_log
 from .mutator import ImpMutator
 
@@ -84,11 +84,11 @@ class DTPAlgorithm(BaseAlgorithm):
                    optim_wrapper) -> Dict[str, torch.Tensor]:
 
         res = super().train_step(data, optim_wrapper)
-        self._train_step(self)
+        self._train_step()
         return res
 
-    def _train_step(self, algorithm):
-        algorithm.mutator.limit_value()
+    def _train_step(self):
+        self.mutator.limit_value()
 
     #
 
@@ -103,3 +103,12 @@ class DTPAlgorithm(BaseAlgorithm):
             return self.target_flop
         else:
             return 1 - (1 - self.target_flop) * (iter / total_iter)
+
+
+@MODEL_WRAPPERS.register_module()
+class DTPAlgorithmDDP(MMDistributedDataParallel):
+    """Train step for group fisher."""
+
+    def train_step(self, data: Union[dict, tuple, list],
+                   optim_wrapper) -> Dict[str, torch.Tensor]:
+        return DTPAlgorithm.train_step(self.module, data, optim_wrapper)

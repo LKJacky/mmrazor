@@ -69,3 +69,8 @@ paramwise_cfg = dict(custom_keys={
 })
 optim_wrapper = _base_.optim_wrapper
 optim_wrapper.update({'paramwise_cfg': paramwise_cfg})
+
+model_wrapper_cfg = dict(
+    type='mmrazor.DTPAlgorithmDDP',
+    broadcast_buffers=False,
+)
