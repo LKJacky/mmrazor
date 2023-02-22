@@ -10,6 +10,9 @@ index_revert = False
 target_flop_ratio = 0.3
 flop_loss_weight = 1
 input_shape = (1, 3, 32, 32)
+
+log_by_epoch = True
+log_interval = 1
 ##############################################################################
 
 custom_imports = dict(imports=['projects'])
@@ -51,17 +54,21 @@ model = dict(
     prune_iter_ratio=prune_iter_ratio)
 
 custom_hooks = getattr(_base_, 'custom_hooks', []) + [
-    dict(type='mmrazor.PruningStructureHook'),
+    dict(
+        type='mmrazor.PruningStructureHook',
+        by_epoch=log_by_epoch,
+        interval=log_interval),
     dict(
         type='mmrazor.ResourceInfoHook',
-        interval=10,
+        interval=-1,
         demo_input=dict(
             type='mmrazor.DefaultDemoInput',
             input_shape=input_shape,
         ),
-        early_stop=True,
-        save_ckpt_thr=[target_flop_ratio],
-    ),
+        early_stop=False,
+        save_ckpt_thr=[],
+        log_interval=log_interval,
+        log_by_epoch=log_by_epoch),
 ]
 
 paramwise_cfg = dict(custom_keys={
