@@ -71,3 +71,5 @@ paramwise_cfg = dict(custom_keys={
 })
 optim_wrapper = _base_.optim_wrapper
 optim_wrapper.update({'paramwise_cfg': paramwise_cfg})
+
+# 93.7900
