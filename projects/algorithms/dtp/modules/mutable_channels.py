@@ -61,6 +61,12 @@ class DTPMutableChannelImp(SimpleMutableChannel):
     @torch.no_grad()
     def limit_value(self):
         self.e.data = torch.clamp(self.e, 1 / self.num_channels, 1.0)
+        # self.e.data = torch.clamp(self.e, self.pre_e - 0.01, self.pre_e + 0.01) # noqa
+
+    @torch.no_grad()
+    def save_info(self):
+        # self.pre_e = self.e.detach().clone()
+        pass
 
 
 class PASMutableChannel(SimpleMutableChannel):

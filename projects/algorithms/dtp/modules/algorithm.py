@@ -83,8 +83,9 @@ class DTPAlgorithm(BaseAlgorithm):
     def train_step(self, data: Union[dict, tuple, list],
                    optim_wrapper) -> Dict[str, torch.Tensor]:
 
+        self.mutator.save_info()
         res = super().train_step(data, optim_wrapper)
-        self._train_step()
+        self.mutator.limit_value()
         return res
 
     def _train_step(self):

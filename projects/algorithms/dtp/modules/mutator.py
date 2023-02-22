@@ -47,6 +47,10 @@ class ImpMutator(ChannelMutator[ImpUnit]):
         for unit in self.mutable_units:
             unit.mutable_channel.limit_value()
 
+    def save_info(self):
+        for unit in self.mutable_units:
+            unit.mutable_channel.save_info()
+
     # soft flops
 
     @torch.no_grad()
