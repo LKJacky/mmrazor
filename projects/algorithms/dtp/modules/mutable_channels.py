@@ -40,7 +40,7 @@ def grad_clip_wrapper(abs):
 
 class DTPMutableChannelImp(SimpleMutableChannel):
 
-    def __init__(self, num_channels: int, **kwargs) -> None:
+    def __init__(self, num_channels: int, delta_limit=-1, **kwargs) -> None:
         super().__init__(num_channels, **kwargs)
 
         self.e = nn.parameter.Parameter(
@@ -50,6 +50,8 @@ class DTPMutableChannelImp(SimpleMutableChannel):
         self.register_buffer('index', index)
         self.index: torch.Tensor
         self.lamda = 1.0
+
+        self.delta_limit = delta_limit
 
     @property
     def current_imp(self):
@@ -61,12 +63,13 @@ class DTPMutableChannelImp(SimpleMutableChannel):
     @torch.no_grad()
     def limit_value(self):
         self.e.data = torch.clamp(self.e, 1 / self.num_channels, 1.0)
-        # self.e.data = torch.clamp(self.e, self.pre_e - 0.01, self.pre_e + 0.01) # noqa
+        if self.delta_limit > 0:
+            self.e.data = torch.clamp(self.e, self.pre_e - self.delta_limit,
+                                      self.pre_e + self.delta_limit)  # noqa
 
     @torch.no_grad()
     def save_info(self):
-        # self.pre_e = self.e.detach().clone()
-        pass
+        self.pre_e = self.e.detach().clone()
 
 
 class PASMutableChannel(SimpleMutableChannel):

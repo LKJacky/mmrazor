@@ -32,11 +32,11 @@ class ImpUnit(L1MutableChannelUnit):
             self.mutable_channel = PASMutableChannel(self.num_channels)
         else:
             self.mutable_channel = DTPMutableChannelImp(  # noqa
-                self.num_channels)
+                self.num_channels, delta_limit=grad_clip)
 
         self.requires_grad_(False)
 
-        self.grad_clip = grad_clip
+        self.grad_clip = -1
 
         self.index_revert = index_revert
 
