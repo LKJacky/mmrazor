@@ -87,3 +87,5 @@ model_wrapper_cfg = dict(
     type='mmrazor.DTPAlgorithmDDP',
     broadcast_buffers=False,
 )
+
+# 74.96
