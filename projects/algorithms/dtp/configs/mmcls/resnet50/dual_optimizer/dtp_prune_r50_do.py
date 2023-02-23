@@ -19,6 +19,9 @@ if hasattr(_base_, 'param_scheduler'):
     delattr(_base_, 'param_scheduler')
 
 train_cfg = dict(by_epoch=True, max_epochs=epoch, val_interval=1)
+
+log_by_epoch = False
+log_interval = 1000
 ##############################################################################
 
 custom_imports = dict(imports=['projects'])
@@ -61,7 +64,10 @@ model = dict(
     prune_iter_ratio=prune_iter_ratio)
 
 custom_hooks = getattr(_base_, 'custom_hooks', []) + [
-    dict(type='mmrazor.PruningStructureHook', by_epoch=False, interval=157),
+    dict(
+        type='mmrazor.PruningStructureHook',
+        by_epoch=log_by_epoch,
+        interval=log_interval),
     dict(
         type='mmrazor.ResourceInfoHook',
         interval=-1,
@@ -71,8 +77,8 @@ custom_hooks = getattr(_base_, 'custom_hooks', []) + [
         ),
         early_stop=False,
         save_ckpt_thr=[],
-        log_interval=1000,
-        log_by_epoch=False),
+        log_interval=log_interval,
+        log_by_epoch=log_by_epoch),
 ]
 
 paramwise_cfg = dict(custom_keys={
