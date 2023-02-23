@@ -8,7 +8,7 @@ from mmrazor.models.mutables import L1MutableChannelUnit
 from mmrazor.registry import MODELS
 from .mutable_channels import (DTPMutableChannelImp,
                                ImpMutableChannelContainer, PASMutableChannel,
-                               grad_clip_wrapper)
+                               grad_adjust_wrapper)
 from .ops import ImpBatchnorm2d, ImpConv2d, ImpLinear
 
 
@@ -20,9 +20,11 @@ class ImpUnit(L1MutableChannelUnit):
         num_channels: int,
         imp_type='l1',
         grad_clip=-1,
+        grad_mode=None,
         index_revert=False,
     ) -> None:
         super().__init__(num_channels, choice_mode='number')
+        delta_limit = grad_clip
 
         assert imp_type in ['dtp', 'pas']
         self.imp_type = imp_type
@@ -32,13 +34,13 @@ class ImpUnit(L1MutableChannelUnit):
             self.mutable_channel = PASMutableChannel(self.num_channels)
         else:
             self.mutable_channel = DTPMutableChannelImp(  # noqa
-                self.num_channels, delta_limit=grad_clip)
+                self.num_channels, delta_limit=delta_limit)
 
         self.requires_grad_(False)
 
-        self.grad_clip = -1
-
         self.index_revert = index_revert
+
+        self.grad_mode = grad_mode
 
     def prepare_for_pruning(self, model: nn.Module):
         self._replace_with_dynamic_ops(
@@ -77,4 +79,4 @@ class ImpUnit(L1MutableChannelUnit):
         self.requires_grad_(True)
         if isinstance(self.mutable_channel, DTPMutableChannelImp):
             self.mutable_channel.e.register_hook(
-                grad_clip_wrapper(self.grad_clip))
+                grad_adjust_wrapper(self.grad_mode))

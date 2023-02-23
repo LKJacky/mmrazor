@@ -1,10 +1,13 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 
+import math
+
 import torch
 import torch.nn as nn
 
 from mmrazor.models.mutables import (MutableChannelContainer,
                                      SimpleMutableChannel)
+from mmrazor.utils import RuntimeInfo
 
 
 def soft_clip(x: torch.Tensor, min, max):
@@ -24,15 +27,21 @@ def dtopk(x: torch.Tensor, e: torch.Tensor, lamda=1.0):
     return s
 
 
-def grad_clip_wrapper(abs):
+def grad_adjust_wrapper(mode=None):
 
-    def grad_clip_hook(grad: torch.Tensor):
-        if abs < 0:
+    def current_grad_lr():
+        ratio = RuntimeInfo().epoch() / RuntimeInfo().max_epochs()
+        return (math.cos(ratio * math.pi) + 1) / 2
+
+    def grad_adjust_hook(grad: torch.Tensor):
+        if mode is None:
             return None
+        elif mode == 'cos':
+            return current_grad_lr() * grad
         else:
-            return torch.clamp(grad, -abs, abs)
+            raise NotImplementedError()
 
-    return grad_clip_hook
+    return grad_adjust_hook
 
 
 # mutable channels
