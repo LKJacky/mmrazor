@@ -86,6 +86,11 @@ class DTPAlgorithm(BaseAlgorithm):
         self.mutator.save_info()
         res = super().train_step(data, optim_wrapper)
         self.mutator.limit_value()
+        with torch.no_grad():
+            if self.current_target == self.target_flop:
+                self.mutator.adjust_to_target(
+                    self.architecture, self.target_flop * self.original_flops,
+                    self.original_flops)
         return res
 
     def _train_step(self):

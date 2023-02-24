@@ -1,3 +1,5 @@
+import math
+
 import torch
 from torch import nn
 
@@ -74,3 +76,12 @@ class ImpMutator(ChannelMutator[ImpUnit]):
                 flop += module.soft_flop()
         assert isinstance(flop, torch.Tensor)
         return flop
+
+    @torch.no_grad()
+    def adjust_to_target(self, model, target, original_flops):
+        # l^2 * now = target
+        now = self.get_soft_flop(model)
+        if abs(now - target) / original_flops > 0.01:
+            lamb = math.sqrt(target / now)
+            for unit in self.mutable_units:
+                unit.mutable_channel.e.data = unit.mutable_channel.e.data * lamb  # noqa
