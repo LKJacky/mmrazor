@@ -12,9 +12,6 @@ flop_loss_weight = 100
 mutator_lr = 1e-2
 input_shape = (1, 3, 32, 32)
 
-if hasattr(_base_, 'param_scheduler'):
-    delattr(_base_, 'param_scheduler')
-
 ##############################################################################
 
 custom_imports = dict(imports=['projects'])
@@ -65,7 +62,7 @@ custom_hooks = getattr(_base_, 'custom_hooks', []) + [
             type='mmrazor.DefaultDemoInput',
             input_shape=input_shape,
         ),
-        early_stop=True,
+        early_stop=False,
         save_ckpt_thr=[target_flop_ratio],
     ),
 ]
