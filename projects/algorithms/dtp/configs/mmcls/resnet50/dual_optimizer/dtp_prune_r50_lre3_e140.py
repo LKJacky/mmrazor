@@ -16,7 +16,7 @@ input_shape = (1, 3, 224, 224)
 log_by_epoch = False
 log_interval = 1000
 
-epoch = 20
+epoch = 140
 
 # optimizer setting
 if hasattr(_base_, 'param_scheduler'):

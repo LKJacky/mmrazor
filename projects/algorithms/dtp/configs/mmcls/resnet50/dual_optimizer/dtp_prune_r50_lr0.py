@@ -5,7 +5,7 @@ pretrained_path = 'work_dirs/pretrained/resnet50_cos_smooth_140.pth'  # noqa
 
 imp_type = 'dtp'
 grad_clip = -1
-prune_iter_ratio = 0.4
+prune_iter_ratio = -1
 index_revert = False
 grad_mode = None
 
@@ -14,7 +14,7 @@ flop_loss_weight = 1000
 input_shape = (1, 3, 224, 224)
 
 log_by_epoch = False
-log_interval = 1000
+log_interval = 100
 
 epoch = 5
 
@@ -32,7 +32,7 @@ train_cfg = dict(by_epoch=True, max_epochs=epoch, val_interval=1)
 
 paramwise_cfg = dict(
     custom_keys={
-        'mutator.': dict(lr=1e-3, decay_mult=0.0),
+        'mutator.': dict(lr=1e-4, decay_mult=0.0),
         'architecture.': dict(lr=0.0, decay_mult=0.0),
     })
 
