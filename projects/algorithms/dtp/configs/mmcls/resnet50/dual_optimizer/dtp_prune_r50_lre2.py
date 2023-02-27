@@ -1,3 +1,4 @@
+# 76.374
 #############################################################################
 _base_ = '../../../../../../models/resnet50/resnet50_pretrain_cos_smooth.py'
 pretrained_path = 'work_dirs/pretrained/resnet50_cos_smooth_140.pth'  # noqa
