@@ -13,7 +13,13 @@ param_scheduler = dict(
     end=epoch,
     _scope_='mmcls')
 train_cfg = dict(by_epoch=True, max_epochs=epoch, val_interval=1)
+finetune_lr = 0.1
 ##############################################################################
+
+optim_wrapper = _base_.optim_wrapper
+optim_wrapper.update({
+    'optimizer': dict(lr=finetune_lr),
+})
 
 algorithm = _base_.model
 algorithm.init_cfg = dict(type='Pretrained', checkpoint=pruned_path)
