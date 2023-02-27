@@ -38,6 +38,7 @@ class DTPAlgorithm(BaseAlgorithm):
             target_flop=0.5,
             flop_loss_weight=1.0,
             prune_iter_ratio=0.6,
+            update_ratio=0.7,
             #
             data_preprocessor: Optional[Union[Dict, nn.Module]] = None,
             init_cfg: Optional[Dict] = None) -> None:
@@ -46,6 +47,7 @@ class DTPAlgorithm(BaseAlgorithm):
         self.target_flop = target_flop
         self.flop_loss_weight = flop_loss_weight
         self.prune_iter_ratio = prune_iter_ratio
+        self.update_ratio = update_ratio
 
         self.mutator: ImpMutator = MODELS.build(mutator_cfg)
         self.mutator.prepare_from_supernet(self.architecture)
@@ -67,17 +69,20 @@ class DTPAlgorithm(BaseAlgorithm):
 
         res: dict = super().forward(inputs, data_samples, mode)  # type: ignore
 
-        if self.training and mode == 'loss':
-            # flop_loss
-            if self.current_target > 0:
-                current_flops = self.mutator.get_soft_flop(self.architecture)
-                res['flop_loss'] = self.flop_loss(
-                    current_flops) * self.flop_loss_weight
-                res['soft_flop'] = current_flops.detach()
-                res['target'] = torch.tensor(self.current_target)
-            else:
-                pass
-
+        if RuntimeInfo().iter() < RuntimeInfo.max_iters() * self.update_ratio:
+            if self.training and mode == 'loss':
+                # flop_loss
+                if self.current_target > 0:
+                    current_flops = self.mutator.get_soft_flop(
+                        self.architecture)
+                    res['flop_loss'] = self.flop_loss(
+                        current_flops) * self.flop_loss_weight
+                    res['soft_flop'] = current_flops.detach()
+                    res['target'] = torch.tensor(self.current_target)
+                else:
+                    pass
+        else:
+            self.mutator.requires_grad_(False)
         return res
 
     def train_step(self, data: Union[dict, tuple, list],
@@ -93,10 +98,13 @@ class DTPAlgorithm(BaseAlgorithm):
     def _after_train_step(self):
         self.mutator.limit_value()
         with torch.no_grad():
-            if self.current_target == self.target_flop:
-                self.mutator.adjust_to_target(
-                    self.architecture, self.target_flop * self.original_flops,
-                    self.original_flops)
+            if RuntimeInfo().iter(
+            ) < RuntimeInfo().max_iters() * self.update_ratio:
+                if self.current_target == self.target_flop:
+                    self.mutator.adjust_to_target(
+                        self.architecture,
+                        self.target_flop * self.original_flops,
+                        self.original_flops)
 
     #
 
