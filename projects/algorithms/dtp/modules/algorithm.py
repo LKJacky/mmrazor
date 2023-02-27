@@ -82,19 +82,21 @@ class DTPAlgorithm(BaseAlgorithm):
 
     def train_step(self, data: Union[dict, tuple, list],
                    optim_wrapper) -> Dict[str, torch.Tensor]:
-
-        self.mutator.save_info()
+        self._before_train_step()
         res = super().train_step(data, optim_wrapper)
+        self._after_train_step()
+        return res
+
+    def _before_train_step(self):
+        self.mutator.save_info()
+
+    def _after_train_step(self):
         self.mutator.limit_value()
         with torch.no_grad():
             if self.current_target == self.target_flop:
                 self.mutator.adjust_to_target(
                     self.architecture, self.target_flop * self.original_flops,
                     self.original_flops)
-        return res
-
-    def _train_step(self):
-        self.mutator.limit_value()
 
     #
 
@@ -117,4 +119,7 @@ class DTPAlgorithmDDP(MMDistributedDataParallel):
 
     def train_step(self, data: Union[dict, tuple, list],
                    optim_wrapper) -> Dict[str, torch.Tensor]:
-        return DTPAlgorithm.train_step(self.module, data, optim_wrapper)
+        DTPAlgorithm._before_train_step(self.module)
+        res = super().train_step(data, optim_wrapper)
+        DTPAlgorithm._after_train_step(self.module)
+        return res
