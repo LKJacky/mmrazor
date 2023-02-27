@@ -10,7 +10,7 @@ index_revert = False
 grad_mode = 'cos'
 
 target_flop_ratio = 0.5
-flop_loss_weight = 50
+flop_loss_weight = 100
 input_shape = (1, 3, 224, 224)
 
 log_by_epoch = False

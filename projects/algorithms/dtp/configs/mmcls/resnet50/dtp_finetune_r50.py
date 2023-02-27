@@ -2,7 +2,7 @@
 import os
 
 _base_ = './dtp_prune_r50.py'
-pruned_path = f"./work_dirs/{os.environ['JOB_NAME']}/epoch_20.pth"
+pruned_path = f"./work_dirs/{os.environ['JOB_NAME']}/{os.environ.get('PTH_NAME','epoch_20')}.pth"  # noqa
 
 epoch = 140
 param_scheduler = dict(
