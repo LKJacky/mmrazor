@@ -63,10 +63,26 @@ class ImpModuleMixin():
         return imp
 
     @property
+    def input_imp_flop(
+            self: Union[DynamicChannelMixin,
+                        'ImpModuleMixin']) -> torch.Tensor:
+        mutable: ImpMutableChannelContainer = self.get_mutable_attr(  # type: ignore # noqa
+            'in_channels')  # type: ignore
+        imp = mutable.current_imp_flop
+        return imp
+
+    @property
     def output_imp(self: nn.Module) -> torch.Tensor:
         mutable: ImpMutableChannelContainer = self.get_mutable_attr(
             'out_channels')
         imp = mutable.current_imp
+        return imp
+
+    @property
+    def output_imp_flop(self: nn.Module) -> torch.Tensor:
+        mutable: ImpMutableChannelContainer = self.get_mutable_attr(
+            'out_channels')
+        imp = mutable.current_imp_flop
         return imp
 
     def imp_forward(self, x: torch.Tensor):
@@ -98,8 +114,8 @@ class ImpConv2d(dynamic_ops.DynamicConv2d, ImpModuleMixin, QuickFlopMixin):
         return nn.Conv2d.forward(self, x)
 
     def soft_flop(self):
-        in_c = soft_ceil(self.input_imp.sum())
-        out_c = soft_ceil(self.output_imp.sum())
+        in_c = soft_ceil(self.input_imp_flop.sum())
+        out_c = soft_ceil(self.output_imp_flop.sum())
         conv_per_pos = self.kernel_size[0] * self.kernel_size[
             1] * in_c * out_c / self.groups
         h, w = self.recorded_out_shape[0][2:]
@@ -119,8 +135,8 @@ class ImpLinear(dynamic_ops.DynamicLinear, ImpModuleMixin, QuickFlopMixin):
         return nn.Linear.forward(self, x)
 
     def soft_flop(self):
-        in_c = soft_ceil(self.input_imp.sum())
-        out_c = soft_ceil(self.output_imp.sum())
+        in_c = soft_ceil(self.input_imp_flop.sum())
+        out_c = soft_ceil(self.output_imp_flop.sum())
         return in_c * out_c
 
 

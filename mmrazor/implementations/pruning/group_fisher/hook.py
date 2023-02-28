@@ -56,9 +56,14 @@ class PruningStructureHook(Hook):
             for unit in algorithm.mutator.mutable_units:
                 if hasattr(unit, 'importance'):
                     imp = unit.importance()
-                    print_log(
-                        f'{unit.name}: \t{imp.min().item()}\t{imp.max().item()}'  # noqa
-                    )
+                    if hasattr(unit.mutable_channel, 'e'):
+                        print_log(
+                            f'{unit.name}: \t{imp.min().item()}\t{imp.max().item()}\t{unit.mutable_channel.e.item()}'  # noqa
+                        )
+                    else:
+                        print_log(
+                            f'{unit.name}: \t{imp.min().item()}\t{imp.max().item()}'  # noqa
+                        )
 
     @master_only
     def show(self, runner):

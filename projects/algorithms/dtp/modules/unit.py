@@ -6,7 +6,8 @@ import torch.nn as nn
 from mmrazor.models.architectures import dynamic_ops
 from mmrazor.models.mutables import L1MutableChannelUnit
 from mmrazor.registry import MODELS
-from .mutable_channels import (DTPMutableChannelImp,
+from .mutable_channels import (DTPAdaptiveMutableChannelImp,
+                               DTPMutableChannelImp,
                                ImpMutableChannelContainer, PASMutableChannel,
                                grad_adjust_wrapper)
 from .ops import ImpBatchnorm2d, ImpConv2d, ImpLinear
@@ -26,16 +27,20 @@ class ImpUnit(L1MutableChannelUnit):
         super().__init__(num_channels, choice_mode='number')
         delta_limit = grad_clip
 
-        assert imp_type in ['dtp', 'pas']
+        assert imp_type in ['dtp', 'pas', 'dtp_a']
         self.imp_type = imp_type
 
         self.mutable_channel: Union[PASMutableChannel, DTPMutableChannelImp]
         if self.imp_type == 'pas':
             self.mutable_channel = PASMutableChannel(self.num_channels)
-        else:
+        elif self.imp_type == 'dtp':
             self.mutable_channel = DTPMutableChannelImp(  # noqa
                 self.num_channels, delta_limit=delta_limit)
-
+        elif self.imp_type == 'dtp_a':
+            self.mutable_channel = DTPAdaptiveMutableChannelImp(  # noqa
+                self.num_channels, delta_limit=delta_limit)
+        else:
+            raise NotImplementedError(self.imp_type)
         self.requires_grad_(False)
 
         self.index_revert = index_revert
@@ -72,6 +77,8 @@ class ImpUnit(L1MutableChannelUnit):
             return self.mutable_channel.current_imp
         elif self.imp_type == 'pas':
             return self.mutable_channel.imp.detach()
+        elif self.imp_type == 'dtp_a':
+            return self.mutable_channel.v.detach()
         else:
             raise NotImplementedError()
 

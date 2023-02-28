@@ -98,13 +98,15 @@ class DTPAlgorithm(BaseAlgorithm):
     def _after_train_step(self):
         self.mutator.limit_value()
         with torch.no_grad():
-            if RuntimeInfo().iter(
-            ) < RuntimeInfo().max_iters() * self.update_ratio:
-                if self.current_target == self.target_flop:
-                    self.mutator.adjust_to_target(
-                        self.architecture,
-                        self.target_flop * self.original_flops,
-                        self.original_flops)
+            if self.mutator.units[0].imp_type == 'dtp' or self.mutator.units[
+                    0].imp_type == 'dtp_a':
+                if RuntimeInfo().iter(
+                ) < RuntimeInfo().max_iters() * self.update_ratio:
+                    if self.current_target == self.target_flop:
+                        self.mutator.adjust_to_target(
+                            self.architecture,
+                            self.target_flop * self.original_flops,
+                            self.original_flops)
 
     #
 
