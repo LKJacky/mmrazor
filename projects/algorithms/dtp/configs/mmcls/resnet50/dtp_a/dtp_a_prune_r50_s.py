@@ -97,4 +97,4 @@ custom_hooks = getattr(_base_, 'custom_hooks', []) + [
 model_wrapper_cfg = dict(
     type='mmrazor.DTPAlgorithmDDP',
     broadcast_buffers=False,
-)
+    find_unused_parameters=True)
