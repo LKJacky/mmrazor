@@ -84,6 +84,8 @@ class ImpUnit(L1MutableChannelUnit):
 
     def activate_grad(self):
         self.requires_grad_(True)
-        if isinstance(self.mutable_channel, DTPMutableChannelImp):
+        if isinstance(self.mutable_channel,
+                      DTPMutableChannelImp) or isinstance(
+                          self.mutable_channel, DTPAdaptiveMutableChannelImp):
             self.mutable_channel.e.register_hook(
                 grad_adjust_wrapper(self.grad_mode))

@@ -69,20 +69,23 @@ class DTPAlgorithm(BaseAlgorithm):
 
         res: dict = super().forward(inputs, data_samples, mode)  # type: ignore
 
-        if RuntimeInfo().iter() < RuntimeInfo.max_iters() * self.update_ratio:
-            if self.training and mode == 'loss':
-                # flop_loss
-                if self.current_target > 0:
-                    current_flops = self.mutator.get_soft_flop(
-                        self.architecture)
-                    res['flop_loss'] = self.flop_loss(
-                        current_flops) * self.flop_loss_weight
-                    res['soft_flop'] = current_flops.detach()
-                    res['target'] = torch.tensor(self.current_target)
-                else:
-                    pass
-        else:
-            self.mutator.requires_grad_(False)
+        if self.training:
+            if RuntimeInfo().iter(
+            ) < RuntimeInfo.max_iters() * self.update_ratio:
+
+                if mode == 'loss':
+                    # flop_loss
+                    if self.current_target > 0:
+                        current_flops = self.mutator.get_soft_flop(
+                            self.architecture)
+                        res['flop_loss'] = self.flop_loss(
+                            current_flops) * self.flop_loss_weight
+                        res['soft_flop'] = current_flops.detach()
+                        res['target'] = torch.tensor(self.current_target)
+                    else:
+                        pass
+            else:
+                self.mutator.requires_grad_(False)
         return res
 
     def train_step(self, data: Union[dict, tuple, list],
