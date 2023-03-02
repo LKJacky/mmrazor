@@ -64,8 +64,11 @@ class ImpMutator(ChannelMutator[ImpUnit]):
         demo_input: DefaultDemoInput = TASK_UTILS.build(self.demo_input)
         model.eval()
         input = demo_input.get_data(model, training=False)
-        input['mode'] = 'tensor'
-        model(**input)
+        if isinstance(input, dict):
+            input['mode'] = 'tensor'
+            model(**input)
+        else:
+            model(input)
         for module in model.modules():
             if isinstance(module, QuickFlopMixin):
                 module.end_record()
