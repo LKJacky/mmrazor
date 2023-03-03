@@ -107,15 +107,18 @@ class DTPAdaptiveMutableChannelImp(SimpleMutableChannel):
 
     @property
     def current_imp(self):
-        dis = self.v.max() - self.v.min()
-        if dis.abs() == 0.0:
-            return self.v.new_ones(
-                self.v.shape) - self.v.detach() + self.v + 0 * self.e
+        if self.e.requires_grad is False and self.v.requires_grad is False:
+            return self.mask
         else:
-            imp = self.get_importance(self.v, self.e)
-            with torch.no_grad():
-                self.mask.data = (imp >= 0.5).float()
-            return imp
+            dis = self.v.max() - self.v.min()
+            if dis.abs() == 0.0:
+                return self.v.new_ones(
+                    self.v.shape) - self.v.detach() + self.v + 0 * self.e
+            else:
+                imp = self.get_importance(self.v, self.e)
+                with torch.no_grad():
+                    self.mask.data = (imp >= 0.5).float()
+                return imp
 
     @property
     def current_imp_flop(self):
