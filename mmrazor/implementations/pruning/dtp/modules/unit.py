@@ -95,3 +95,6 @@ class ImpUnit(L1MutableChannelUnit):
                           self.mutable_channel, DTPAdaptiveMutableChannelImp):
             self.mutable_channel.e.register_hook(
                 grad_adjust_wrapper(self.grad_mode))
+
+    def info(self) -> str:
+        return f'imp: {self.mutable_channel.v.min().item():.3f}\t{self.mutable_channel.v.max().item():.3f}\t{self.mutable_channel.e.item():.3f}'  # noqa
