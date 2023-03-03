@@ -11,6 +11,23 @@ from mmrazor.models.architectures.dynamic_ops import DynamicChannelMixin
 from .mutable_channels import ImpMutableChannelContainer
 
 
+class STEMask(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, x, mask):
+        ctx.save_for_backward(x)
+        return x * mask
+
+    @staticmethod
+    def backward(ctx, grad_outputs: torch.Tensor):
+        x, = ctx.saved_tensors
+        mask_grad: torch.Tensor = (grad_outputs * x)
+        if len(mask_grad.shape) == 4:
+            mask_grad = mask_grad.sum(dim=[2, 3], keepdim=True)
+
+        return grad_outputs, mask_grad
+
+
 def soft_ceil(x):
     with torch.no_grad():
         x_ceil = torch.ceil(x.detach().data)
@@ -53,6 +70,9 @@ class QuickFlopMixin:
 
 class ImpModuleMixin():
 
+    def _imp_init(self):
+        self.ste = False
+
     @property
     def input_imp(
             self: Union[DynamicChannelMixin,
@@ -93,7 +113,10 @@ class ImpModuleMixin():
             input_imp = input_imp.reshape([1, -1])
         else:
             raise NotImplementedError()
-        x = x * input_imp
+        if self.ste:
+            x = STEMask.apply(x, input_imp)
+        else:
+            x = x * input_imp
         return x
 
     def soft_flop(self):

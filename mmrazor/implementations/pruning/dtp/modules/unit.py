@@ -11,7 +11,7 @@ from .mutable_channels import (DTPAdaptiveMutableChannelImp,
                                DTPMutableChannelImp,
                                ImpMutableChannelContainer, PASMutableChannel,
                                grad_adjust_wrapper)
-from .ops import ImpBatchnorm2d, ImpConv2d, ImpLinear
+from .ops import ImpBatchnorm2d, ImpConv2d, ImpLinear, ImpModuleMixin
 
 
 @MODELS.register_module()
@@ -24,6 +24,7 @@ class ImpUnit(L1MutableChannelUnit):
         grad_clip=-1,
         grad_mode=None,
         index_revert=False,
+        ste=False,
     ) -> None:
         super().__init__(num_channels, choice_mode='number')
         delta_limit = grad_clip
@@ -47,6 +48,7 @@ class ImpUnit(L1MutableChannelUnit):
         self.index_revert = index_revert
 
         self.grad_mode = grad_mode
+        self.ste = ste
 
     def prepare_for_pruning(self, model: nn.Module):
         self._replace_with_dynamic_ops(
@@ -58,6 +60,9 @@ class ImpUnit(L1MutableChannelUnit):
             })
         self._register_channel_container(model, ImpMutableChannelContainer)
         self._register_mutable_channel(self.mutable_channel)
+        for channel in self.input_related + self.output_related:
+            if isinstance(channel.module, ImpModuleMixin):
+                channel.module.ste = self.ste
 
     @torch.no_grad()
     def resort(self):
