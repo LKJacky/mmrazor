@@ -97,4 +97,9 @@ class ImpUnit(L1MutableChannelUnit):
                 grad_adjust_wrapper(self.grad_mode))
 
     def info(self) -> str:
-        return f'imp: {self.mutable_channel.v.min().item():.3f}\t{self.mutable_channel.v.max().item():.3f}\t{self.mutable_channel.e.item():.3f}'  # noqa
+        if self.imp_type == 'dtp_a':
+            return f'imp: {self.mutable_channel.v.min().item():.3f}\t{self.mutable_channel.v.max().item():.3f}\t{self.mutable_channel.e.item():.3f}'  # noqa
+        elif self.imp_type == 'pas':
+            return f'imp: {self.mutable_channel.imp.min().item():.3f}\t{self.mutable_channel.imp.max().item():.3f}'  # noqa
+        else:
+            raise NotImplementedError()
