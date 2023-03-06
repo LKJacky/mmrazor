@@ -47,6 +47,21 @@ def grad_adjust_wrapper(mode=None):
 # mutable channels
 
 
+class BaseDTPMutableChannel(SimpleMutableChannel):
+
+    @property
+    def current_imp(self):
+        raise NotImplementedError()
+
+    @property
+    def current_imp_flop(self):
+        raise NotImplementedError()
+
+    @torch.no_grad()
+    def limit_value(self):
+        raise NotImplementedError()
+
+
 class DTPMutableChannelImp(SimpleMutableChannel):
 
     def __init__(self, num_channels: int, delta_limit=-1, **kwargs) -> None:

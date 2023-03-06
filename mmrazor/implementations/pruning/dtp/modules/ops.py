@@ -118,6 +118,7 @@ class ImpConv2d(dynamic_ops.DynamicConv2d, ImpModuleMixin, QuickFlopMixin):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._quick_flop_init()
+        self._imp_init()
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.imp_forward(x)
@@ -139,6 +140,7 @@ class ImpLinear(dynamic_ops.DynamicLinear, ImpModuleMixin, QuickFlopMixin):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._quick_flop_init()
+        self._imp_init()
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.imp_forward(x)

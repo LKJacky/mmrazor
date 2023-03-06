@@ -11,6 +11,63 @@ from .ops import QuickFlopMixin
 from .unit import ImpUnit
 
 
+class BaseDTPMutator(ChannelMutator):
+
+    def __init__(
+        self,
+        channel_unit_cfg=dict(type='ImpUnit', default_args=dict()),
+        parse_cfg=dict(
+            _scope_='mmrazor',
+            type='ChannelAnalyzer',
+            demo_input=dict(
+                type='DefaultDemoInput',
+                input_shape=[1, 3, 224, 224],
+            ),
+            tracer_type='BackwardTracer',
+        )
+    ) -> None:
+        super().__init__(channel_unit_cfg, parse_cfg)
+        self.demo_input = parse_cfg['demo_input']
+
+    def prepare_from_supernet(self, supernet) -> None:
+        res = super().prepare_from_supernet(supernet)
+        for unit in self.mutable_units:
+            unit.requires_grad_(True)
+        self.init_quick_flop(supernet)
+        return res
+
+    @torch.no_grad()
+    def init_quick_flop(self, model: nn.Module):
+        for module in model.modules():
+            if isinstance(module, QuickFlopMixin):
+                module.start_record()
+        demo_input: DefaultDemoInput = TASK_UTILS.build(self.demo_input)
+        model.eval()
+        input = demo_input.get_data(model, training=False)
+        if isinstance(input, dict):
+            input['mode'] = 'tensor'
+            model(**input)
+        else:
+            model(input)
+        for module in model.modules():
+            if isinstance(module, QuickFlopMixin):
+                module.end_record()
+
+    def get_soft_flop(self, model):
+        flop = 0
+        for _, module in model.named_modules():
+            if isinstance(module, QuickFlopMixin):
+                flop += module.soft_flop()
+        assert isinstance(flop, torch.Tensor)
+        return flop
+
+    def after_train_iter(self):
+        raise NotImplementedError()
+
+    def before_train(self):
+        raise NotImplementedError()
+
+
 @MODELS.register_module()
 class ImpMutator(ChannelMutator[ImpUnit]):
 
