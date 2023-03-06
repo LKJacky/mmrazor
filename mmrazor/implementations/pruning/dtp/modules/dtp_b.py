@@ -1,5 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 
+import math
 from typing import List
 
 import torch
@@ -8,6 +9,7 @@ import torch.nn as nn
 from mmrazor.models.architectures import dynamic_ops
 from mmrazor.models.mutables import L1MutableChannelUnit
 from mmrazor.registry import MODELS
+from mmrazor.utils import print_log
 from .mutable_channels import (BaseDTPMutableChannel,
                                ImpMutableChannelContainer, dtopk)
 from .mutator import BaseDTPMutator
@@ -58,21 +60,24 @@ class DTPBMutableChannelImp(BaseDTPMutableChannel):
             return self.v.new_ones(
                 self.v.shape) - self.v.detach() + self.v + 0 * self.e
         else:
-            imp = self.get_importance(self.v.detach(), self.e)
+            imp = self.get_importance(self.v, self.e)
             return imp
 
     @torch.no_grad()
     def limit_value(self):
-        self.e.data = torch.clamp(self.e, 1 / self.num_channels, 1.0)
+        if not self.per_channel_mode:
+            self.e.data = torch.clamp(self.e, 1 / self.num_channels, 1.0)
         pass
 
     @torch.no_grad()
     def mutate_param_per_channel(self):
+        self.per_channel_mode = False
         imp = self.get_importance(self.v, self.e)
         mask = imp >= 0.5
-        self.v.data[mask] = 0.6
-        self.v.data[~mask] = 0.4
-        self.e.data = 0.5
+        self.v.data[mask] = 0.05
+        self.v.data[~mask] = -0.05
+        self.e.data.fill_(0.0)
+        self.per_channel_mode = True
 
     # train mode
 
@@ -136,6 +141,7 @@ class DTPBMutator(BaseDTPMutator):
             unit.mutable_channel.limit_value()
 
     def to_per_channel_train(self):
+        print_log('To per channel mode')
         for unit in self.mutable_units:
             unit.mutable_channel.mutate_param_per_channel()
 
@@ -180,6 +186,9 @@ class DTPBScheduler:
     def before_train_forward(self, iter, epoch, max_iters, max_epochs):
         if iter < self.decay_ratio * max_iters:
             self.mutator.ratio_train()
+        elif iter == math.ceil(self.decay_ratio * max_iters):
+            self.mutator.to_per_channel_train()
+            self.mutator.per_channel_train()
         elif iter < (self.decay_ratio + self.refine_ratio) * max_iters:
             self.mutator.per_channel_train()
         else:
@@ -199,7 +208,7 @@ class DTPBScheduler:
             return {
                 'flops_loss': self.flop_loss(iter, epoch, max_iters,
                                              max_epochs),
-                'soft_flop': self.mutator.get_soft_flop().detach(),
+                'soft_flop': self.mutator.get_soft_flop(self.model).detach(),
                 'target': self.current_target(iter, epoch, max_iters,
                                               max_epochs)
             }
