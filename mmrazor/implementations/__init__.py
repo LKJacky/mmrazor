@@ -9,5 +9,6 @@ stored in one folder. As this structure is experimental, it may change rapidly.
 """
 
 from . import pruning  # noqa
+from .models import *  # noqa
 
 __all__ = ['pruning']
