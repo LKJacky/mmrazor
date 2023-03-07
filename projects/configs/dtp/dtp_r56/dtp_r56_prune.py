@@ -3,15 +3,21 @@
 _base_ = '../../resnet56/resnet56_pretrain.py'
 pretrained_path = 'work_dirs/pretrained/resnet56_pretrain.pth'
 
-grad_clip = -1
-flops_target = 0.3
+decay_ratio = 0.6
+refine_ratio = 0.4
+target_flop_ratio = 0.34
+flop_loss_weight = 100
 
-target_flop_ratio = 0.3
-flop_loss_weight = 1
+log_interval = 196
+
 input_shape = (1, 3, 32, 32)
 
-log_by_epoch = True
-log_interval = 1
+epoch = 30
+train_cfg = dict(by_epoch=True, max_epochs=epoch)
+
+origin_lr = _base_.optim_wrapper.optimizer.lr
+prune_lr = origin_lr * 0.1
+
 ##############################################################################
 
 custom_imports = dict(imports=['projects'])
@@ -44,14 +50,20 @@ model = dict(
     ),
     scheduler=dict(
         type='DTPScheduler',
-        flops_target=0.5,
-        decay_ratio=0.6,
-        refine_ratio=0.2,
-        flop_loss_weight=flop_loss_weight),
+        flops_target=target_flop_ratio,
+        decay_ratio=decay_ratio,
+        refine_ratio=refine_ratio,
+        flop_loss_weight=flop_loss_weight,
+        structure_log_interval=log_interval),
 )
 
 paramwise_cfg = dict(custom_keys={
     'mutable_channel': dict(decay_mult=0.0),
 })
 optim_wrapper = _base_.optim_wrapper
-optim_wrapper.update({'paramwise_cfg': paramwise_cfg})
+optim_wrapper.update({
+    'paramwise_cfg': paramwise_cfg,
+    'optimizer': {
+        'lr': prune_lr
+    },
+})

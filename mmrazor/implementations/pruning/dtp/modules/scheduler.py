@@ -34,7 +34,7 @@ class BaseDTPScheduler:
         self.mutator.prepare_from_supernet(self.model)
         self.mutator.init_quick_flop(self.model)
         self.init_flop = self.mutator.get_soft_flop(self.model).item()
-        print(f'Get initial flops: {self.init_flop/1e6}')
+        print_log(f'Get initial flops: {self.init_flop/1e6}')
 
     def before_train_forward(self, iter, epoch, max_iters, max_epochs):
         raise NotImplementedError()
