@@ -33,7 +33,6 @@ class BaseDTPMutator(ChannelMutator):
         res = super().prepare_from_supernet(supernet)
         for unit in self.mutable_units:
             unit.requires_grad_(True)
-        self.init_quick_flop(supernet)
         return res
 
     @torch.no_grad()
@@ -61,11 +60,14 @@ class BaseDTPMutator(ChannelMutator):
         assert isinstance(flop, torch.Tensor)
         return flop
 
-    def after_train_iter(self):
-        raise NotImplementedError()
-
-    def before_train(self):
-        raise NotImplementedError()
+    def info(self):
+        import json
+        res = ''
+        structure = self.current_choices
+        res += (json.dumps(structure, indent=4)) + '\n'
+        for unit in self.mutable_units:
+            res += (f'{unit.name}:\t{unit.info()}') + '\n'
+        return res
 
 
 @MODELS.register_module()

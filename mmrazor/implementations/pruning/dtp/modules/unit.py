@@ -14,6 +14,32 @@ from .mutable_channels import (DTPAdaptiveMutableChannelImp,
 from .ops import ImpBatchnorm2d, ImpConv2d, ImpLinear, ImpModuleMixin
 
 
+class BaseDTPUnit(L1MutableChannelUnit):
+
+    def __init__(
+        self,
+        num_channels: int,
+    ) -> None:
+        super().__init__(num_channels, choice_mode='number')
+        self.mutable_channel: DTPMutableChannelImp = DTPMutableChannelImp(
+            self.num_channels)
+        self.requires_grad_(False)
+
+    def prepare_for_pruning(self, model: nn.Module):
+        self._replace_with_dynamic_ops(
+            model, {
+                nn.Conv2d: ImpConv2d,
+                nn.BatchNorm2d: ImpBatchnorm2d,
+                nn.Linear: ImpLinear,
+                nn.SyncBatchNorm: dynamic_ops.DynamicSyncBatchNorm,
+            })
+        self._register_channel_container(model, ImpMutableChannelContainer)
+        self._register_mutable_channel(self.mutable_channel)
+
+    def info(self):
+        raise NotImplementedError()
+
+
 @MODELS.register_module()
 class ImpUnit(L1MutableChannelUnit):
 
