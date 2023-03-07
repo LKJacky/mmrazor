@@ -2,16 +2,22 @@
 #############################################################################
 _base_ = '../vgg/vgg_pretrain.py'
 pretrained_path = 'work_dirs/pretrained/vgg_pretrained.pth'
+chip_path = 'work_dirs/chip_vgg/iter_3.pth'
+
+decay_ratio = 0.6
+refine_ratio = 0.4
+target_flop_ratio = 0.25
+flop_loss_weight = 100
+
+log_interval = 196
 
 input_shape = (1, 3, 32, 32)
 
-iter = 3
-train_cfg = dict(_delete_=True, by_epoch=False, max_iters=iter, val_interval=1)
-batch_size = 256
-train_dataloader = dict(batch_size=batch_size, )
+epoch = 15
+train_cfg = dict(by_epoch=True, max_epochs=epoch)
 
-default_hooks = dict(
-    checkpoint=dict(type='CheckpointHook', by_epoch=False, interval=1), )
+origin_lr = _base_.optim_wrapper.optimizer.lr
+prune_lr = origin_lr * 0.1
 
 ##############################################################################
 
@@ -29,11 +35,11 @@ architecture['_scope_'] = _base_.default_scope
 model = dict(
     _delete_=True,
     _scope_='mmrazor',
-    type='ChipAlgorithm',
+    type='BaseDTPAlgorithm',
     architecture=architecture,
-    mutator=dict(
-        type='ChipMutator',
-        channel_unit_cfg=dict(type='ChipUnit', default_args=dict()),
+    mutator_cfg=dict(
+        type='DTPMutator',
+        channel_unit_cfg=dict(type='DTPChipUnit', default_args=dict()),
         parse_cfg=dict(
             _scope_='mmrazor',
             type='ChannelAnalyzer',
@@ -43,4 +49,23 @@ model = dict(
             ),
             tracer_type='FxTracer'),
     ),
+    scheduler=dict(
+        type='DTPScheduler',
+        flops_target=target_flop_ratio,
+        decay_ratio=decay_ratio,
+        refine_ratio=refine_ratio,
+        flop_loss_weight=flop_loss_weight,
+        structure_log_interval=log_interval),
+    init_cfg=dict(type='Pretrained', checkpoint=chip_path),
 )
+
+paramwise_cfg = dict(custom_keys={
+    'mutable_channel': dict(decay_mult=0.0),
+})
+optim_wrapper = _base_.optim_wrapper
+optim_wrapper.update({
+    'paramwise_cfg': paramwise_cfg,
+    'optimizer': {
+        'lr': prune_lr
+    },
+})

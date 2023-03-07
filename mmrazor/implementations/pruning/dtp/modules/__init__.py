@@ -2,6 +2,7 @@
 from .algorithm import DTPAlgorithm
 from .counters import ImpConv2dCounter, ImpLinearCounter
 from .dtp import *  # noqa
+from .dtp_chip import *  # noqa
 from .mutator import ImpMutator
 from .scheduler import BaseDTPScheduler
 
