@@ -8,13 +8,6 @@ pruned_path = f"./work_dirs/{os.environ['JOB_NAME']}/{os.environ.get('PTH_NAME',
 epoch = 300
 train_cfg = dict(by_epoch=True, max_epochs=epoch)
 
-optim_wrapper = _base_.optim_wrapper
-optim_wrapper.update({
-    'optimizer': {
-        'lr': _base_.origin_lr,
-    },
-})
-
 ##############################################################################
 
 algorithm = _base_.model

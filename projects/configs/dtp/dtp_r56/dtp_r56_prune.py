@@ -15,8 +15,7 @@ input_shape = (1, 3, 32, 32)
 epoch = 30
 train_cfg = dict(by_epoch=True, max_epochs=epoch)
 
-origin_lr = _base_.optim_wrapper.optimizer.lr
-prune_lr = origin_lr * 0.1
+mutator_lr = _base_.optim_wrapper.optimizer.lr * 0.1
 
 ##############################################################################
 
@@ -58,12 +57,9 @@ model = dict(
 )
 
 paramwise_cfg = dict(custom_keys={
-    'mutable_channel': dict(decay_mult=0.0),
+    'mutable_channel': dict(decay_mult=0.0, lr=mutator_lr),
 })
 optim_wrapper = _base_.optim_wrapper
 optim_wrapper.update({
     'paramwise_cfg': paramwise_cfg,
-    'optimizer': {
-        'lr': prune_lr
-    },
 })
