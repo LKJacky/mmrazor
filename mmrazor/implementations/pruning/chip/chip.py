@@ -38,9 +38,8 @@ class ChipUnit(BaseCollectUni):
             else:
                 raise NotImplementedError()
         assert isinstance(new_ci, torch.Tensor)
+        new_ci / len(list(self.input_related_dynamic_ops))
         self.predefine_imp.data += new_ci
-        self.predefine_imp = self.predefine_imp / len(
-            list(self.input_related_dynamic_ops))
         if dist.is_initialized():
             dist.all_reduce(self.predefine_imp)
 
