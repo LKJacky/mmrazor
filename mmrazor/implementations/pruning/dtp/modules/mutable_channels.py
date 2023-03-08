@@ -27,6 +27,13 @@ def dtopk(x: torch.Tensor, e: torch.Tensor, lamda=1.0):
     return s
 
 
+def dtp_get_importance(v: torch.Tensor, e: torch.Tensor):
+    vm = v.unsqueeze(-1) - v.unsqueeze(0)
+    vm = (vm >= 0).float() - vm.detach() + vm
+    v_union = vm.mean(dim=-1)  # big to small
+    return dtopk(1 - v_union, e)
+
+
 def grad_adjust_wrapper(mode=None):
 
     def current_grad_lr():
