@@ -55,7 +55,7 @@ class BaseDTPMutableChannel(SimpleMutableChannel):
 
     @property
     def current_imp_flop(self):
-        raise NotImplementedError()
+        return self.current_imp
 
     @torch.no_grad()
     def limit_value(self):

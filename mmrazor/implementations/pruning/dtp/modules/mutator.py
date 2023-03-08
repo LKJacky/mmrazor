@@ -7,11 +7,12 @@ from torch import nn
 from mmrazor.models.mutators import ChannelMutator
 from mmrazor.models.task_modules.demo_inputs import DefaultDemoInput
 from mmrazor.registry import MODELS, TASK_UTILS
+from ...chip.collect.mutator import CollectMutatorMixin
 from .ops import QuickFlopMixin
 from .unit import ImpUnit
 
 
-class BaseDTPMutator(ChannelMutator):
+class BaseDTPMutator(ChannelMutator, CollectMutatorMixin):
 
     def __init__(
         self,
@@ -39,7 +40,7 @@ class BaseDTPMutator(ChannelMutator):
     def init_quick_flop(self, model: nn.Module):
         for module in model.modules():
             if isinstance(module, QuickFlopMixin):
-                module.start_record()
+                module.quick_flop_start_record()
         demo_input: DefaultDemoInput = TASK_UTILS.build(self.demo_input)
         model.eval()
         input = demo_input.get_data(model, training=False)
@@ -50,7 +51,7 @@ class BaseDTPMutator(ChannelMutator):
             model(input)
         for module in model.modules():
             if isinstance(module, QuickFlopMixin):
-                module.end_record()
+                module.quick_flop_end_record()
 
     def get_soft_flop(self, model):
         flop = 0
@@ -119,7 +120,7 @@ class ImpMutator(ChannelMutator[ImpUnit]):
     def init_quick_flop(self, model: nn.Module):
         for module in model.modules():
             if isinstance(module, QuickFlopMixin):
-                module.start_record()
+                module.quick_flop_start_record()
         demo_input: DefaultDemoInput = TASK_UTILS.build(self.demo_input)
         model.eval()
         input = demo_input.get_data(model, training=False)
@@ -130,7 +131,7 @@ class ImpMutator(ChannelMutator[ImpUnit]):
             model(input)
         for module in model.modules():
             if isinstance(module, QuickFlopMixin):
-                module.end_record()
+                module.quick_flop_end_record()
 
     def get_soft_flop(self, model):
         flop = 0

@@ -14,8 +14,47 @@ from mmrazor.registry import MODELS
 from .ops import CollectConv2d, CollectLinear, CollectMixin
 
 
+class CollectUnitMixin:
+
+    @property
+    def input_related_collect_ops(self):
+        for channel in self.input_related:
+            if isinstance(channel.module, CollectMixin):
+                yield channel.module
+
+    @property
+    def output_related_collect_ops(self):
+        for channel in self.output_related:
+            if isinstance(channel.module, CollectMixin):
+                yield channel.module
+
+    @property
+    def collect_ops(self):
+        for module in self.input_related_collect_ops:
+            yield module
+        for module in self.output_related_collect_ops:
+            yield module
+
+    # fisher information recorded
+
+    def start_record_fisher_info(self) -> None:
+        """Start recording the related fisher info of each channel."""
+        for module in self.collect_ops:
+            module.start_record()
+
+    def end_record_fisher_info(self) -> None:
+        """Stop recording the related fisher info of each channel."""
+        for module in self.collect_ops:
+            module.end_record()
+
+    def reset_recorded(self) -> None:
+        """Reset the recorded info of each channel."""
+        for module in self.collect_ops:
+            module.reset_recorded()
+
+
 @MODELS.register_module()
-class BaseCollectUni(L1MutableChannelUnit):
+class BaseCollectUni(L1MutableChannelUnit, CollectUnitMixin):
 
     def __init__(self, num_channels: int, *args) -> None:
         super().__init__(num_channels, *args)
@@ -57,20 +96,3 @@ class BaseCollectUni(L1MutableChannelUnit):
             yield module
         for module in self.output_related_dynamic_ops:
             yield module
-
-    # fisher information recorded
-
-    def start_record_fisher_info(self) -> None:
-        """Start recording the related fisher info of each channel."""
-        for module in self.dynamic_ops:
-            module.start_record()
-
-    def end_record_fisher_info(self) -> None:
-        """Stop recording the related fisher info of each channel."""
-        for module in self.dynamic_ops:
-            module.end_record()
-
-    def reset_recorded(self) -> None:
-        """Reset the recorded info of each channel."""
-        for module in self.dynamic_ops:
-            module.reset_recorded()

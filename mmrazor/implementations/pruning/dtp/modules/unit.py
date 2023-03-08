@@ -7,6 +7,7 @@ import torch.nn as nn
 from mmrazor.models.architectures import dynamic_ops
 from mmrazor.models.mutables import L1MutableChannelUnit
 from mmrazor.registry import MODELS
+from ...chip.collect.unit import CollectUnitMixin
 from .mutable_channels import (DTPAdaptiveMutableChannelImp,
                                DTPMutableChannelImp,
                                ImpMutableChannelContainer, PASMutableChannel,
@@ -14,7 +15,7 @@ from .mutable_channels import (DTPAdaptiveMutableChannelImp,
 from .ops import ImpBatchnorm2d, ImpConv2d, ImpLinear, ImpModuleMixin
 
 
-class BaseDTPUnit(L1MutableChannelUnit):
+class BaseDTPUnit(L1MutableChannelUnit, CollectUnitMixin):
 
     def __init__(
         self,

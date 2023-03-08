@@ -8,6 +8,7 @@ from torch import Tensor
 
 import mmrazor.models.architectures.dynamic_ops as dynamic_ops
 from mmrazor.models.architectures.dynamic_ops import DynamicChannelMixin
+from ...chip.collect.ops import CollectMixin
 from .mutable_channels import ImpMutableChannelContainer
 
 
@@ -24,35 +25,35 @@ def soft_ceil(x):
 class QuickFlopMixin:
 
     def _quick_flop_init(self) -> None:
-        self.handlers: list = []
-        self.recorded_out_shape: List = []
-        self.recorded_in_shape: List = []
+        self.quick_flop_handlers: list = []
+        self.quick_flop_recorded_out_shape: List = []
+        self.quick_flop_recorded_in_shape: List = []
 
-    def forward_hook_wrapper(self):
+    def quick_flop_forward_hook_wrapper(self):
         """Wrap the hook used in forward."""
 
         def forward_hook(module: QuickFlopMixin, input, output):
-            module.recorded_out_shape.append(output.shape)
-            module.recorded_in_shape.append(input[0].shape)
+            module.quick_flop_recorded_out_shape.append(output.shape)
+            module.quick_flop_recorded_in_shape.append(input[0].shape)
 
         return forward_hook
 
-    def start_record(self: torch.nn.Module) -> None:
+    def quick_flop_start_record(self: torch.nn.Module) -> None:
         """Start recording information during forward and backward."""
         self.end_record()  # ensure to run start_record only once
         self.handlers.append(
-            self.register_forward_hook(self.forward_hook_wrapper()))
+            self.register_forward_hook(self.quick_flop_forward_hook_wrapper()))
 
-    def end_record(self):
+    def quick_flop_end_record(self):
         """Stop recording information during forward and backward."""
-        for handle in self.handlers:
+        for handle in self.quick_flop_handlers:
             handle.remove()
-        self.handlers = []
+        self.quick_flop_handlers = []
 
-    def reset_recorded(self):
+    def quick_flop_reset_recorded(self):
         """Reset the recorded information."""
-        self.recorded_out_shape = []
-        self.recorded_in_shape = []
+        self.quick_flop_recorded_out_shape = []
+        self.quick_flop_recorded_in_shape = []
 
 
 class ImpModuleMixin():
@@ -93,6 +94,7 @@ class ImpModuleMixin():
         return imp
 
     def imp_forward(self, x: torch.Tensor):
+
         input_imp = self.input_imp
         if len(x.shape) == 4:
             input_imp = input_imp.reshape([1, -1, 1, 1])
@@ -113,12 +115,14 @@ class ImpModuleMixin():
         return 0.0
 
 
-class ImpConv2d(dynamic_ops.DynamicConv2d, ImpModuleMixin, QuickFlopMixin):
+class ImpConv2d(dynamic_ops.DynamicConv2d, ImpModuleMixin, QuickFlopMixin,
+                CollectMixin):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._quick_flop_init()
         self._imp_init()
+        self._collect_init()
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.imp_forward(x)
@@ -129,18 +133,20 @@ class ImpConv2d(dynamic_ops.DynamicConv2d, ImpModuleMixin, QuickFlopMixin):
         out_c = soft_ceil(self.output_imp_flop.sum())
         conv_per_pos = self.kernel_size[0] * self.kernel_size[
             1] * in_c * out_c / self.groups
-        h, w = self.recorded_out_shape[0][2:]
+        h, w = self.quick_flop_recorded_out_shape[0][2:]
         flop = conv_per_pos * h * w
         bias_flop = out_c * w * w
         return flop + bias_flop
 
 
-class ImpLinear(dynamic_ops.DynamicLinear, ImpModuleMixin, QuickFlopMixin):
+class ImpLinear(dynamic_ops.DynamicLinear, ImpModuleMixin, QuickFlopMixin,
+                CollectMixin):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._quick_flop_init()
         self._imp_init()
+        self._collect_init()
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.imp_forward(x)
