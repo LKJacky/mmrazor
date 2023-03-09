@@ -49,21 +49,7 @@ class PruningStructureHook(Hook):
     def show_unit_info(self, algorithm):
         """Show unit information of an algorithm."""
         if is_pruning_algorithm(algorithm):
-            chices = algorithm.mutator.choice_template
-            import json
-            print_log(json.dumps(chices, indent=4))
-
-            for unit in algorithm.mutator.mutable_units:
-                if hasattr(unit, 'importance'):
-                    imp = unit.importance()
-                    if hasattr(unit.mutable_channel, 'e'):
-                        print_log(
-                            f'{unit.name}: \t{imp.min().item()}\t{imp.max().item()}\t{unit.mutable_channel.e.item()}'  # noqa
-                        )
-                    else:
-                        print_log(
-                            f'{unit.name}: \t{imp.min().item()}\t{imp.max().item()}'  # noqa
-                        )
+            print_log(algorithm.mutator.info())
 
     @master_only
     def show(self, runner):
@@ -82,6 +68,9 @@ class PruningStructureHook(Hook):
                          outputs) -> None:
         if not self.by_epoch and RuntimeInfo.iter() % self.interval == 0:
             self.show(runner)
+
+    def after_run(self, runner) -> None:
+        self.show(runner)
 
 
 @HOOKS.register_module()
@@ -170,6 +159,9 @@ class ResourceInfoHook(Hook):
         """Check resource after train epoch."""
         if self.log_by_epoch and RuntimeInfo.epoch() % self.log_interval == 0:
             self.show_resource(runner)
+
+    def after_run(self, runner) -> None:
+        self.show_resource(runner)
 
     def show_resource(self, runner):
         model = get_model_from_runner(runner)

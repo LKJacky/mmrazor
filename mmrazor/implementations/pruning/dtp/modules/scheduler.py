@@ -40,8 +40,7 @@ class BaseDTPScheduler:
         raise NotImplementedError()
 
     def after_train_forward(self, iter, epoch, max_iters, max_epochs):
-        if iter % self.structure_log_interval == 0:
-            print_log(self.mutator.info())
+        pass
 
     def flop_loss(self, iter, epoch, max_iters, max_epochs):
         target = self.current_target(iter, epoch, max_iters, max_epochs)

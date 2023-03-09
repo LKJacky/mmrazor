@@ -33,8 +33,9 @@ class DTPFNMutableChannelImp(BaseDTPMutableChannel):
         if self.imp.min() == self.imp.max():
             return self.imp.new_ones([self.num_channels])
         w = dtp_get_importance(self.imp, self.e)
-        with torch.no_grad():
-            self.mask.data = (w >= 0.5).float()
+        if self.training:
+            with torch.no_grad():
+                self.mask.data = (w >= 0.5).float()
         return w
 
     @torch.no_grad()

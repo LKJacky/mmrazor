@@ -5,9 +5,30 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from mmrazor.models.architectures.dynamic_ops import DynamicBatchNorm2d
 from mmrazor.registry import TASK_UTILS
+from ..flops_params_counter import get_model_parameters_number
 from .conv_layer_counter import Conv2dCounter
 from .linear_layer_counter import LinearCounter
+from .norm_layer_counter import BatchNorm2dCounter
+
+
+@TASK_UTILS.register_module()
+class DynamicBatchNorm2dCounter(BatchNorm2dCounter):
+
+    @staticmethod
+    def add_count_hook(module: DynamicBatchNorm2d, input, output):
+        """Calculate FLOPs and params based on the size of input & output."""
+        input = input[0]
+        N, C, H, W = input.shape
+        if 'num_features' in module.mutable_attrs:
+            C = module.mutable_attrs[
+                'num_features'].activated_channels  # type: ignore
+        batch_flops = np.prod([N, C, H, W])
+        if getattr(module, 'affine', False):
+            batch_flops *= 2
+        module.__flops__ += int(batch_flops)
+        module.__params__ += get_model_parameters_number(module)
 
 
 @TASK_UTILS.register_module()

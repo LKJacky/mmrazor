@@ -40,8 +40,8 @@ class QuickFlopMixin:
 
     def quick_flop_start_record(self: torch.nn.Module) -> None:
         """Start recording information during forward and backward."""
-        self.end_record()  # ensure to run start_record only once
-        self.handlers.append(
+        self.quick_flop_end_record()  # ensure to run start_record only once
+        self.quick_flop_handlers.append(
             self.register_forward_hook(self.quick_flop_forward_hook_wrapper()))
 
     def quick_flop_end_record(self):
@@ -54,6 +54,9 @@ class QuickFlopMixin:
         """Reset the recorded information."""
         self.quick_flop_recorded_out_shape = []
         self.quick_flop_recorded_in_shape = []
+
+    def soft_flop(self):
+        raise NotImplementedError()
 
 
 class ImpModuleMixin():
@@ -108,11 +111,11 @@ class ImpModuleMixin():
             x = x * input_imp
         return x
 
-    def soft_flop(self):
-        # input_imp = self.input_imp
-        # output_imp = self.output_imp
-        # flop = input_imp.sum() * output_imp.sum()
-        return 0.0
+
+def soft_mask_sum(mask: torch.Tensor):
+    soft = mask.sum()
+    hard = (mask >= 0.5).float().sum()
+    return hard.detach() - soft.detach() + soft
 
 
 class ImpConv2d(dynamic_ops.DynamicConv2d, ImpModuleMixin, QuickFlopMixin,
@@ -129,8 +132,8 @@ class ImpConv2d(dynamic_ops.DynamicConv2d, ImpModuleMixin, QuickFlopMixin,
         return nn.Conv2d.forward(self, x)
 
     def soft_flop(self):
-        in_c = soft_ceil(self.input_imp_flop.sum())
-        out_c = soft_ceil(self.output_imp_flop.sum())
+        in_c = soft_mask_sum(self.input_imp_flop)
+        out_c = soft_mask_sum(self.output_imp_flop)
         conv_per_pos = self.kernel_size[0] * self.kernel_size[
             1] * in_c * out_c / self.groups
         h, w = self.quick_flop_recorded_out_shape[0][2:]
@@ -153,12 +156,37 @@ class ImpLinear(dynamic_ops.DynamicLinear, ImpModuleMixin, QuickFlopMixin,
         return nn.Linear.forward(self, x)
 
     def soft_flop(self):
-        in_c = soft_ceil(self.input_imp_flop.sum())
-        out_c = soft_ceil(self.output_imp_flop.sum())
+        in_c = soft_mask_sum(self.input_imp_flop)
+        out_c = soft_mask_sum(self.output_imp_flop)
         return in_c * out_c
 
 
-class ImpBatchnorm2d(dynamic_ops.DynamicBatchNorm2d):
+class ImpBatchnorm2d(dynamic_ops.DynamicBatchNorm2d, QuickFlopMixin):
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._quick_flop_init()
 
     def forward(self, input: Tensor) -> Tensor:
         return nn.BatchNorm2d.forward(self, input)
+
+    def soft_flop(self):
+        in_c = soft_mask_sum(self.input_imp_flop)
+        h, w = self.quick_flop_recorded_out_shape[0][2:]
+        return h * w * in_c
+
+    @property
+    def output_imp_flop(self: nn.Module) -> torch.Tensor:
+        mutable: ImpMutableChannelContainer = self.get_mutable_attr(
+            'out_channels')
+        imp = mutable.current_imp_flop
+        return imp
+
+    @property
+    def input_imp_flop(
+            self: Union[DynamicChannelMixin,
+                        'ImpModuleMixin']) -> torch.Tensor:
+        mutable: ImpMutableChannelContainer = self.get_mutable_attr(  # type: ignore # noqa
+            'in_channels')  # type: ignore
+        imp = mutable.current_imp_flop
+        return imp

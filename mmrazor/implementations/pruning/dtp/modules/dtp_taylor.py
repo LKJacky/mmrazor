@@ -41,8 +41,9 @@ class DTPTMutableChannelImp(BaseDTPMutableChannel):
     def current_imp(self):
         e_imp = dtp_get_importance(self.taylor, self.e)
         w = e_imp * self.imp
-        with torch.no_grad():
-            self.mask.data = (e_imp >= 0.5).float()
+        if self.training:
+            with torch.no_grad():
+                self.mask.data = (e_imp >= 0.5).float()
         return w
 
     @torch.no_grad()

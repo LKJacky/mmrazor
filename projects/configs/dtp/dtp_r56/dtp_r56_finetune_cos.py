@@ -28,3 +28,16 @@ model = dict(
     type='GroupFisherSubModel',
     algorithm=algorithm,
 )
+custom_hooks = _base_.custom_hooks[:-2]
+
+custom_hooks.append(
+    dict(
+        type='mmrazor.ResourceInfoHook',
+        interval=1000,
+        demo_input=dict(
+            type='mmrazor.DefaultDemoInput',
+            input_shape=_base_.input_shape,
+        ),
+        early_stop=False,
+        save_ckpt_thr=[],
+    ), )

@@ -29,8 +29,9 @@ class DTPMutableChannelImp(BaseDTPMutableChannel):
     @property
     def current_imp(self):
         w = dtopk(self.index, self.e, self.lamda)
-        with torch.no_grad():
-            self.mask.data = (w >= 0.5).float()
+        if self.training:
+            with torch.no_grad():
+                self.mask.data = (w >= 0.5).float()
         return w
 
     @property

@@ -55,7 +55,22 @@ model = dict(
         flop_loss_weight=flop_loss_weight,
         structure_log_interval=log_interval),
 )
-
+custom_hooks = getattr(_base_, 'custom_hooks', []) + [
+    dict(
+        type='mmrazor.PruningStructureHook',
+        by_epoch=False,
+        interval=log_interval),
+    dict(
+        type='mmrazor.ResourceInfoHook',
+        interval=1,
+        demo_input=dict(
+            type='mmrazor.DefaultDemoInput',
+            input_shape=input_shape,
+        ),
+        early_stop=False,
+        save_ckpt_thr=[],
+    ),
+]
 paramwise_cfg = dict(custom_keys={
     'mutable_channel': dict(decay_mult=0.0, lr=mutator_lr),
 })

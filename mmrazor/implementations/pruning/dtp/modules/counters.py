@@ -1,6 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from mmrazor.models.task_modules.estimators.counters.op_counters.dynamic_op_counters import (  # noqa
-    DynamicConv2dCounter, DynamicLinearCounter)
+    DynamicBatchNorm2dCounter, DynamicConv2dCounter, DynamicLinearCounter)
 from mmrazor.registry import TASK_UTILS
 
 
@@ -11,4 +11,9 @@ class ImpLinearCounter(DynamicLinearCounter):
 
 @TASK_UTILS.register_module()
 class ImpConv2dCounter(DynamicConv2dCounter):
+    pass
+
+
+@TASK_UTILS.register_module()
+class ImpBatchnorm2dCounter(DynamicBatchNorm2dCounter):
     pass
