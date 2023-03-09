@@ -212,8 +212,11 @@ class ImpMutableChannelContainer(MutableChannelContainer):
             self._assert_mutables_valid()
             mutable_channels = list(self.mutable_channels.values())
             imps = [mutable.current_imp for mutable in mutable_channels]
-            imp = torch.cat(imps)
-            return imp
+            if len(imps) == 1:
+                return imps[0]
+            else:
+                imp = torch.cat(imps)
+                return imp
 
     @property
     def current_imp_flop(self):
@@ -225,5 +228,8 @@ class ImpMutableChannelContainer(MutableChannelContainer):
             self._assert_mutables_valid()
             mutable_channels = list(self.mutable_channels.values())
             imps = [mutable.current_imp_flop for mutable in mutable_channels]
-            imp = torch.cat(imps)
+            if len(imps) == 1:
+                imp = imps[0]
+            else:
+                imp = torch.cat(imps)
             return imp
