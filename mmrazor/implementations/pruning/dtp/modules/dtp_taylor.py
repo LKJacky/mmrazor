@@ -2,6 +2,7 @@
 
 import torch
 import torch.nn as nn
+from mmengine.dist import all_reduce
 
 from mmrazor.registry import MODELS
 from .mutable_channels import BaseDTPMutableChannel, dtp_get_importance
@@ -51,6 +52,7 @@ class DTPTMutableChannelImp(BaseDTPMutableChannel):
     @torch.no_grad()
     def update_taylor(self, grad):
         new_taylor = (self.imp * grad)**2
+        all_reduce(new_taylor)
         self.taylor = self.taylor * self.decay + (1 - self.decay) * new_taylor
 
 
