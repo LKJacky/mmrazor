@@ -5,10 +5,27 @@ import torch.nn as nn
 from mmengine.dist import all_reduce
 
 from mmrazor.registry import MODELS
-from .mutable_channels import BaseDTPMutableChannel, dtp_get_importance
+from .mutable_channels import BaseDTPMutableChannel
 from .unit import BaseDTPUnit
 
 # dtp with taylor importance base dtp with adaptive importance
+
+
+def dtopk(x: torch.Tensor, e: torch.Tensor, lamda=1.0):
+    # add min or max
+    # e = soft_clip(e, 1 / x.numel(), 1.0)
+
+    y: torch.Tensor = -(x - e) * x.numel() * lamda
+    s = y.sigmoid()
+    return s
+
+
+@torch.jit.script
+def dtp_get_importance(v: torch.Tensor, e: torch.Tensor):
+    vm = v.unsqueeze(-1) - v.unsqueeze(0)
+    vm = (vm >= 0).float() - vm.detach() + vm
+    v_union = vm.mean(dim=-1)  # big to small
+    return dtopk(1 - v_union, e)
 
 
 def taylor_backward_hook_wrapper(module: 'DTPTMutableChannelImp', input):
