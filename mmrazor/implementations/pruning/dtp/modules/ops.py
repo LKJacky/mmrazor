@@ -112,10 +112,21 @@ class ImpModuleMixin():
         return x
 
 
+@torch.jit.script
 def soft_mask_sum(mask: torch.Tensor):
     soft = mask.sum()
     hard = (mask >= 0.5).float().sum()
     return hard.detach() - soft.detach() + soft
+
+
+@torch.jit.script
+def conv_soft_flop(input_imp_flop, output_imp_flop, h, w, k1, k2, groups):
+    in_c = soft_mask_sum(input_imp_flop)
+    out_c = soft_mask_sum(output_imp_flop)
+    conv_per_pos = k1 * k2 * in_c * out_c / groups
+    flop = conv_per_pos * h * w
+    bias_flop = out_c * h * w
+    return flop + bias_flop
 
 
 class ImpConv2d(dynamic_ops.DynamicConv2d, ImpModuleMixin, QuickFlopMixin,
@@ -132,14 +143,10 @@ class ImpConv2d(dynamic_ops.DynamicConv2d, ImpModuleMixin, QuickFlopMixin,
         return nn.Conv2d.forward(self, x)
 
     def soft_flop(self):
-        in_c = soft_mask_sum(self.input_imp_flop)
-        out_c = soft_mask_sum(self.output_imp_flop)
-        conv_per_pos = self.kernel_size[0] * self.kernel_size[
-            1] * in_c * out_c / self.groups
-        h, w = self.quick_flop_recorded_out_shape[0][2:]
-        flop = conv_per_pos * h * w
-        bias_flop = out_c * w * w
-        return flop + bias_flop
+        return conv_soft_flop(self.input_imp_flop, self.output_imp_flop,
+                              *self.quick_flop_recorded_out_shape[0][2:],
+                              self.kernel_size[0], self.kernel_size[1],
+                              self.groups)
 
 
 class ImpLinear(dynamic_ops.DynamicLinear, ImpModuleMixin, QuickFlopMixin,
@@ -161,6 +168,12 @@ class ImpLinear(dynamic_ops.DynamicLinear, ImpModuleMixin, QuickFlopMixin,
         return in_c * out_c
 
 
+@torch.jit.script
+def bn_soft_flop(input_imp_flop, h, w):
+    in_c = soft_mask_sum(input_imp_flop)
+    return h * w * in_c
+
+
 class ImpBatchnorm2d(dynamic_ops.DynamicBatchNorm2d, QuickFlopMixin):
 
     def __init__(self, *args, **kwargs) -> None:
@@ -171,9 +184,8 @@ class ImpBatchnorm2d(dynamic_ops.DynamicBatchNorm2d, QuickFlopMixin):
         return nn.BatchNorm2d.forward(self, input)
 
     def soft_flop(self):
-        in_c = soft_mask_sum(self.input_imp_flop)
-        h, w = self.quick_flop_recorded_out_shape[0][2:]
-        return h * w * in_c
+        return bn_soft_flop(self.input_imp_flop,
+                            *self.quick_flop_recorded_out_shape[0][2:])
 
     @property
     def output_imp_flop(self: nn.Module) -> torch.Tensor:

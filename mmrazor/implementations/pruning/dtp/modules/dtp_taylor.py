@@ -11,6 +11,7 @@ from .unit import BaseDTPUnit
 # dtp with taylor importance base dtp with adaptive importance
 
 
+@torch.jit.script
 def dtopk(x: torch.Tensor, e: torch.Tensor, lamda=1.0):
     # add min or max
     # e = soft_clip(e, 1 / x.numel(), 1.0)
