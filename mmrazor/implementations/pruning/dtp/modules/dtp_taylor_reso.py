@@ -122,4 +122,10 @@ class DTPTRScheduler(BaseDTPScheduler):
         def get_reso(ratio):
             return (math.cos(ratio * math.pi) + 1) / 2
 
-        return get_reso(epoch / max_epochs)
+        if iter < self.decay_ratio * max_iters:
+            ratio = (iter / (self.decay_ratio * max_iters))
+        elif iter < (self.decay_ratio + self.refine_ratio) * max_iters:
+            ratio = 1.0
+        else:
+            ratio = 1.0
+        return get_reso(ratio)

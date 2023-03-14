@@ -52,10 +52,15 @@ class BaseDTPScheduler:
                 target)**2
 
     def current_target(self, iter, epoch, max_iters, max_epochs):
+
+        def get_target(ratio):
+            assert 0 <= ratio <= 1
+            return 1 - (1 - self.flops_target) * ratio
+
         if iter < self.decay_ratio * max_iters:
-            return 1 - (1 - self.flops_target) * (
-                iter / (self.decay_ratio * max_iters))
+            ratio = (iter / (self.decay_ratio * max_iters))
         elif iter < (self.decay_ratio + self.refine_ratio) * max_iters:
-            return self.flops_target
+            ratio = 1.0
         else:
-            return self.flops_target
+            ratio = 1.0
+        return get_target(ratio)
