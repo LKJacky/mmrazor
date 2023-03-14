@@ -5,6 +5,7 @@ from .dtp import *  # noqa
 from .dtp_adaptive import *  # noqa
 from .dtp_chip import *  # noqa
 from .dtp_fn import *  # noqa
+from .dtp_leap import *  # noqa
 from .dtp_taylor import *  # noqa
 from .dtp_taylor_reso import *  # noqa
 from .mutator import ImpMutator
