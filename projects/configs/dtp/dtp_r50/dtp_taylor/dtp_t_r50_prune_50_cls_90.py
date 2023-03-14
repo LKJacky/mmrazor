@@ -19,6 +19,10 @@ train_cfg = dict(by_epoch=True, max_epochs=epoch)
 mutator_lr = 0.01
 model_lr = 0.1
 original_lr = _base_.optim_wrapper.optimizer.lr
+
+if hasattr(_base_, 'param_scheduler'):
+    delattr(_base_, 'param_scheduler')
+
 ##############################################################################
 
 custom_imports = dict(imports=['projects'])
