@@ -9,25 +9,26 @@ from mmrazor.registry import MODELS, TASK_UTILS
 from .dtp_adaptive import DTPAMutator
 from .dtp_taylor import (DTPTMutableChannelImp, DTPTUnit,
                          taylor_backward_hook_wrapper)
-from .mutable_channels import soft_clip
 from .scheduler import BaseDTPScheduler
 
 # dtp with taylor importance base dtp with adaptive importance
 
 
+@torch.jit.script
+def dtopk_reso(x: torch.Tensor, e: torch.Tensor, resolution=1 / 1000):
+    # add min or max
+    # e = soft_clip(e, 1 / x.numel(), 1)
+    y: torch.Tensor = -(x - e) * (4 / (resolution + 1e-8))
+    s = y.sigmoid()
+    return s
+
+
+@torch.jit.script
 def dtp_get_importance(v: torch.Tensor, e: torch.Tensor, resolution=1 / 1000):
     vm = v.unsqueeze(-1) - v.unsqueeze(0)
     vm = (vm >= 0).float() - vm.detach() + vm
     v_union = vm.mean(dim=-1)  # big to small
     return dtopk_reso(1 - v_union, e, resolution=resolution)
-
-
-def dtopk_reso(x: torch.Tensor, e: torch.Tensor, resolution=1 / 1000):
-    # add min or max
-    e = soft_clip(e, 1 / x.numel(), 1)
-    y: torch.Tensor = -(x - e) * (4 / (resolution + 1e-8))
-    s = y.sigmoid()
-    return s
 
 
 class DTPTRMutableChannelImp(DTPTMutableChannelImp):
