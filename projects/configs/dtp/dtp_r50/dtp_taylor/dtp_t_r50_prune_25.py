@@ -86,3 +86,11 @@ optim_wrapper.update({
         'lr': model_lr
     }
 })
+
+default_hooks = dict(
+    checkpoint=dict(
+        type='CheckpointHook',
+        interval=1,
+        save_best='auto',
+        max_keep_ckpts=5,
+    ), )

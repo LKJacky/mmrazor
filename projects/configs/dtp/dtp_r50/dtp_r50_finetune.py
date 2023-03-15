@@ -33,3 +33,10 @@ custom_hooks.append(
         early_stop=False,
         save_ckpt_thr=[],
     ), )
+default_hooks = dict(
+    checkpoint=dict(
+        type='CheckpointHook',
+        interval=1,
+        save_best='auto',
+        max_keep_ckpts=5,
+    ), )

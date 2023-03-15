@@ -81,3 +81,10 @@ optim_wrapper = _base_.optim_wrapper
 optim_wrapper.update({
     'paramwise_cfg': paramwise_cfg,
 })
+default_hooks = dict(
+    checkpoint=dict(
+        type='CheckpointHook',
+        interval=1,
+        save_best='auto',
+        max_keep_ckpts=5,
+    ), )
