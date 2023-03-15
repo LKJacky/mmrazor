@@ -42,7 +42,8 @@ class DTPTRMutableChannelImp(DTPTMutableChannelImp):
     def current_imp(self):
         e_imp = dtp_get_importance(self.taylor, self.e, resolution=self.reso)
         if self.training and e_imp.requires_grad:
-            e_imp.register_hook(taylor_backward_hook_wrapper(self, e_imp))
+            e_imp.register_hook(
+                taylor_backward_hook_wrapper(self, e_imp.detach()))
         if self.training:
             with torch.no_grad():
                 self.mask.data = (e_imp >= 0.5).float()
