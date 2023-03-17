@@ -20,13 +20,11 @@ class LambdaLayer(nn.Module):
         return self.lambd(x)
 
 
-class BasicBlock(nn.Module, DynamicBlockMixin):
+class BaseBasicBlock(nn.Module):
     expansion = 1
 
     def __init__(self, in_planes, planes, stride=1, option='B'):
-        super(BasicBlock, self).__init__()
-        self._dynamic_block_init()
-
+        super(BaseBasicBlock, self).__init__()
         self.conv1 = nn.Conv2d(
             in_planes,
             planes,
@@ -58,6 +56,21 @@ class BasicBlock(nn.Module, DynamicBlockMixin):
     def forward(self, x):
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
+        out += self.shortcut(x)
+        out = F.relu(out)
+        return out
+
+
+class BasicBlock(BaseBasicBlock, DynamicBlockMixin):
+    expansion = 1
+
+    def __init__(self, in_planes, planes, stride=1, option='B'):
+        super().__init__(in_planes, planes, stride, option)
+        self._dynamic_block_init()
+
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
         out += self.shortcut(x) * self.scale
         out = F.relu(out)
         return out
@@ -65,6 +78,15 @@ class BasicBlock(nn.Module, DynamicBlockMixin):
     @property
     def is_removable(self):
         return len(self.shortcut) == 0
+
+    def to_static_op(self) -> nn.Module:
+        module = BaseBasicBlock(
+            self.conv1.in_channels,
+            self.conv1.out_channels,
+            stride=self.conv1.stride[0],
+            option='B')
+        module.load_state_dict(self.state_dict())
+        return module
 
 
 @MODELS.register_module()

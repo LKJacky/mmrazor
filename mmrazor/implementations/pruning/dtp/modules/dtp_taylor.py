@@ -22,11 +22,11 @@ def dtopk(x: torch.Tensor, e: torch.Tensor, lamda=1.0):
 
 
 @torch.jit.script
-def dtp_get_importance(v: torch.Tensor, e: torch.Tensor):
+def dtp_get_importance(v: torch.Tensor, e: torch.Tensor, lamda=1.0):
     vm = v.unsqueeze(-1) - v.unsqueeze(0)
     vm = (vm >= 0).float() - vm.detach() + vm
     v_union = vm.mean(dim=-1)  # big to small
-    return dtopk(1 - v_union, e)
+    return dtopk(1 - v_union, e, lamda=lamda)
 
 
 def taylor_backward_hook_wrapper(module: 'DTPTMutableChannelImp', input):

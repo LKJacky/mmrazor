@@ -58,6 +58,18 @@ class QuickFlopMixin:
     def soft_flop(self):
         raise NotImplementedError()
 
+    @classmethod
+    def get_flop(cls, model: nn.Module):
+        flops = 0
+        if isinstance(model, QuickFlopMixin):
+            return model.soft_flop()
+        for child in model.children():
+            if isinstance(child, QuickFlopMixin):
+                flops = flops + child.soft_flop()
+            else:
+                flops = flops + cls.get_flop(child)
+        return flops
+
 
 class ImpModuleMixin():
 
