@@ -102,5 +102,5 @@ def GroupFisherSubModel(
         model.init_cfg = None
         model.init_weights = types.MethodType(
             hacky_init_weights_wrapper(pruning_structure), model)
-    print(model)
+    print_log(model)
     return model
