@@ -3,7 +3,8 @@ import unittest
 
 from mmrazor.implementations.pruning.dms.core.mutator import (BlockInitialer,
                                                               DMSMutator)
-from mmrazor.implementations.pruning.dms.core.resnet import ResNetCifarDMS
+from mmrazor.implementations.pruning.dms.core.resnet import (ResNetCifarDMS,
+                                                             ResNetCifarSuper)
 from mmrazor.registry import MODELS
 
 
@@ -43,3 +44,7 @@ class TestDMS(unittest.TestCase):
         mutator.init_quick_flop(model)
         print(mutator.get_soft_flop(model))
         print(mutator)
+
+    def test_model_super(self):
+        model = ResNetCifarSuper()
+        print(model)

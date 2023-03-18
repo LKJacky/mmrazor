@@ -123,6 +123,44 @@ class ResNetCifarDMS(nn.Module):
         return (out, )
 
 
+@MODELS.register_module()
+def ResNetCifarSuper(ratio=2.0, num_blocks=[12, 12, 12], *args, **kwargs):
+    model = MODELS.build(
+        dict(
+            type='mmcls.ImageClassifier',
+            backbone=dict(
+                type='mmrazor.ResNetCifarDMS',
+                num_blocks=num_blocks,
+                num_classes=10),
+            head=dict(
+                type='mmcls.LinearClsHead',
+                num_classes=10,
+                in_channels=64,
+                loss=dict(type='mmcls.CrossEntropyLoss', loss_weight=1.0),
+            )))
+    from mmrazor.models.utils.expandable_utils import (
+        expand_expandable_dynamic_model, to_expandable_model)
+    mutator = to_expandable_model(model)
+    for unit in mutator.mutable_units:
+        unit.expand_to(int(unit.current_choice * ratio))
+
+    model = expand_expandable_dynamic_model(model)
+    for module in model.modules():
+        if isinstance(module, nn.Conv2d):
+            module.reset_parameters()
+        elif isinstance(module, nn.BatchNorm2d):
+            module.reset_parameters()
+        elif isinstance(module, nn.Linear):
+            module.reset_parameters()
+        elif hasattr(module, 'reset_parameters'):
+            module.reset_parameters()
+        else:
+            from mmrazor.utils import print_log
+            print_log(f'{type(module)} is not initialized')
+    print_log(f'Super ResNetCifar {model}')
+    return model
+
+
 if __name__ == '__main__':
     model = ResNetCifarDMS()
     MODEL = dict(
