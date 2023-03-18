@@ -3,8 +3,8 @@
 _base_ = '../../resnet56/resnet56_pretrain.py'
 pretrained_path = 'work_dirs/pretrained/resnet56_pretrain.pth'
 
-decay_ratio = 0.9
-refine_ratio = 0.1
+decay_ratio = 0.6
+refine_ratio = 0.4
 target_flop_ratio = 0.34
 flop_loss_weight = 100
 

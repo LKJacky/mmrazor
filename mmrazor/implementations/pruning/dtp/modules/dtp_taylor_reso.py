@@ -18,7 +18,8 @@ from .scheduler import BaseDTPScheduler
 def dtopk_reso(x: torch.Tensor, e: torch.Tensor, resolution=1 / 1000):
     # add min or max
     # e = soft_clip(e, 1 / x.numel(), 1)
-    y: torch.Tensor = -(x - e) * (4 / (resolution + 1e-8))
+    resolution = max(resolution, 1 / x.numel())
+    y: torch.Tensor = -(x - e) * (1 / resolution)
     s = y.sigmoid()
     return s
 
