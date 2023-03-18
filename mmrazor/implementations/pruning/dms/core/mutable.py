@@ -61,10 +61,20 @@ class MutableBlocks(BaseMutable):
         self.taylor = self.taylor * self.decay + (1 - self.decay) * new_taylor
 
     def info(self):
+
+        def get_mask_str():
+            mask_str = ''
+            for i in range(self.num_blocks):
+                if self.mask[i] == 1:
+                    mask_str += '1'
+                else:
+                    mask_str += '0'
+            return mask_str
+
         return (
-            f'mutable_block_{self.num_blocks}: {self.e.item()}, \t'
-            f'self.taylor: {self.taylor.min().item()}\t{self.taylor.max().item()}'  # noqa
-        )
+            f'mutable_block_{self.num_blocks}:\t{self.e.item():.3f}, \t'
+            f'self.taylor: {self.taylor.min().item():.3f}\t{self.taylor.max().item():.3f}\t'  # noqa
+            f'{get_mask_str()}')
 
     # inherit from BaseMutable
 

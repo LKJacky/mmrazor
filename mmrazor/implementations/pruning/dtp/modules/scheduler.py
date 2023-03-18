@@ -48,7 +48,8 @@ class BaseDTPScheduler:
                 target)**2
 
     def flop_loss_by_target(self, target):
-        return (self.mutator.get_soft_flop(self.model) / self.init_flop -
+        return (max(
+            self.mutator.get_soft_flop(self.model) / self.init_flop, target) -
                 target)**2
 
     def current_target(self, iter, epoch, max_iters, max_epochs):
