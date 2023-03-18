@@ -12,6 +12,7 @@ from ...dtp.modules.ops import QuickFlopMixin
 from .mutable import MutableBlocks
 from .op import DynamicStage
 from .resnet import ResLayer
+from .resnet_img import ResLayer as ResLayerImg
 
 
 def replace_modules(model: nn.Module, module_map={}):
@@ -35,7 +36,12 @@ class BlockInitialer:
         pass
 
     def prepare_from_supernet(self, supernet: nn.Module) -> List:
-        replace_modules(supernet, module_map={ResLayer: DynamicStage})
+        replace_modules(
+            supernet,
+            module_map={
+                ResLayer: DynamicStage,
+                ResLayerImg: DynamicStage,
+            })
         mutables = []
         for module in supernet.modules():
             if isinstance(module, DynamicStage):
