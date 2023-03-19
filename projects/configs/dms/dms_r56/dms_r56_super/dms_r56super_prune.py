@@ -1,7 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 #############################################################################
 _base_ = '../../../resnet56/resnet56_pretrain.py'
-pretrained_path = 'work_dirs/pretrained/resnet56_pretrain.pth'
+pretrained_path = 'work_dirs/pretrained/resnet56_super_pretrain.pth'
 
 decay_ratio = 0.6
 refine_ratio = 0.4
@@ -33,7 +33,8 @@ if hasattr(_base_, 'data_preprocessor'):
     architecture.update({'data_preprocessor': _base_.data_preprocessor})
     data_preprocessor = None
 
-# architecture['init_cfg'] = dict(type='Pretrained', checkpoint=pretrained_path) # noqa
+architecture['init_cfg'] = dict(
+    type='Pretrained', checkpoint=pretrained_path)  # noqa
 architecture['_scope_'] = _base_.default_scope
 
 model = dict(
