@@ -124,8 +124,14 @@ class ResNetCifarDMS(nn.Module):
 
 
 @MODELS.register_module()
-def ResNetCifarSuper(ratio=2.0, num_blocks=[12, 12, 12], *args, **kwargs):
-    model = MODELS.build(
+def ResNetCifarSuper(ratio=2.0,
+                     num_blocks=[12, 12, 12],
+                     init_cfg=None,
+                     data_preprocessor=None,
+                     *args,
+                     **kwargs):
+    from mmcls.models.classifiers import ImageClassifier
+    model: ImageClassifier = MODELS.build(
         dict(
             type='mmcls.ImageClassifier',
             backbone=dict(
@@ -137,7 +143,9 @@ def ResNetCifarSuper(ratio=2.0, num_blocks=[12, 12, 12], *args, **kwargs):
                 num_classes=10,
                 in_channels=64,
                 loss=dict(type='mmcls.CrossEntropyLoss', loss_weight=1.0),
-            )))
+            ),
+            init_cfg=init_cfg,
+            data_preprocessor=data_preprocessor))
     from mmrazor.models.utils.expandable_utils import (
         expand_expandable_dynamic_model, to_expandable_model)
     mutator = to_expandable_model(model)
@@ -157,6 +165,8 @@ def ResNetCifarSuper(ratio=2.0, num_blocks=[12, 12, 12], *args, **kwargs):
         else:
             from mmrazor.utils import print_log
             print_log(f'{type(module)} is not initialized')
+
+    print_log(f'{kwargs.keys()} are not used in Super ResNetCifar')
     print_log(f'Super ResNetCifar {model}')
     return model
 
