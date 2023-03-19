@@ -12,11 +12,11 @@ from mmrazor.utils.typing import DumpChosen
 
 def _dynamic_to_static(model: nn.Module) -> nn.Module:
     from mmrazor.models.architectures.dynamic_ops import DynamicMixin
-
-    for name, module in model.named_children():
-        model._modules[name] = _dynamic_to_static(module)
     if isinstance(model, DynamicMixin):
         model = model.to_static_op()
+    else:
+        for name, module in model.named_children():
+            model._modules[name] = _dynamic_to_static(module)
     return model
 
 

@@ -375,10 +375,11 @@ class Bottleneck(BaseBottleneck, DynamicBlockMixin):
         return self.downsample is None
 
     def to_static_op(self) -> nn.Module:
+        from mmrazor.structures.subnet.fix_subnet import _dynamic_to_static
         module = BaseBottleneck(*self.init_args, **self.init_kwargs)
         for name, m in self.named_children():
             assert hasattr(module, name)
-            setattr(module, name, m)
+            setattr(module, name, _dynamic_to_static(m))
         return module
 
 

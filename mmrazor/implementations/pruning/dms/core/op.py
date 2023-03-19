@@ -83,19 +83,21 @@ class DynamicStage(nn.Sequential, DynamicMixin):
         return cls(module._modules)
 
     def to_static_op(self) -> nn.Module:
+        from mmrazor.structures.subnet.fix_subnet import _dynamic_to_static
         modules = []
         i = 0
         for module in self:
             if isinstance(module, DynamicBlockMixin) and module.is_removable:
                 if self.mutable_blocks.mask[i] < 0.5:
-                    i += 1
-                    continue
+                    pass
                 else:
-                    i += 1
-            modules.append(module)
+                    modules.append(module)
+                i += 1
+            else:
+                modules.append(module)
 
         module = nn.Sequential(*modules)
-        return module
+        return _dynamic_to_static(module)
 
     def static_op_factory(self):
         return super().static_op_factory
