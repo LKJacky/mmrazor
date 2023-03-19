@@ -376,7 +376,9 @@ class Bottleneck(BaseBottleneck, DynamicBlockMixin):
 
     def to_static_op(self) -> nn.Module:
         module = BaseBottleneck(*self.init_args, **self.init_kwargs)
-        module.load_state_dict(self.state_dict())
+        for name, m in self.named_children():
+            assert hasattr(module, name)
+            setattr(module, name, m)
         return module
 
 

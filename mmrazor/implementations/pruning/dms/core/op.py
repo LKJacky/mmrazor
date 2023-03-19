@@ -93,7 +93,9 @@ class DynamicStage(nn.Sequential, DynamicMixin):
                 else:
                     i += 1
             modules.append(module)
-        return nn.Sequential(*modules)
+
+        module = nn.Sequential(*modules)
+        return module
 
     def static_op_factory(self):
         return super().static_op_factory
