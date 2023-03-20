@@ -64,9 +64,11 @@ class BaseBasicBlock(nn.Module):
 class BasicBlock(BaseBasicBlock, DynamicBlockMixin):
     expansion = 1
 
-    def __init__(self, in_planes, planes, stride=1, option='B'):
-        super().__init__(in_planes, planes, stride, option)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._dynamic_block_init()
+        self.args = args
+        self.kwargs = kwargs
 
     def forward(self, x):
         out = F.relu(self.bn1(self.conv1(x)))
@@ -80,12 +82,11 @@ class BasicBlock(BaseBasicBlock, DynamicBlockMixin):
         return len(self.shortcut) == 0
 
     def to_static_op(self) -> nn.Module:
-        module = BaseBasicBlock(
-            self.conv1.in_channels,
-            self.conv1.out_channels,
-            stride=self.conv1.stride[0],
-            option='B')
-        module.load_state_dict(self.state_dict())
+        from mmrazor.structures.subnet.fix_subnet import _dynamic_to_static
+        module = BaseBasicBlock(*self.args, **self.kwargs)
+        for name, m in self.named_children():
+            assert hasattr(module, name)
+            setattr(module, name, _dynamic_to_static(m))
         return module
 
 
