@@ -41,3 +41,9 @@ export JOB_NAME=dtp_t_r56_prune_34_e300_r9
 export PTH_NAME=epoch_300
 python ./tools/train.py projects/configs/dtp/dtp_r56/dtp_taylor/dtp_t_r56_prune_34_e300_r9.py
 python ./tools/train.py projects/configs/dtp/dtp_r56/dtp_r56_finetune.py --work-dir work_dirs/${JOB_NAME}_finetune
+
+
+export JOB_NAME=dtp_t_r56super_prune_11_e300
+export PTH_NAME=epoch_1
+python ./tools/train.py projects/configs/dtp/dtp_r56/dtp_taylor/dtp_t_r56super_prune_11_e300.py
+python ./tools/train.py projects/configs/dtp/dtp_r56/dtp_r56super_finetune.py --work-dir work_dirs/${JOB_NAME}_finetune
