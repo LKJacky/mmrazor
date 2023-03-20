@@ -8,6 +8,9 @@ pruned_path = f"./work_dirs/{os.environ['JOB_NAME']}/{os.environ.get('PTH_NAME',
 epoch = 300
 train_cfg = dict(by_epoch=True, max_epochs=epoch)
 
+param_scheduler = dict(
+    type='MultiStepLR', by_epoch=True, milestones=[150, 225], gamma=0.1)
+
 ##############################################################################
 
 algorithm = _base_.model
