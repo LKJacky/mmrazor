@@ -13,6 +13,7 @@ class DynamicBlockMixin(DynamicMixin, QuickFlopMixin):
 
     def _dynamic_block_init(self):
         self._scale_func = None
+        self._flop_scale_func = None
         self._quick_flop_init()
 
     @property
@@ -25,6 +26,14 @@ class DynamicBlockMixin(DynamicMixin, QuickFlopMixin):
                 return scale
             else:
                 return scale.view([1, -1, 1, 1])
+
+    @property
+    def flop_scale(self):
+        if self._flop_scale_func is None:
+            return 1.0
+        else:
+            scale: torch.Tensor = self._flop_scale_func()
+            return scale
 
     @property
     def is_removable(self):
@@ -49,18 +58,7 @@ class DynamicBlockMixin(DynamicMixin, QuickFlopMixin):
         flops = 0
         for child in self.children():
             flops = flops + QuickFlopMixin.get_flop(child)
-        scale = self.scale
-        if isinstance(scale, float):
-            scale = 1.0
-        else:
-            if scale.numel() == 1:
-                scale = (scale >=
-                         0.5).float().detach() - scale.detach() + scale
-            else:
-                scale: torch.Tensor  # type: ignore
-                hard_scale = (scale >= 0.5).any().float()
-                scale = hard_scale.detach() - scale.mean().detach(
-                ) + scale.mean()
+        scale = self.flop_scale
         return scale * flops
 
     @property
@@ -79,6 +77,8 @@ class DynamicStage(nn.Sequential, DynamicMixin):
 
         for i, block in enumerate(self.removable_block):
             block._scale_func = self.mutable_blocks.block_scale_fun_wrapper(i)
+            block._flop_scale_func = self.mutable_blocks.block_flop_scale_fun_wrapper(  # noqa
+                i)
 
     @property
     def removable_block(self) -> Iterator[DynamicBlockMixin]:

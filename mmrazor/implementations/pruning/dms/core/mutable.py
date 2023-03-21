@@ -35,6 +35,13 @@ class MutableBlocks(BaseMutable):
 
         return scale
 
+    def block_flop_scale_fun_wrapper(self, i):
+
+        def scale():
+            return self.current_imp[i]
+
+        return scale
+
     @property
     def current_imp(self):
         imp = dtp_get_importance(self.taylor, self.e, lamda=4.0)

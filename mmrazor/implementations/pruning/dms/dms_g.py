@@ -50,6 +50,16 @@ class GraduallyMutableBlocks(MutableBlocks):
 
         return scale
 
+    def block_flop_scale_fun_wrapper(self, i):
+
+        def scale():
+            imp = self.get_current_imp(i)
+            hard_scale = (imp >= 0.5).any().float()
+            scale = hard_scale.detach() - imp.mean().detach() + imp.mean()
+            return scale
+
+        return scale
+
     @property
     def current_imp(self):
         raise NotImplementedError()
