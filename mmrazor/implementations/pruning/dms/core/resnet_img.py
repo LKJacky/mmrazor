@@ -227,7 +227,6 @@ class BaseBottleneck(BaseModule):
             kernel_size=1,
             bias=False)
         self.add_module(self.norm3_name, norm3)
-
         self.relu = build_activation_layer(act_cfg)
         self.downsample = downsample
         self.drop_path = DropPath(drop_prob=drop_path_rate
@@ -381,6 +380,10 @@ class Bottleneck(BaseBottleneck, DynamicBlockMixin):
             assert hasattr(module, name)
             setattr(module, name, _dynamic_to_static(m))
         return module
+
+    @property
+    def out_channel(self):
+        return self.conv3.out_channels
 
 
 def get_expansion(block, expansion=None):

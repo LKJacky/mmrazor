@@ -1,6 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from typing import Iterator
 
+import torch
 import torch.nn as nn
 
 from mmrazor.models.architectures.dynamic_ops import DynamicMixin
@@ -19,7 +20,11 @@ class DynamicBlockMixin(DynamicMixin, QuickFlopMixin):
         if self._scale_func is None:
             return 1.0
         else:
-            return self._scale_func()
+            scale: torch.Tensor = self._scale_func()
+            if scale.numel() == 1:
+                return scale
+            else:
+                return scale.view([1, -1, 1, 1])
 
     @property
     def is_removable(self):
@@ -48,8 +53,19 @@ class DynamicBlockMixin(DynamicMixin, QuickFlopMixin):
         if isinstance(scale, float):
             scale = 1.0
         else:
-            scale = (scale >= 0.5).float().detach() - scale.detach() + scale
+            if scale.numel() == 1:
+                scale = (scale >=
+                         0.5).float().detach() - scale.detach() + scale
+            else:
+                scale: torch.Tensor  # type: ignore
+                hard_scale = (scale >= 0.5).any().float()
+                scale = hard_scale.detach() - scale.mean().detach(
+                ) + scale.mean()
         return scale * flops
+
+    @property
+    def out_channel(self):
+        raise NotImplementedError()
 
 
 class DynamicStage(nn.Sequential, DynamicMixin):

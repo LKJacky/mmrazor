@@ -89,6 +89,10 @@ class BasicBlock(BaseBasicBlock, DynamicBlockMixin):
             setattr(module, name, _dynamic_to_static(m))
         return module
 
+    @property
+    def out_channel(self):
+        return self.conv2.out_channels
+
 
 @MODELS.register_module()
 class ResNetCifarDMS(nn.Module):

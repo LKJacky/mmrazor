@@ -1,2 +1,3 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from .core import *
+from .core import *  # noqa
+from .dms_g import *  # noqa

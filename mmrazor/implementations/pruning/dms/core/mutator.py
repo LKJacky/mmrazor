@@ -32,19 +32,23 @@ def replace_modules(model: nn.Module, module_map={}):
 
 class BlockInitialer:
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self,
+                 dynamic_statge_module=DynamicStage,
+                 block_mixin_layers=[ResLayer, ResLayerImg]) -> None:
+        self.dyanmic_stage_module = dynamic_statge_module
+        self.block_mixin_layers = block_mixin_layers
 
     def prepare_from_supernet(self, supernet: nn.Module) -> List:
+        map_dict = {}
+        for block in self.block_mixin_layers:
+            map_dict[block] = self.dyanmic_stage_module
         replace_modules(
             supernet,
-            module_map={
-                ResLayer: DynamicStage,
-                ResLayerImg: DynamicStage,
-            })
+            module_map=map_dict,
+        )
         mutables = []
         for module in supernet.modules():
-            if isinstance(module, DynamicStage):
+            if isinstance(module, self.dyanmic_stage_module):
                 mutables.append(module.mutable_blocks)
                 module.mutable_blocks.requires_grad_(True)
         return mutables
