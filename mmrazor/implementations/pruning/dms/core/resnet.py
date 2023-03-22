@@ -73,7 +73,7 @@ class BasicBlock(BaseBasicBlock, DynamicBlockMixin):
     def forward(self, x):
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
-        out += self.shortcut(x) * self.scale
+        out = out * self.scale + self.shortcut(x)
         out = F.relu(out)
         return out
 

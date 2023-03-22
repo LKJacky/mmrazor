@@ -356,7 +356,7 @@ class Bottleneck(BaseBottleneck, DynamicBlockMixin):
 
             out = self.drop_path(out)
 
-            out += identity * self.scale
+            out = identity + out * self.scale
 
             return out
 

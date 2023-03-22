@@ -37,6 +37,7 @@ class BlockInitialer:
                  block_mixin_layers=[ResLayer, ResLayerImg]) -> None:
         self.dyanmic_stage_module = dynamic_statge_module
         self.block_mixin_layers = block_mixin_layers
+        self.stages: List[DynamicStage] = []
 
     def prepare_from_supernet(self, supernet: nn.Module) -> List:
         map_dict = {}
@@ -50,6 +51,7 @@ class BlockInitialer:
         for module in supernet.modules():
             if isinstance(module, self.dyanmic_stage_module):
                 mutables.append(module.mutable_blocks)
+                self.stages.append(module)
                 module.mutable_blocks.requires_grad_(True)
         return mutables
 
@@ -84,9 +86,20 @@ class DMSMutator(BaseMutator):
             self.block_initializer.prepare_from_supernet(supernet))
 
     def info(self):
+
         mutable_info = ''
-        for mut in self.block_mutables:
-            mutable_info += mut.info() + '\n'
+
+        @torch.no_grad()
+        def stage_info(stage: DynamicStage):
+            scales = ''
+            for block in stage.removable_block:
+                scales += f'{block.flop_scale:.2f} '
+            return scales
+
+        for mut, stage in zip(self.block_mutables,
+                              self.block_initializer.stages):
+            mutable_info += mut.info() + '\tratio:\t' + stage_info(
+                stage) + '\n'
         return self.dtp_mutator.info() + '\n' + mutable_info
 
     @torch.no_grad()
