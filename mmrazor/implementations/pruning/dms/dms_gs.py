@@ -81,3 +81,21 @@ class DMSGSScheduler(DTPAScheduler):
             self.mutator.soft_flop_mode_to(False)
         else:
             self.mutator.requires_grad_(False)
+
+
+@TASK_UTILS.register_module()
+class DMSGS_E_Scheduler(DMSGSScheduler):
+
+    def current_target(self, iter, epoch, max_iters, max_epochs):
+
+        def get_target(ratio):
+            assert 0 <= ratio <= 1
+            return 1 - (1 - self.flops_target) * ratio
+
+        if iter < self.decay_ratio * max_iters:
+            ratio = epoch / (max_epochs * self.decay_ratio)
+        elif iter < (self.decay_ratio + self.refine_ratio) * max_iters:
+            ratio = 1.0
+        else:
+            ratio = 1.0
+        return get_target(ratio)
