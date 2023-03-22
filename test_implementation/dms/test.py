@@ -48,3 +48,13 @@ class TestDMS(unittest.TestCase):
     def test_model_super(self):
         model = ResNetCifarSuper()
         print(model)
+
+    def test_scale_polarize(self):
+        import torch
+
+        from mmrazor.implementations.pruning.dms.dms_gsd import scale_polarize
+
+        for lam in [0.5, 1, 5, 10]:
+            for i in range(10):
+                a = torch.tensor([i * 0.1])
+                print(a, scale_polarize(a, lam=lam), lam)
