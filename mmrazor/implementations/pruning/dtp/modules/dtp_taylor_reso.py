@@ -15,7 +15,7 @@ from .scheduler import BaseDTPScheduler
 
 
 @torch.jit.script
-def dtopk_reso(x: torch.Tensor, e: torch.Tensor, resolution=1 / 1000):
+def dtopk_reso(x: torch.Tensor, e: torch.Tensor, resolution: float = 1 / 1000):
     # add min or max
     # e = soft_clip(e, 1 / x.numel(), 1)
     resolution = max(resolution, 1 / x.numel())
@@ -25,7 +25,9 @@ def dtopk_reso(x: torch.Tensor, e: torch.Tensor, resolution=1 / 1000):
 
 
 @torch.jit.script
-def dtp_get_importance(v: torch.Tensor, e: torch.Tensor, resolution=1 / 1000):
+def dtp_get_importance(v: torch.Tensor,
+                       e: torch.Tensor,
+                       resolution: float = 1 / 1000):
     vm = v.unsqueeze(-1) - v.unsqueeze(0)
     vm = (vm >= 0).float() - vm.detach() + vm
     v_union = vm.mean(dim=-1)  # big to small

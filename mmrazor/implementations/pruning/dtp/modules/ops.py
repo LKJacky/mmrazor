@@ -132,7 +132,8 @@ def soft_mask_sum(mask: torch.Tensor):
 
 
 @torch.jit.script
-def conv_soft_flop(input_imp_flop, output_imp_flop, h, w, k1, k2, groups):
+def conv_soft_flop(input_imp_flop, output_imp_flop, h: int, w: int, k1: int,
+                   k2: int, groups: int):
     in_c = soft_mask_sum(input_imp_flop)
     out_c = soft_mask_sum(output_imp_flop)
     conv_per_pos = k1 * k2 * in_c * out_c / groups
@@ -181,7 +182,7 @@ class ImpLinear(dynamic_ops.DynamicLinear, ImpModuleMixin, QuickFlopMixin,
 
 
 @torch.jit.script
-def bn_soft_flop(input_imp_flop, h, w):
+def bn_soft_flop(input_imp_flop, h: int, w: int):
     in_c = soft_mask_sum(input_imp_flop)
     return h * w * in_c
 

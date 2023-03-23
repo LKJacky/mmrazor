@@ -12,7 +12,7 @@ from .unit import BaseDTPUnit
 
 
 @torch.jit.script
-def dtopk(x: torch.Tensor, e: torch.Tensor, lamda=1.0):
+def dtopk(x: torch.Tensor, e: torch.Tensor, lamda: float = 1.0):
     # add min or max
     # e = soft_clip(e, 1 / x.numel(), 1.0)
 
@@ -24,9 +24,9 @@ def dtopk(x: torch.Tensor, e: torch.Tensor, lamda=1.0):
 @torch.jit.script
 def dtp_get_importance(v: torch.Tensor,
                        e: torch.Tensor,
-                       lamda=1.0,
-                       space_min=0,
-                       space_max=1.0):
+                       lamda: float = 1.0,
+                       space_min: float = 0,
+                       space_max: float = 1.0):
     vm = v.unsqueeze(-1) - v.unsqueeze(0)
     vm = (vm >= 0).float() - vm.detach() + vm
     v_union = vm.mean(dim=-1)  # big to small
