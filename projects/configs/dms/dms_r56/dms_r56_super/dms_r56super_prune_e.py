@@ -7,7 +7,7 @@ decay_ratio = 0.6
 refine_ratio = 0.4
 target_flop_ratio = 0.11
 flop_loss_weight = 100
-by_epoch = False
+by_epoch = True
 
 log_interval = 196
 

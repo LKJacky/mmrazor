@@ -94,6 +94,20 @@ class DTPAMutator(BaseDTPMutator):
 class DTPAScheduler(BaseDTPScheduler):
     mutator: DTPAMutator
 
+    def __init__(self,
+                 model: nn.Module,
+                 mutator: BaseDTPMutator,
+                 flops_target=0.5,
+                 decay_ratio=0.6,
+                 refine_ratio=0.2,
+                 flop_loss_weight=1,
+                 by_epoch=False,
+                 structure_log_interval=100) -> None:
+        super().__init__(model, mutator, flops_target, decay_ratio,
+                         refine_ratio, flop_loss_weight,
+                         structure_log_interval)
+        self.by_epoch = by_epoch
+
     def before_train_forward(self, iter, epoch, max_iters, max_epochs):
         self.mutator.limit_value()
         if iter < (self.decay_ratio + self.refine_ratio) * max_iters:
@@ -116,3 +130,20 @@ class DTPAScheduler(BaseDTPScheduler):
             return res
         else:
             return {}
+
+    def current_target(self, iter, epoch, max_iters, max_epochs):
+
+        def get_target(ratio):
+            assert 0 <= ratio <= 1
+            return 1 - (1 - self.flops_target) * ratio
+
+        if iter < self.decay_ratio * max_iters:
+            if self.by_epoch:
+                ratio = (epoch / (self.decay_ratio * max_epochs))
+            else:
+                ratio = (iter / (self.decay_ratio * max_iters))
+        elif iter < (self.decay_ratio + self.refine_ratio) * max_iters:
+            ratio = 1.0
+        else:
+            ratio = 1.0
+        return get_target(ratio)
