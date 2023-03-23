@@ -141,3 +141,7 @@ class DMSMutator(BaseMutator):
     # inherit from BaseMutator
     def search_groups(self):
         return super().search_groups
+
+    def set_soft_flop_scale_converter(self, fun):
+        for mut in self.block_mutables:
+            mut.flop_scale_converter = fun

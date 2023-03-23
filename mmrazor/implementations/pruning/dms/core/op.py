@@ -75,6 +75,10 @@ class DynamicStage(nn.Sequential, DynamicMixin):
             'mutable_blocks', MutableBlocks(len(list(self.removable_block))))
         self.mutable_blocks: MutableBlocks
 
+        self.prepare_blocks()
+
+    def prepare_blocks(self):
+
         for i, block in enumerate(self.removable_block):
             block._scale_func = self.mutable_blocks.block_scale_fun_wrapper(i)
             block._flop_scale_func = self.mutable_blocks.block_flop_scale_fun_wrapper(  # noqa

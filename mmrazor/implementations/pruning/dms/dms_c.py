@@ -1,9 +1,9 @@
+# dms by channel
+
 # Copyright (c) OpenMMLab. All rights reserved.
 import torch
-import torch.nn as nn
 from mmengine.dist import all_reduce
 
-from mmrazor.models.mutables import BaseMutable
 from mmrazor.registry import MODELS
 from ..dtp.modules.dtp_taylor import dtp_get_importance
 from .core.mutable import MutableBlocks
@@ -13,7 +13,7 @@ from .core.op import DynamicBlockMixin, DynamicStage
 # differential model scale gradually.
 
 
-def taylor_backward_hook_wrapper(module: 'GraduallyMutableBlocks', input, i):
+def taylor_backward_hook_wrapper(module: 'ChannelMutableBlocks', input, i):
 
     def taylor_backward_hook(grad):
         with torch.no_grad():
@@ -22,26 +22,16 @@ def taylor_backward_hook_wrapper(module: 'GraduallyMutableBlocks', input, i):
     return taylor_backward_hook
 
 
-class GraduallyMutableBlocks(MutableBlocks):
+class ChannelMutableBlocks(MutableBlocks):
 
     def __init__(self, num_blocks, num_channel) -> None:
-        super(BaseMutable, self).__init__()
+        super().__init__(num_blocks)
 
-        self.num_blocks = num_blocks
         self.num_channel = num_channel
-
-        mask = torch.ones([num_blocks])
-        self.register_buffer('mask', mask)
-        self.mask: torch.Tensor
-
-        self.e = nn.parameter.Parameter(torch.tensor(1.0), requires_grad=False)
 
         taylor = torch.zeros([num_blocks, num_channel])
         self.register_buffer('taylor', taylor)
         self.taylor: torch.Tensor
-
-        self.decay = 0.99
-        self.requires_grad_(False)
 
     def block_scale_fun_wrapper(self, i):
 
@@ -54,9 +44,11 @@ class GraduallyMutableBlocks(MutableBlocks):
 
         def scale():
             imp = self.get_current_imp(i)
-            hard_scale = (imp >= 0.5).any().float()
-            scale = hard_scale.detach() - imp.mean().detach() + imp.mean()
-            return scale
+            scale = imp.mean()
+            if self.flop_scale_converter is None:
+                return scale
+            else:
+                return self.flop_scale_converter(scale)
 
         return scale
 
@@ -81,10 +73,6 @@ class GraduallyMutableBlocks(MutableBlocks):
                 self.mask.data[i] = (imp >= 0.5).any().float()
         return imp
 
-    @property
-    def current_imp_flop(self):
-        raise NotImplementedError()
-
     @torch.no_grad()
     def update_taylor(self, input, grad, i):
         new_taylor = (input * grad)**2
@@ -94,27 +82,17 @@ class GraduallyMutableBlocks(MutableBlocks):
 
     @torch.no_grad()
     def info(self):
-
-        def get_mask_str():
-            mask_str = ''
-            for i in range(self.num_blocks):
-                if self.mask[i] == 1:
-                    mask_str += '1'
-                else:
-                    mask_str += '0'
-            return mask_str
+        info = super().info()
 
         imp = self.get_current_imp(0)
         imp1 = self.get_current_imp(-1)
 
-        return (
-            f'mutable_block_{self.num_blocks}:\t{self.e.item():.3f}, \t'
-            f'self.taylor:\t{self.taylor.min().item():.3f}\t{self.taylor.max().item():.3f}\t'  # noqa
-            f'imp:\t {imp.max().item():.3f}\t{imp.min().item():.3f},\t{imp1.max().item():.3f}\t{imp1.min().item():.3f}\t'  # noqa
-            f'{get_mask_str()}')
+        return info + (
+            f'channel_imp:\t {imp.max().item():.3f}\t{imp.min().item():.3f}\t'
+            f'{imp1.max().item():.3f}\t{imp1.min().item():.3f}\t')  # noqa
 
 
-class GraduallyDynamicStaget(DynamicStage):
+class ChannelDynamicStaget(DynamicStage):
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -123,22 +101,20 @@ class GraduallyDynamicStaget(DynamicStage):
             if isinstance(module, DynamicBlockMixin):
                 block0 = module
 
-        self.mutable_attrs = {}
         self.register_mutable_attr(
             'mutable_blocks',
-            GraduallyMutableBlocks(
+            ChannelMutableBlocks(
                 len(list(self.removable_block)),
                 num_channel=block0.out_channel))
-        self.mutable_blocks: GraduallyMutableBlocks
+        self.mutable_blocks: ChannelMutableBlocks
 
-        for i, block in enumerate(self.removable_block):
-            block._scale_func = self.mutable_blocks.block_scale_fun_wrapper(i)
+        self.prepare_blocks()
 
 
 @MODELS.register_module()
-class DMSGMutator(DMSMutator):
+class DMSCMutator(DMSMutator):
 
     def __init__(self, *args, **kwargs):
         DMSMutator.__init__(self, *args, **kwargs)
         self.block_initializer = BlockInitialer(
-            dynamic_statge_module=GraduallyDynamicStaget)
+            dynamic_statge_module=ChannelDynamicStaget)

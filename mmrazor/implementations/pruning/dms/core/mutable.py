@@ -28,10 +28,16 @@ class MutableBlocks(BaseMutable):
         self.decay = 0.99
         self.requires_grad_(False)
 
+        self.flop_scale_converter = None
+
     def block_scale_fun_wrapper(self, i):
 
         def scale():
-            return self.current_imp[i]
+            scale = self.current_imp[i]
+            if self.flop_scale_converter is None:
+                return scale
+            else:
+                return self.flop_scale_converter(scale)
 
         return scale
 
@@ -54,8 +60,7 @@ class MutableBlocks(BaseMutable):
 
     @property
     def current_imp_flop(self):
-        e_imp = dtp_get_importance(self.taylor, self.e)
-        return e_imp
+        raise NotImplementedError()
 
     @torch.no_grad()
     def limit_value(self):
@@ -79,9 +84,9 @@ class MutableBlocks(BaseMutable):
             return mask_str
 
         return (
-            f'mutable_block_{self.num_blocks}:\t{self.e.item():.3f}, \t'
-            f'self.taylor: {self.taylor.min().item():.3f}\t{self.taylor.max().item():.3f}\t'  # noqa
-            f'{get_mask_str()}')
+            f'mutable_block: {self.num_blocks} \t {self.e.item():.3f}, \t'
+            f'self.taylor: \t{self.taylor.min().item():.3f}\t{self.taylor.max().item():.3f}\t'  # noqa
+            f'mask:\t{get_mask_str()}\t')
 
     # inherit from BaseMutable
 

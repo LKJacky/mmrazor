@@ -7,13 +7,13 @@ decay_ratio = 0.6
 refine_ratio = 0.4
 target_flop_ratio = 0.11
 flop_loss_weight = 100
+by_epoch = True
 
 log_interval = 196
 
 input_shape = (1, 3, 32, 32)
 
 epoch = 300
-
 train_cfg = dict(by_epoch=True, max_epochs=epoch)
 
 mutator_lr = _base_.optim_wrapper.optimizer.lr * 0.1
@@ -44,7 +44,7 @@ model = dict(
     type='BaseDTPAlgorithm',
     architecture=architecture,
     mutator_cfg=dict(
-        type='DMSGMutator',
+        type='DMSMutator',
         dtp_mutator_cfg=dict(
             type='DTPAMutator',
             channel_unit_cfg=dict(type='DTPTUnit', default_args=dict()),
@@ -59,12 +59,14 @@ model = dict(
         ),
     ),
     scheduler=dict(
-        type='DTPAScheduler',
+        type='DMSScheduler',
         flops_target=target_flop_ratio,
         decay_ratio=decay_ratio,
         refine_ratio=refine_ratio,
         flop_loss_weight=flop_loss_weight,
-        structure_log_interval=log_interval),
+        structure_log_interval=log_interval,
+        by_epoch=by_epoch,
+    ),
 )
 
 custom_hooks = getattr(_base_, 'custom_hooks', []) + [
