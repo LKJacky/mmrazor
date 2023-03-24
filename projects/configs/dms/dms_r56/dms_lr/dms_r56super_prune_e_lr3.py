@@ -16,18 +16,10 @@ input_shape = (1, 3, 32, 32)
 epoch = 100
 train_cfg = dict(by_epoch=True, max_epochs=epoch)
 
-mutator_lr = _base_.optim_wrapper.optimizer.lr * 0.1
+mutator_lr = _base_.optim_wrapper.optimizer.lr * 0.001
 
 if hasattr(_base_, 'param_scheduler'):
     delattr(_base_, 'param_scheduler')
-
-param_scheduler = dict(
-    type='CosineAnnealingLR',
-    T_max=epoch,
-    by_epoch=True,
-    begin=0,
-    end=epoch,
-    _scope_='mmcls')
 
 ##############################################################################
 
