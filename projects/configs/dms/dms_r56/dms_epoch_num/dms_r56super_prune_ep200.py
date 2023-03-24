@@ -13,7 +13,7 @@ log_interval = 196
 
 input_shape = (1, 3, 32, 32)
 
-epoch = 100
+epoch = 200
 train_cfg = dict(by_epoch=True, max_epochs=epoch)
 
 mutator_lr = _base_.optim_wrapper.optimizer.lr * 0.1
