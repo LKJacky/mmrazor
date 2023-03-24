@@ -55,7 +55,7 @@ class MutableBlocks(BaseMutable):
         if self.training and imp.requires_grad:
             imp.register_hook(taylor_backward_hook_wrapper(self, imp.detach()))
             with torch.no_grad():
-                self.mask.data = (imp >= 0.5).float()
+                self.mask.data = (imp >= 0.1).float()
         return imp
 
     @property

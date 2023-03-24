@@ -7,7 +7,7 @@ from .mutator import DMSMutator
 
 
 def to_hard(scale):
-    hard = (scale >= 0.5).float()
+    hard = (scale >= 0.1).float()
     return hard.detach() - scale.detach() + scale
 
 

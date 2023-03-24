@@ -70,7 +70,7 @@ class ChannelMutableBlocks(MutableBlocks):
             imp.register_hook(
                 taylor_backward_hook_wrapper(self, imp.detach(), i))
             with torch.no_grad():
-                self.mask.data[i] = (imp >= 0.5).any().float()
+                self.mask.data[i] = (imp >= 0.1).any().float()
         return imp
 
     @torch.no_grad()

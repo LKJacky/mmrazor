@@ -24,7 +24,7 @@ class SqMutableBlocks(MutableBlocks):
 
         if self.training and imp.requires_grad:
             with torch.no_grad():
-                self.mask.data = (imp >= 0.5).float()
+                self.mask.data = (imp >= 0.1).float()
         return imp
 
 
