@@ -22,7 +22,7 @@ if hasattr(_base_, 'param_scheduler'):
     delattr(_base_, 'param_scheduler')
 
 param_scheduler = dict(
-    type='MultiStepLR', by_epoch=True, milestones=[150, 225], gamma=0.1)
+    type='MultiStepLR', by_epoch=True, milestones=[50, 75], gamma=0.1)
 
 ##############################################################################
 
