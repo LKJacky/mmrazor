@@ -21,6 +21,9 @@ class AdaptiveMutableBlocks(MutableBlocks):
 
     @property
     def current_imp(self):
+        if self.taylor.min() == self.taylor.max():
+            return torch.ones_like(
+                self.taylor) - self.taylor.detach() + self.taylor
         imp = dtp_get_importance(self.taylor, self.e, lamda=4.0)
 
         if self.training and imp.requires_grad:
