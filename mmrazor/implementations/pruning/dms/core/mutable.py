@@ -7,6 +7,8 @@ from mmrazor.models.mutables import BaseMutable
 from ...dtp.modules.dtp_taylor import (dtp_get_importance,
                                        taylor_backward_hook_wrapper)
 
+BlockThreshold = 0.5
+
 
 class MutableBlocks(BaseMutable):
 
@@ -55,7 +57,7 @@ class MutableBlocks(BaseMutable):
         if self.training and imp.requires_grad:
             imp.register_hook(taylor_backward_hook_wrapper(self, imp.detach()))
             with torch.no_grad():
-                self.mask.data = (imp >= 0.1).float()
+                self.mask.data = (imp >= BlockThreshold).float()
         return imp
 
     @property

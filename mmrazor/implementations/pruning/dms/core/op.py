@@ -6,7 +6,7 @@ import torch.nn as nn
 
 from mmrazor.models.architectures.dynamic_ops import DynamicMixin
 from ...dtp.modules.ops import QuickFlopMixin
-from .mutable import MutableBlocks
+from .mutable import BlockThreshold, MutableBlocks
 
 
 class DynamicBlockMixin(DynamicMixin, QuickFlopMixin):
@@ -108,7 +108,7 @@ class DynamicStage(nn.Sequential, DynamicMixin):
         i = 0
         for module in self:
             if isinstance(module, DynamicBlockMixin) and module.is_removable:
-                if self.mutable_blocks.mask[i] < 0.5:
+                if self.mutable_blocks.mask[i] < BlockThreshold:
                     pass
                 else:
                     modules.append(module)

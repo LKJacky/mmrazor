@@ -5,7 +5,7 @@ import torch
 
 from mmrazor.registry import MODELS
 from ..dtp.modules.dtp_taylor import dtopk
-from .core.mutable import MutableBlocks
+from .core.mutable import BlockThreshold, MutableBlocks
 from .core.mutator import BlockInitialer, DMSMutator
 from .core.op import DynamicStage
 
@@ -24,7 +24,7 @@ class SqMutableBlocks(MutableBlocks):
 
         if self.training and imp.requires_grad:
             with torch.no_grad():
-                self.mask.data = (imp >= 0.1).float()
+                self.mask.data = (imp >= BlockThreshold).float()
         return imp
 
 

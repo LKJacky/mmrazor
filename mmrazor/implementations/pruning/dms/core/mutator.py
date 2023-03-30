@@ -9,7 +9,7 @@ from mmrazor.models.task_modules.demo_inputs import DefaultDemoInput
 from mmrazor.registry import MODELS, TASK_UTILS
 from ...dtp.modules.dtp_adaptive import DTPAMutator
 from ...dtp.modules.ops import QuickFlopMixin
-from .mutable import MutableBlocks
+from .mutable import BlockThreshold, MutableBlocks
 from .op import DynamicStage
 from .resnet import ResLayer
 from .resnet_img import ResLayer as ResLayerImg
@@ -54,6 +54,11 @@ class BlockInitialer:
                 self.stages.append(module)
                 module.mutable_blocks.requires_grad_(True)
         return mutables
+
+
+def to_hard(scale):
+    hard = (scale >= BlockThreshold).float()
+    return hard.detach() - scale.detach() + scale
 
 
 @MODELS.register_module()
@@ -129,10 +134,17 @@ class DMSMutator(BaseMutator):
     def get_soft_flop(self, model):
         return QuickFlopMixin.get_flop(model)
 
-    def ratio_train(self):
+    def channel_depth_train(self):
         self.dtp_mutator.ratio_train()
         for mul in self.block_mutables:
             mul.requires_grad_(True)
+        self.set_soft_flop_scale_converter(None)
+
+    def channel_train(self):
+        self.dtp_mutator.ratio_train()
+        for mul in self.block_mutables:
+            mul.requires_grad_(False)
+        self.set_soft_flop_scale_converter(to_hard)
 
     @property
     def choice_template(self):
