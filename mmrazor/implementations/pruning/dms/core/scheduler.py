@@ -66,10 +66,12 @@ class DMSScheduler(DTPAScheduler):
         if loss_type == 'l2':
             loss = (soft_flop - target)**2
         elif loss_type == 'l2+':
-            loss = (soft_flop - target)**2 + (soft_flop - target)
+            loss = (soft_flop - target)**2 + (soft_flop - target) * (
+                1 if soft_flop > target else 0)
         elif loss_type == 'log':
-            loss = torch.log(soft_flop / target)
+            loss = torch.log(
+                soft_flop / target) * (1 if soft_flop > target else 0)
         else:
             raise NotImplementedError()
 
-        return loss * (1 if soft_flop > target else 0)
+        return loss
