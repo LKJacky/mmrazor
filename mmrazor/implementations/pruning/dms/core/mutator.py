@@ -107,7 +107,7 @@ class DMSMutator(BaseMutator):
             mutable_info += mut.info() + '\tratio:\t' + stage_info(
                 stage) + '\n'
 
-        flop_info = f'soft_flop: {self.get_soft_flop(self.saved_model[0])}/1e6'
+        flop_info = f'soft_flop: {self.get_soft_flop(self.saved_model[0])/1e6}'
 
         return self.dtp_mutator.info() + '\n' + mutable_info + '\n' + flop_info
 

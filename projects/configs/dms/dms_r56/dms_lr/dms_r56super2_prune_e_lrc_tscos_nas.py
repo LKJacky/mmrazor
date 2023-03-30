@@ -5,7 +5,7 @@ pretrained_path = 'work_dirs/pretrained/resnet56_super_pretrain.pth'
 
 decay_ratio = 0.6
 refine_ratio = 0.4
-target_flop_ratio = 0.11
+target_flop_ratio = 0.098
 flop_loss_weight = 100
 by_epoch = True
 target_scheduler = 'cos'
@@ -36,8 +36,9 @@ custom_imports = dict(imports=['projects'])
 
 architecture = dict(
     type='mmrazor.ResNetCifarSuper',
-    ratio=1.5,
-    num_blocks=[12, 12, 12],
+    ratio=2.0,
+    single_layer_ratio=2.0,
+    num_blocks=[6, 6, 12],
 )
 
 if hasattr(_base_, 'data_preprocessor'):
