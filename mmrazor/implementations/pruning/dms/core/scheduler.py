@@ -1,14 +1,10 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import numpy as np
+import torch
 
 from mmrazor.registry import TASK_UTILS
 from ...dtp.modules.dtp_adaptive import DTPAScheduler
 from .mutator import DMSMutator
-
-
-def to_hard(scale):
-    hard = (scale >= 0.1).float()
-    return hard.detach() - scale.detach() + scale
 
 
 @TASK_UTILS.register_module()
@@ -32,17 +28,12 @@ class DMSScheduler(DTPAScheduler):
 
     def before_train_forward(self, iter, epoch, max_iters, max_epochs):
         self.mutator.limit_value()
-        if iter < (self.decay_ratio + self.refine_ratio) * max_iters:
-            self.change_hard_mode(iter, epoch, max_iters, max_epochs)
-            self.mutator.ratio_train()
+        if iter < (self.decay_ratio) * max_iters:
+            self.mutator.channel_depth_train()
+        elif iter < (self.decay_ratio + self.refine_ratio) * max_iters:
+            self.mutator.channel_train()
         else:
             self.mutator.requires_grad_(False)
-
-    def change_hard_mode(self, iter, epoch, max_iters, max_epochs):
-        if iter < (self.decay_ratio * max_iters):
-            self.mutator.set_soft_flop_scale_converter(None)
-        else:
-            self.mutator.set_soft_flop_scale_converter(to_hard)
 
     def current_target(self, iter, epoch, max_iters, max_epochs):
 
@@ -66,3 +57,19 @@ class DMSScheduler(DTPAScheduler):
             return t
         else:
             raise NotImplementedError(f'{self.target_scheduler}')
+
+    def flop_loss(self, iter, epoch, max_iters, max_epochs):
+        target = self.current_target(iter, epoch, max_iters, max_epochs)
+        soft_flop = self.mutator.get_soft_flop(self.model) / self.init_flop
+
+        loss_type = 'l2+'
+        if loss_type == 'l2':
+            loss = (soft_flop - target)**2
+        elif loss_type == 'l2+':
+            loss = (soft_flop - target)**2 + (soft_flop - target)
+        elif loss_type == 'log':
+            loss = torch.log(soft_flop / target)
+        else:
+            raise NotImplementedError()
+
+        return loss * (1 if soft_flop > target else 0)

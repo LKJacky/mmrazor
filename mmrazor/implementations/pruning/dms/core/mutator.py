@@ -86,6 +86,7 @@ class DMSMutator(BaseMutator):
         self.block_mutables: List[MutableBlocks] = nn.ModuleList()
 
     def prepare_from_supernet(self, supernet) -> None:
+        self.saved_model = [supernet]
         self.dtp_mutator.prepare_from_supernet(supernet)
         self.block_mutables = nn.ModuleList(
             self.block_initializer.prepare_from_supernet(supernet))
@@ -105,7 +106,10 @@ class DMSMutator(BaseMutator):
                               self.block_initializer.stages):
             mutable_info += mut.info() + '\tratio:\t' + stage_info(
                 stage) + '\n'
-        return self.dtp_mutator.info() + '\n' + mutable_info
+
+        flop_info = f'soft_flop: {self.get_soft_flop(self.saved_model[0])}/1e6'
+
+        return self.dtp_mutator.info() + '\n' + mutable_info + '\n' + flop_info
 
     @torch.no_grad()
     def init_quick_flop(self, model: nn.Module):
