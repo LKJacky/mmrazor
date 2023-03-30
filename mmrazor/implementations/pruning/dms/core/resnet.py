@@ -130,6 +130,7 @@ class ResNetCifarDMS(nn.Module):
 
 @MODELS.register_module()
 def ResNetCifarSuper(ratio=2.0,
+                     single_layer_ratio=1.0,
                      num_blocks=[12, 12, 12],
                      init_cfg=None,
                      data_preprocessor=None,
@@ -155,7 +156,10 @@ def ResNetCifarSuper(ratio=2.0,
         expand_expandable_dynamic_model, to_expandable_model)
     mutator = to_expandable_model(model)
     for unit in mutator.mutable_units:
-        unit.expand_to(int(unit.current_choice * ratio))
+        if len(unit.input_related) < 5:
+            unit.expand_to(int(unit.current_choice * single_layer_ratio))
+        else:
+            unit.expand_to(int(unit.current_choice * ratio))
 
     model = expand_expandable_dynamic_model(model)
     for module in model.modules():
