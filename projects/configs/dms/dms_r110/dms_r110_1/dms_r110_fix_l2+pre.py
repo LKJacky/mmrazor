@@ -1,7 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 #############################################################################
 _base_ = '../../../resnet56/resnet101_pretrain.py'
-pretrained_path = 'work_dirs/pretrained/resnet56_super_pretrain.pth'
+pretrained_path = 'work_dirs/pretrained/r101_pretrain.pth'
 
 decay_ratio = 0.6
 refine_ratio = 0.4
