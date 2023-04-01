@@ -20,11 +20,13 @@ class DMSScheduler(DTPAScheduler):
                  flop_loss_weight=1,
                  by_epoch=False,
                  target_scheduler='linear',
-                 structure_log_interval=100) -> None:
+                 structure_log_interval=100,
+                 loss_type='l2') -> None:
         super().__init__(model, mutator, flops_target, decay_ratio,
                          refine_ratio, flop_loss_weight, by_epoch,
                          structure_log_interval)
         self.target_scheduler = target_scheduler
+        self.loss_type = loss_type
 
     def before_train_forward(self, iter, epoch, max_iters, max_epochs):
         self.mutator.limit_value()
@@ -62,7 +64,7 @@ class DMSScheduler(DTPAScheduler):
         target = self.current_target(iter, epoch, max_iters, max_epochs)
         soft_flop = self.mutator.get_soft_flop(self.model) / self.init_flop
 
-        loss_type = 'l2+'
+        loss_type = self.loss_type
         if loss_type == 'l2':
             loss = (soft_flop - target)**2
         elif loss_type == 'l2+':
