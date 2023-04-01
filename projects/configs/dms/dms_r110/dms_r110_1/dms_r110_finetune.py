@@ -1,20 +1,27 @@
 #############################################################################
 import os
 
-_base_ = './dms_r101_prune.py'
+_base_ = './dms_r110_fix_l2.py'
 
 pruned_path = f"./work_dirs/{os.environ['JOB_NAME']}/{os.environ.get('PTH_NAME','epoch_30')}.pth"  # noqa
 
 epoch = 300
 train_cfg = dict(by_epoch=True, max_epochs=epoch)
 
-param_scheduler = dict(
-    _delete_=True,
-    type='MultiStepLR',
-    by_epoch=True,
-    milestones=[150, 225],
-    gamma=0.1)
-
+if hasattr(_base_, 'param_scheduler'):
+    param_scheduler = dict(
+        _delete_=True,
+        type='MultiStepLR',
+        by_epoch=True,
+        milestones=[150, 225],
+        gamma=0.1)
+else:
+    param_scheduler = dict(
+        type='MultiStepLR',
+        by_epoch=True,
+        milestones=[150, 225],
+        gamma=0.1,
+    )
 ##############################################################################
 
 algorithm = _base_.model
