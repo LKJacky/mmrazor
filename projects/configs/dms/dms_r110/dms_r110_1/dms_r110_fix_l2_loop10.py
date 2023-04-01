@@ -7,7 +7,7 @@ decay_ratio = 0.6
 refine_ratio = 0.4
 target_flop_ratio = 0.17
 flop_loss_weight = 100
-by_epoch = False
+by_epoch = True
 target_scheduler = 'loop_10'
 loss_type = 'l2'
 
@@ -15,7 +15,7 @@ log_interval = 196
 
 input_shape = (1, 3, 32, 32)
 
-epoch = 1
+epoch = 100
 train_cfg = dict(by_epoch=True, max_epochs=epoch)
 
 mutator_lr = _base_.optim_wrapper.optimizer.lr * 0.1
