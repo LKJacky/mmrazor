@@ -52,11 +52,29 @@ class DMSScheduler(DTPAScheduler):
             ratio = 1.0
         else:
             ratio = 1.0
+
+        # get loop ratio
+        def get_loop_ratio(T=1):
+            if self.by_epoch:
+                return (epoch % T) / T
+            else:
+                return (iter % T) / T
+
         if self.target_scheduler == 'linear':
             return get_target(ratio)
         elif self.target_scheduler == 'cos':
             t = get_target(1 - 0.5 * (1 + np.cos(np.pi * ratio)))
             return t
+        elif self.target_scheduler.startswith('loop_'):
+            if ratio < 1:
+                T = int(self.target_scheduler[5:])
+                remain_ratio = 0.5 * (1 + np.cos(np.pi * ratio))  # in [1,0]
+                loop_ratio = get_loop_ratio(T)  # in [0,1]
+                loop_r = 0.5 * (1 + np.cos(np.pi * loop_ratio * 2)
+                                )  # 1 -> 0 -> 1
+                return get_target(1 - remain_ratio * loop_r)
+            else:
+                return get_target(1.0)
         else:
             raise NotImplementedError(f'{self.target_scheduler}')
 
