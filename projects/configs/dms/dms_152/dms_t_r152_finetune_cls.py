@@ -17,6 +17,7 @@ param_scheduler = dict(
     milestones=[30, 60, 90],
     gamma=0.1,
     _scope_='mmcls')
+find_unused_parameters = False
 
 ##############################################################################
 
