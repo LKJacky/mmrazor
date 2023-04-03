@@ -57,6 +57,7 @@ def hacky_init_weights_wrapper(fix_subnet):
 def GroupFisherSubModel(
     algorithm,
     divisor=1,
+    reset_params=False,
     **kargs,
 ):
     """Convert a algorithm(with an architecture) to a static pruned
@@ -103,4 +104,10 @@ def GroupFisherSubModel(
         model.init_weights = types.MethodType(
             hacky_init_weights_wrapper(pruning_structure), model)
     print_log(model)
+    if reset_params:
+        print_log('reset parameters')
+        for module in model.modules():
+            if hasattr(module, 'reset_parameters'):
+                module.reset_parameters()
+
     return model
