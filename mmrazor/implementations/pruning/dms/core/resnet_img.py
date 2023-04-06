@@ -322,9 +322,7 @@ class BasicBlock(BaseBasicBlock, DynamicBlockMixin):
         return self.downsample is None
 
     def to_static_op(self) -> nn.Module:
-        module = BaseBasicBlock(*self.init_args, **self.init_kwargs)
-        module.load_state_dict(self.state_dict())
-        return module
+        raise NotImplementedError()
 
 
 class Bottleneck(BaseBottleneck, DynamicBlockMixin):

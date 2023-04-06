@@ -9,6 +9,7 @@ from mmrazor.models.task_modules.demo_inputs import DefaultDemoInput
 from mmrazor.registry import MODELS, TASK_UTILS
 from ...dtp.modules.dtp_adaptive import DTPAMutator
 from ...dtp.modules.ops import QuickFlopMixin
+from .mobilenet import MobileNetLayers
 from .mutable import BlockThreshold, MutableBlocks
 from .op import DynamicStage
 from .resnet import ResLayer
@@ -32,9 +33,11 @@ def replace_modules(model: nn.Module, module_map={}):
 
 class BlockInitialer:
 
-    def __init__(self,
-                 dynamic_statge_module=DynamicStage,
-                 block_mixin_layers=[ResLayer, ResLayerImg]) -> None:
+    def __init__(
+            self,
+            dynamic_statge_module=DynamicStage,
+            block_mixin_layers=[ResLayer, ResLayerImg,
+                                MobileNetLayers]) -> None:
         self.dyanmic_stage_module = dynamic_statge_module
         self.block_mixin_layers = block_mixin_layers
         self.stages: List[DynamicStage] = []
