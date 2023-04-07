@@ -573,7 +573,8 @@ class ResNetDMS(BaseBackbone):
         34: (BasicBlock, (3, 4, 6, 3)),
         50: (Bottleneck, (3, 4, 6, 3)),
         101: (Bottleneck, (3, 4, 23, 3)),
-        152: (Bottleneck, (3, 8, 36, 3))
+        152: (Bottleneck, (3, 8, 36, 3)),
+        300: (Bottleneck, (5, 12, 54, 5)),
     }
 
     def __init__(self,
@@ -781,3 +782,63 @@ class ResNetDMS(BaseBackbone):
                 # trick: eval have effect on BatchNorm only
                 if isinstance(m, _BatchNorm):
                     m.eval()
+
+
+@MODELS.register_module()
+def ResNetImgSuper(ratio=2.0,
+                   single_layer_ratio=1.2,
+                   depth=300,
+                   init_cfg=None,
+                   data_preprocessor=None,
+                   *args,
+                   **kwargs):
+    from mmcls.models.classifiers import ImageClassifier
+    model: ImageClassifier = MODELS.build(
+        dict(
+            type='ImageClassifier',
+            backbone=dict(
+                type='mmrazor.ResNetDMS',
+                depth=depth,
+                num_stages=4,
+                out_indices=(3, ),
+                style='pytorch'),
+            neck=dict(type='GlobalAveragePooling'),
+            head=dict(
+                type='LinearClsHead',
+                num_classes=1000,
+                in_channels=2048,
+                loss=dict(type='CrossEntropyLoss', loss_weight=1.0),
+                topk=(1, 5)),
+            _scope_='mmcls',
+            data_preprocessor=dict(
+                num_classes=1000,
+                mean=[123.675, 116.28, 103.53],
+                std=[58.395, 57.12, 57.375],
+                to_rgb=True),
+        ))
+    from mmrazor.models.utils.expandable_utils import (
+        expand_expandable_dynamic_model, to_expandable_model)
+    mutator = to_expandable_model(model)
+    for unit in mutator.mutable_units:
+        if len(unit.input_related) < 5:
+            unit.expand_to(int(unit.current_choice * single_layer_ratio))
+        else:
+            unit.expand_to(int(unit.current_choice * ratio))
+
+    model = expand_expandable_dynamic_model(model)
+    for module in model.modules():
+        if isinstance(module, nn.Conv2d):
+            module.reset_parameters()
+        elif isinstance(module, nn.BatchNorm2d):
+            module.reset_parameters()
+        elif isinstance(module, nn.Linear):
+            module.reset_parameters()
+        elif hasattr(module, 'reset_parameters'):
+            module.reset_parameters()
+        else:
+            from mmrazor.utils import print_log
+            print_log(f'{type(module)} is not initialized')
+
+    print_log(f'{kwargs.keys()} are not used in Super ResNetCifar')
+    print_log(f'Super ResNetImg {model}')
+    return model
