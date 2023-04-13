@@ -179,3 +179,17 @@ class DmsMobileNetV2(MobileNetV2):
             self.in_channels = out_channels
 
         return nn.Sequential(*layers)
+
+
+@MODELS.register_module()
+class DmsMobileNetV2Ex(DmsMobileNetV2):
+
+    # Parameters to build layers. 4 parameters are needed to construct a
+    # layer, from left to right: expand_ratio, channel, num_blocks, stride.
+    arch_settings = [[1, 16, 2, 1], [6, 24, 4, 2], [6, 32, 6, 2],
+                     [6, 64, 8, 2], [6, 96, 6, 1], [6, 160, 6, 2],
+                     [6, 320, 2, 1]]
+
+    def __init__(self, *args, **kwargs):
+        kwargs['widen_factor'] = 1.5
+        super().__init__(*args, **kwargs)
