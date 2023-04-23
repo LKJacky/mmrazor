@@ -61,6 +61,11 @@ class SequentialMutableChannelUnit(MutableChannelUnit):
     def prepare_for_pruning(self, model: nn.Module):
         """Prepare for pruning, including register mutable channels."""
         # register MutableMask
+        from torchvision.models.swin_transformer import ShiftedWindowAttention
+
+        from mmrazor.implementations.pruning.dms.core.swin import \
+            DynamicShiftedWindowAttention
+
         self._replace_with_dynamic_ops(
             model, {
                 Conv2dAdaptivePadding:
@@ -71,6 +76,8 @@ class SequentialMutableChannelUnit(MutableChannelUnit):
                 nn.SyncBatchNorm: dynamic_ops.DynamicSyncBatchNorm,
                 EngineSyncBatchNorm: dynamic_ops.DynamicSyncBatchNorm,
                 _BatchNormXd: dynamic_ops.DynamicBatchNormXd,
+                ShiftedWindowAttention: DynamicShiftedWindowAttention,
+                nn.LayerNorm: dynamic_ops.DynamicLayerNorm,
             })
         self._register_channel_container(model, MutableChannelContainer)
         self._register_mutable_channel(self.mutable_channel)

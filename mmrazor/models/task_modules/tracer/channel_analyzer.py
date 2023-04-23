@@ -18,8 +18,10 @@ from typing import Dict, List, Tuple, Union
 
 import torch
 import torch.nn as nn
+from mmcls.models.utils.attention import WindowMSA
 from mmcv.cnn.bricks import Scale
 from mmengine.model.utils import revert_sync_batchnorm
+from torchvision.models.swin_transformer import ShiftedWindowAttention
 
 from mmrazor.models.architectures.dynamic_ops import DynamicChannelMixin
 from mmrazor.models.mutables.mutable_channel import (
@@ -60,6 +62,8 @@ class ChannelAnalyzer:
         nn.modules.batchnorm._BatchNorm,
         # mmcv
         Scale,
+        WindowMSA,
+        ShiftedWindowAttention,
     )
 
     def __init__(self,

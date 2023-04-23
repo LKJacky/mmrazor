@@ -68,9 +68,11 @@ def find_mutable(model, try_units, units, demo_input, template_tensors):
     try:
         forward_units(model, try_units, units, demo_input, template_tensors)
         return try_units
-    except Exception:
+    except Exception as e:
         if len(try_units) == 1:
-            print_log(f'Find an unmutable unit {try_units[0]}', level='debug')
+            print_log(
+                f'Find an unmutable unit {try_units[0]}, failed as {e}',
+                level='debug')
             return []
         else:
             num = len(try_units)

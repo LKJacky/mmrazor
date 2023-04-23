@@ -27,12 +27,16 @@ class BaseDTPUnit(L1MutableChannelUnit, CollectUnitMixin):
         self.requires_grad_(False)
 
     def prepare_for_pruning(self, model: nn.Module):
+        from torchvision.models.swin_transformer import ShiftedWindowAttention
+
+        from ...dms.core.swin import DynamicShiftedWindowAttention
         self._replace_with_dynamic_ops(
             model, {
                 nn.Conv2d: ImpConv2d,
                 nn.BatchNorm2d: ImpBatchnorm2d,
                 nn.Linear: ImpLinear,
                 nn.SyncBatchNorm: dynamic_ops.DynamicSyncBatchNorm,
+                ShiftedWindowAttention: DynamicShiftedWindowAttention,
             })
         self._register_channel_container(model, ImpMutableChannelContainer)
         self._register_mutable_channel(self.mutable_channel)
