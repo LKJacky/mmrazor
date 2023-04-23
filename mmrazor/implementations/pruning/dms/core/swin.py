@@ -19,56 +19,7 @@ from ...dtp.modules.ops import ImpLinear
 from .op import DynamicBlockMixin
 
 
-class DynamicShiftedWindowAttention(ShiftedWindowAttention,
-                                    DynamicChannelMixin):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.init_args = args
-        self.init_kwargs = kwargs
-
-        self.qkv = DynamicLinear.convert_from(self.qkv)
-        self.proj = DynamicLinear.convert_from(self.proj)
-        self.mutable_attrs: Dict[str, BaseMutable] = nn.ModuleDict()
-
-        self.in_channels = self.qkv.in_features
-        self.out_channels = self.proj.out_features
-
-    def register_mutable_attr(self, attr: str, mutable):
-        if attr == 'in_channels':
-            self.qkv.register_mutable_attr(attr, mutable)
-        elif attr == 'out_channels':
-            self.proj.register_mutable_attr(attr, mutable)
-        else:
-            raise NotImplementedError()
-        self.mutable_attrs[attr] = mutable
-
-    @classmethod
-    def convert_from(cls, module: ShiftedWindowAttention):
-        new_module = cls(
-            dim=module.qkv.in_features,
-            window_size=module.window_size,
-            shift_size=module.shift_size,
-            num_heads=module.num_heads,
-            qkv_bias=module.qkv.bias is not None,
-            proj_bias=module.proj.bias is not None,
-            attention_dropout=module.attention_dropout,
-            dropout=module.dropout,
-        )
-        new_module.load_state_dict(module.state_dict())
-        return new_module
-
-    def to_static_op(self) -> Module:
-        module: WindowMSA = self.static_op_factory(*self.init_args,
-                                                   **self.init_kwargs)
-        module.qkv = self.qkv
-        module.proj = self.proj
-        module.load_state_dict(self.state_dict)
-        return module
-
-    @property
-    def static_op_factory(self):
-        return ShiftedWindowAttention
+class BaseShiftedWindowAttention(ShiftedWindowAttention):
 
     def shift_x(self, input: torch.Tensor):
         B, H, W, C = input.shape
@@ -194,6 +145,58 @@ class DynamicShiftedWindowAttention(ShiftedWindowAttention,
 
         x = self.un_shift_x(x, B, H, W, pad_H, pad_W)
         return x
+
+
+class DynamicShiftedWindowAttention(BaseShiftedWindowAttention,
+                                    DynamicChannelMixin):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.init_args = args
+        self.init_kwargs = kwargs
+
+        self.qkv = DynamicLinear.convert_from(self.qkv)
+        self.proj = DynamicLinear.convert_from(self.proj)
+        self.mutable_attrs: Dict[str, BaseMutable] = nn.ModuleDict()
+
+        self.in_channels = self.qkv.in_features
+        self.out_channels = self.proj.out_features
+
+    def register_mutable_attr(self, attr: str, mutable):
+        if attr == 'in_channels':
+            self.qkv.register_mutable_attr(attr, mutable)
+        elif attr == 'out_channels':
+            self.proj.register_mutable_attr(attr, mutable)
+        else:
+            raise NotImplementedError()
+        self.mutable_attrs[attr] = mutable
+
+    @classmethod
+    def convert_from(cls, module: ShiftedWindowAttention):
+        new_module = cls(
+            dim=module.qkv.in_features,
+            window_size=module.window_size,
+            shift_size=module.shift_size,
+            num_heads=module.num_heads,
+            qkv_bias=module.qkv.bias is not None,
+            proj_bias=module.proj.bias is not None,
+            attention_dropout=module.attention_dropout,
+            dropout=module.dropout,
+        )
+        new_module.load_state_dict(module.state_dict())
+        return new_module
+
+    def to_static_op(self) -> Module:
+        module: WindowMSA = self.static_op_factory(*self.init_args,
+                                                   **self.init_kwargs)
+        module.qkv = self.qkv.to_static_op()
+        module.proj = self.proj.to_static_op()
+
+        return module
+
+    @property
+    def static_op_factory(self):
+        return BaseShiftedWindowAttention
 
 
 class ImpShiftedWindowAttention(DynamicShiftedWindowAttention):
