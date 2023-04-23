@@ -1,16 +1,19 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from typing import Dict
+from typing import Dict, List
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from mmcls.models.utils.attention import WindowMSA
 from torch.nn import Module
-from torchvision.models.swin_transformer import ShiftedWindowAttention
+from torchvision.models.swin_transformer import (PatchMerging,
+                                                 ShiftedWindowAttention,
+                                                 SwinTransformer)
 
 from mmrazor.models.architectures.dynamic_ops import (DynamicChannelMixin,
                                                       DynamicLinear)
 from mmrazor.models.mutables import BaseMutable
+from mmrazor.registry import MODELS
 
 
 class DynamicShiftedWindowAttention(ShiftedWindowAttention,
@@ -273,3 +276,35 @@ class DynamicWindowMSA(WindowMSA, DynamicChannelMixin):
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
+
+
+@MODELS.register_module()
+class TorchSwinBackbone(SwinTransformer):
+
+    def __init__(self,
+                 patch_size: List[int],
+                 embed_dim: int,
+                 depths: List[int],
+                 num_heads: List[int],
+                 window_size: List[int],
+                 mlp_ratio: float = 4,
+                 dropout: float = 0,
+                 attention_dropout: float = 0,
+                 stochastic_depth_prob: float = 0.1,
+                 num_classes: int = 1000,
+                 norm_layer=None,
+                 block=None,
+                 downsample_layer=PatchMerging):
+        super().__init__(patch_size, embed_dim, depths, num_heads, window_size,
+                         mlp_ratio, dropout, attention_dropout,
+                         stochastic_depth_prob, num_classes, norm_layer, block,
+                         downsample_layer)
+        delattr(self, 'avgpool')
+        delattr(self, 'flatten')
+        delattr(self, 'head')
+
+    def forward(self, x):
+        x = self.features(x)
+        x = self.norm(x)
+        x = self.permute(x)
+        return (x, )
