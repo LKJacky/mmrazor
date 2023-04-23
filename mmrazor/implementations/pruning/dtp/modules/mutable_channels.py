@@ -5,7 +5,7 @@ import math
 import torch
 import torch.nn as nn
 
-from mmrazor.models.mutables import (MutableChannelContainer,
+from mmrazor.models.mutables import (DerivedMutable, MutableChannelContainer,
                                      SimpleMutableChannel)
 from mmrazor.utils import RuntimeInfo
 
@@ -67,6 +67,48 @@ class BaseDTPMutableChannel(SimpleMutableChannel):
     @torch.no_grad()
     def limit_value(self):
         raise NotImplementedError()
+
+    def expand_mutable_channel(self, expand_ratio):
+
+        def _expand_mask():
+            mask = self.current_mask
+            mask = torch.unsqueeze(
+                mask, -1).expand(list(mask.shape) + [expand_ratio]).flatten(-2)
+            return mask
+
+        return DrivedDTPMutableChannelImp(_expand_mask, _expand_mask,
+                                          expand_ratio, [self])
+
+
+class DrivedDTPMutableChannelImp(DerivedMutable):
+
+    def __init__(self,
+                 choice_fn,
+                 mask_fn,
+                 expand_ratio,
+                 source_mutables=None,
+                 alias=None,
+                 init_cfg=None) -> None:
+        super().__init__(choice_fn, mask_fn, source_mutables, alias, init_cfg)
+        self.expand_ratio = expand_ratio
+
+    @property
+    def current_imp(self):
+        mutable = list(self.source_mutables)[0]
+        mask = mutable.current_imp
+        mask = torch.unsqueeze(
+            mask,
+            -1).expand(list(mask.shape) + [self.expand_ratio]).flatten(-2)
+        return mask
+
+    @property
+    def current_imp_flop(self):
+        mutable = list(self.source_mutables)[0]
+        mask = mutable.current_imp_flop
+        mask = torch.unsqueeze(
+            mask,
+            -1).expand(list(mask.shape) + [self.expand_ratio]).flatten(-2)
+        return mask
 
 
 class DTPMutableChannelImp(SimpleMutableChannel):

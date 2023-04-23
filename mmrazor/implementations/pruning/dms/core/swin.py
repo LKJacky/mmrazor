@@ -8,12 +8,15 @@ from mmcls.models.utils.attention import WindowMSA
 from torch.nn import Module
 from torchvision.models.swin_transformer import (PatchMerging,
                                                  ShiftedWindowAttention,
-                                                 SwinTransformer)
+                                                 SwinTransformer,
+                                                 SwinTransformerBlock)
 
 from mmrazor.models.architectures.dynamic_ops import (DynamicChannelMixin,
                                                       DynamicLinear)
 from mmrazor.models.mutables import BaseMutable
 from mmrazor.registry import MODELS
+from ...dtp.modules.ops import ImpLinear
+from .op import DynamicBlockMixin
 
 
 class DynamicShiftedWindowAttention(ShiftedWindowAttention,
@@ -193,6 +196,15 @@ class DynamicShiftedWindowAttention(ShiftedWindowAttention,
         return x
 
 
+class ImpShiftedWindowAttention(DynamicShiftedWindowAttention):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.qkv = ImpLinear.convert_from(self.qkv)
+        self.proj = ImpLinear.convert_from(self.proj)
+
+
 class DynamicWindowMSA(WindowMSA, DynamicChannelMixin):
 
     def __init__(self, *args, **kwargs):
@@ -278,6 +290,33 @@ class DynamicWindowMSA(WindowMSA, DynamicChannelMixin):
         return x
 
 
+class SwinSequential(nn.Sequential):
+    pass
+
+
+class DynamicSwinTransformerBlock(SwinTransformerBlock, DynamicBlockMixin):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.init_args = args
+        self.init_kwargs = kwargs
+        self._dynamic_block_init()
+
+    def forward(self, x):
+        x = x + self.stochastic_depth(self.attn(self.norm1(x))) * self.scale
+        x = x + self.stochastic_depth(self.mlp(self.norm2(x))) * self.scale
+        return x
+
+    def to_static_op(self) -> Module:
+
+        from mmrazor.structures.subnet.fix_subnet import _dynamic_to_static
+        module = SwinTransformerBlock(*self.init_args, **self.init_kwargs)
+        for name, m in self.named_children():
+            assert hasattr(module, name)
+            setattr(module, name, _dynamic_to_static(m))
+        return module
+
+
 @MODELS.register_module()
 class TorchSwinBackbone(SwinTransformer):
 
@@ -293,7 +332,7 @@ class TorchSwinBackbone(SwinTransformer):
                  stochastic_depth_prob: float = 0.1,
                  num_classes: int = 1000,
                  norm_layer=None,
-                 block=None,
+                 block=DynamicSwinTransformerBlock,
                  downsample_layer=PatchMerging):
         super().__init__(patch_size, embed_dim, depths, num_heads, window_size,
                          mlp_ratio, dropout, attention_dropout,
@@ -302,6 +341,15 @@ class TorchSwinBackbone(SwinTransformer):
         delattr(self, 'avgpool')
         delattr(self, 'flatten')
         delattr(self, 'head')
+
+        self.features[1] = SwinSequential(
+            *(self.features[1]._modules.values()))
+        self.features[3] = SwinSequential(
+            *(self.features[3]._modules.values()))
+        self.features[5] = SwinSequential(
+            *(self.features[5]._modules.values()))
+        self.features[7] = SwinSequential(
+            *(self.features[7]._modules.values()))
 
     def forward(self, x):
         x = self.features(x)

@@ -14,6 +14,7 @@ from .mutable import BlockThreshold, MutableBlocks
 from .op import DynamicStage
 from .resnet import ResLayer
 from .resnet_img import ResLayer as ResLayerImg
+from .swin import SwinSequential
 
 
 def replace_modules(model: nn.Module, module_map={}):
@@ -34,10 +35,12 @@ def replace_modules(model: nn.Module, module_map={}):
 class BlockInitialer:
 
     def __init__(
-            self,
-            dynamic_statge_module=DynamicStage,
-            block_mixin_layers=[ResLayer, ResLayerImg,
-                                MobileNetLayers]) -> None:
+        self,
+        dynamic_statge_module=DynamicStage,
+        block_mixin_layers=[
+            ResLayer, ResLayerImg, SwinSequential, MobileNetLayers
+        ]
+    ) -> None:
         self.dyanmic_stage_module = dynamic_statge_module
         self.block_mixin_layers = block_mixin_layers
         self.stages: List[DynamicStage] = []

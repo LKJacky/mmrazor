@@ -1,5 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 
+import math
 from typing import List, Union
 
 import torch
@@ -111,12 +112,6 @@ class ImpModuleMixin():
     def imp_forward(self, x: torch.Tensor):
 
         input_imp = self.input_imp
-        if len(x.shape) == 4:
-            input_imp = input_imp.reshape([1, -1, 1, 1])
-        elif len(x.shape) == 2:
-            input_imp = input_imp.reshape([1, -1])
-        else:
-            raise NotImplementedError()
         if self.ste:
             x = ste_forward(x, input_imp)
         else:
@@ -161,6 +156,11 @@ class ImpConv2d(dynamic_ops.DynamicConv2d, ImpModuleMixin, QuickFlopMixin,
                               self.kernel_size[0], self.kernel_size[1],
                               self.groups)
 
+    @property
+    def input_imp(self) -> Tensor:
+        imp = ImpModuleMixin.input_imp.fget(self)  # type: ignore
+        return imp.reshape([-1, 1, 1])
+
 
 class ImpLinear(dynamic_ops.DynamicLinear, ImpModuleMixin, QuickFlopMixin,
                 CollectMixin):
@@ -179,6 +179,11 @@ class ImpLinear(dynamic_ops.DynamicLinear, ImpModuleMixin, QuickFlopMixin,
         in_c = soft_mask_sum(self.input_imp_flop)
         out_c = soft_mask_sum(self.output_imp_flop)
         return in_c * out_c
+
+    @property
+    def input_imp(self) -> Tensor:
+        imp = ImpModuleMixin.input_imp.fget(self)  # type: ignore
+        return imp
 
 
 @torch.jit.script
@@ -206,6 +211,36 @@ class ImpBatchnorm2d(dynamic_ops.DynamicBatchNorm2d, QuickFlopMixin):
             'out_channels')
         imp = mutable.current_imp_flop
         return imp
+
+    @property
+    def input_imp_flop(
+            self: Union[DynamicChannelMixin,
+                        'ImpModuleMixin']) -> torch.Tensor:
+        mutable: ImpMutableChannelContainer = self.get_mutable_attr(  # type: ignore # noqa
+            'in_channels')  # type: ignore
+        imp = mutable.current_imp_flop
+        return imp
+
+
+@torch.jit.script
+def ln_soft_flop(input_imp_flop: torch.Tensor, num: int):
+    in_c = soft_mask_sum(input_imp_flop)
+    return num * in_c
+
+
+class ImpLayerNorm(dynamic_ops.DynamicLayerNorm, QuickFlopMixin):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._quick_flop_init()
+
+    def forward(self, input: Tensor) -> Tensor:
+        return nn.LayerNorm.forward(self, input)
+
+    def soft_flop(self):
+        return ln_soft_flop(
+            self.input_imp_flop,
+            math.prod(self.quick_flop_recorded_out_shape[1:-1]))
 
     @property
     def input_imp_flop(
