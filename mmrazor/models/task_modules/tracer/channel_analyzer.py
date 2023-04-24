@@ -24,6 +24,7 @@ from mmengine.model.utils import revert_sync_batchnorm
 from torchvision.models.swin_transformer import ShiftedWindowAttention
 
 from mmrazor.models.architectures.dynamic_ops import DynamicChannelMixin
+from mmrazor.models.architectures.ops.swin import BaseShiftedWindowAttention
 from mmrazor.models.mutables.mutable_channel import (
     MutableChannelUnit, SequentialMutableChannelUnit)
 from mmrazor.models.mutables.mutable_channel.units.utils import find_mutable
@@ -64,6 +65,7 @@ class ChannelAnalyzer:
         Scale,
         WindowMSA,
         ShiftedWindowAttention,
+        BaseShiftedWindowAttention,
     )
 
     def __init__(self,

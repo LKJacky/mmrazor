@@ -14,6 +14,7 @@ from mmcv.cnn.bricks import Scale
 from mmengine import MMLogger
 from torchvision.models.swin_transformer import ShiftedWindowAttention
 
+from mmrazor.models.architectures.ops.swin import BaseShiftedWindowAttention
 from mmrazor.utils import print_log
 from .channel_flow import ChannelTensor
 from .module_graph import ModuleNode
@@ -488,6 +489,7 @@ channel_nodes_mapping = {
         nn.modules.pooling._AdaptiveMaxPoolNd: PassChannelNode,
         Scale: PassChannelNode,
         nn.modules.GroupNorm: GroupNormNode,
+        BaseShiftedWindowAttention: MixChannelNode,
         ShiftedWindowAttention: MixChannelNode,
         WindowMSA: MixChannelNode,
         nn.LayerNorm: LayerNormNode,

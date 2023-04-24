@@ -63,8 +63,8 @@ class SequentialMutableChannelUnit(MutableChannelUnit):
         # register MutableMask
         from torchvision.models.swin_transformer import ShiftedWindowAttention
 
-        from mmrazor.implementations.pruning.dms.core.swin import \
-            DynamicShiftedWindowAttention
+        from mmrazor.implementations.pruning.dms.core.swin import (
+            BaseShiftedWindowAttention, DynamicShiftedWindowAttention)
 
         self._replace_with_dynamic_ops(
             model, {
@@ -77,6 +77,7 @@ class SequentialMutableChannelUnit(MutableChannelUnit):
                 EngineSyncBatchNorm: dynamic_ops.DynamicSyncBatchNorm,
                 _BatchNormXd: dynamic_ops.DynamicBatchNormXd,
                 ShiftedWindowAttention: DynamicShiftedWindowAttention,
+                BaseShiftedWindowAttention: DynamicShiftedWindowAttention,
                 nn.LayerNorm: dynamic_ops.DynamicLayerNorm,
             })
         self._register_channel_container(model, MutableChannelContainer)
