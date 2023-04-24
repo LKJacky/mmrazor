@@ -11,6 +11,7 @@ from torchvision.models.swin_transformer import (ShiftedWindowAttention,
                                                  SwinTransformer,
                                                  SwinTransformerBlock)
 
+from mmrazor.implementations.pruning.dtp.modules.ops import QuickFlopMixin
 from mmrazor.models.architectures.dynamic_ops import (DynamicChannelMixin,
                                                       DynamicLinear)
 from mmrazor.models.architectures.ops.swin import BaseShiftedWindowAttention
@@ -73,13 +74,28 @@ class DynamicShiftedWindowAttention(BaseShiftedWindowAttention,
         return BaseShiftedWindowAttention
 
 
-class ImpShiftedWindowAttention(DynamicShiftedWindowAttention):
+class ImpShiftedWindowAttention(DynamicShiftedWindowAttention, QuickFlopMixin):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self._quick_flop_init()
+
         self.qkv = ImpLinear.convert_from(self.qkv)
         self.proj = ImpLinear.convert_from(self.proj)
+
+    def soft_flop(self):
+        flops = 0
+        flops = flops + self.qkv.soft_flop()
+        flops = flops + self.proj.soft_flop()
+
+        qkv_dim = self.qkv.out_features // 3
+        win_size = self.window_size[0] * self.window_size[1]
+        _, _, H, W = self.quick_flop_recorded_in_shape[0]
+        n_win = H // self.window_size[0] * W // self.window_size[1]
+
+        flops = flops + n_win * (win_size**2) * qkv_dim
+        return flops
 
 
 class SwinSequential(nn.Sequential):

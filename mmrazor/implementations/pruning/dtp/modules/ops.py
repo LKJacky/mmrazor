@@ -3,6 +3,7 @@
 import math
 from typing import List, Union
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -178,7 +179,8 @@ class ImpLinear(dynamic_ops.DynamicLinear, ImpModuleMixin, QuickFlopMixin,
     def soft_flop(self):
         in_c = soft_mask_sum(self.input_imp_flop)
         out_c = soft_mask_sum(self.output_imp_flop)
-        return in_c * out_c
+        num = np.prod(self.quick_flop_recorded_in_shape[0][1:-1])
+        return in_c * out_c * num
 
     @property
     def input_imp(self) -> Tensor:
