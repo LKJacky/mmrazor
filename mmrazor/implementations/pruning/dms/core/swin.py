@@ -14,7 +14,8 @@ from torchvision.models.swin_transformer import (ShiftedWindowAttention,
 from mmrazor.models.architectures.dynamic_ops import (DynamicChannelMixin,
                                                       DynamicLinear)
 from mmrazor.models.mutables import BaseMutable
-from mmrazor.registry import MODELS
+from mmrazor.models.task_modules.estimators.counters import BaseCounter
+from mmrazor.registry import MODELS, TASK_UTILS
 from ...dtp.modules.ops import ImpLinear
 from .op import DynamicBlockMixin
 
@@ -215,7 +216,8 @@ class SwinSequential(nn.Sequential):
 class DynamicSwinTransformerBlock(SwinTransformerBlock, DynamicBlockMixin):
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(
+            *args, attn_layer=BaseShiftedWindowAttention, **kwargs)
         self.init_args = args
         self.init_kwargs = kwargs
         self._dynamic_block_init()
@@ -314,6 +316,27 @@ class TorchSwinBackbone(SwinTransformer):
         x = self.norm(x)
         x = self.permute(x)
         return (x, )
+
+
+##########################################################################
+# counters
+
+
+@TASK_UTILS.register_module()
+class BaseShiftedWindowAttentionCounter(BaseCounter):
+
+    @staticmethod
+    def add_count_hook(module: BaseShiftedWindowAttention, input, output):
+        input = input[0]
+        B, C, H, W = input.shape
+        nH = H // module.window_size[0]
+        nW = W // module.window_size[1]
+
+        n_win = nH * nW
+        win_size = module.window_size[0] * module.window_size[1]
+        overall_flops = n_win * (win_size**2) * C * 2
+
+        module.__flops__ += overall_flops
 
 
 ##########################################################################

@@ -44,7 +44,7 @@ if __name__ == '__main__':
     estimator = ResourceEstimator(
         flops_params_cfg=dict(
             input_shape=(1, 3, H, W),
-            print_per_layer_stat=False,
+            print_per_layer_stat=True,
             input_constructor=input_generator_wrapper(
                 model,
                 (1, 3, H, W),
