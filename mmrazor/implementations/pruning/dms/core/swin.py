@@ -1,13 +1,13 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from typing import Dict, List
+from typing import Callable, Dict, List
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from mmcls.models.utils.attention import WindowMSA
+from torch import Tensor
 from torch.nn import Module
-from torchvision.models.swin_transformer import (PatchMerging,
-                                                 ShiftedWindowAttention,
+from torchvision.models.swin_transformer import (ShiftedWindowAttention,
                                                  SwinTransformer,
                                                  SwinTransformerBlock)
 
@@ -208,6 +208,117 @@ class ImpShiftedWindowAttention(DynamicShiftedWindowAttention):
         self.proj = ImpLinear.convert_from(self.proj)
 
 
+class SwinSequential(nn.Sequential):
+    pass
+
+
+class DynamicSwinTransformerBlock(SwinTransformerBlock, DynamicBlockMixin):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.init_args = args
+        self.init_kwargs = kwargs
+        self._dynamic_block_init()
+
+    def forward(self, x):
+        x = x + self.stochastic_depth(self.attn(self.norm1(x))) * self.scale
+        x = x + self.stochastic_depth(self.mlp(self.norm2(x))) * self.scale
+        return x
+
+    def to_static_op(self) -> Module:
+
+        from mmrazor.structures.subnet.fix_subnet import _dynamic_to_static
+        module = SwinTransformerBlock(*self.init_args, **self.init_kwargs)
+        for name, m in self.named_children():
+            assert hasattr(module, name)
+            setattr(module, name, _dynamic_to_static(m))
+        return module
+
+
+def _patch_merging_pad(x: torch.Tensor) -> torch.Tensor:
+    H, W, _ = x.shape[-3:]
+    x = F.pad(x, (0, 0, 0, W % 2, 0, H % 2))
+    x0 = x[..., 0::2, 0::2, :].unsqueeze(-1)  # ... H/2 W/2 C 1
+    x1 = x[..., 1::2, 0::2, :].unsqueeze(-1)  # ... H/2 W/2 C
+    x2 = x[..., 0::2, 1::2, :].unsqueeze(-1)  # ... H/2 W/2 C
+    x3 = x[..., 1::2, 1::2, :].unsqueeze(-1)  # ... H/2 W/2 C
+    x = torch.cat([x0, x1, x2, x3], -1).flatten(-2, -1)  # ... H/2 W/2 C*4
+    return x
+
+
+class PatchMerging(nn.Module):
+    """Patch Merging Layer.
+
+    Args:
+        dim (int): Number of input channels.
+        norm_layer (nn.Module): Normalization layer. Default: nn.LayerNorm.
+    """
+
+    def __init__(self,
+                 dim: int,
+                 norm_layer: Callable[..., nn.Module] = nn.LayerNorm):
+        super().__init__()
+        self.dim = dim
+        self.reduction = nn.Linear(4 * dim, 2 * dim, bias=False)
+        self.norm = norm_layer(4 * dim)
+
+    def forward(self, x: Tensor):
+        """
+        Args:
+            x (Tensor): input tensor with expected layout of [..., H, W, C]
+        Returns:
+            Tensor with layout of [..., H/2, W/2, 2*C]
+        """
+        x = _patch_merging_pad(x)
+        x = self.norm(x)
+        x = self.reduction(x)  # ... H/2 W/2 2*C
+        return x
+
+
+@MODELS.register_module()
+class TorchSwinBackbone(SwinTransformer):
+
+    def __init__(self,
+                 patch_size: List[int],
+                 embed_dim: int,
+                 depths: List[int],
+                 num_heads: List[int],
+                 window_size: List[int],
+                 mlp_ratio: float = 4,
+                 dropout: float = 0,
+                 attention_dropout: float = 0,
+                 stochastic_depth_prob: float = 0.1,
+                 num_classes: int = 1000,
+                 norm_layer=None,
+                 block=DynamicSwinTransformerBlock,
+                 downsample_layer=PatchMerging):
+        super().__init__(patch_size, embed_dim, depths, num_heads, window_size,
+                         mlp_ratio, dropout, attention_dropout,
+                         stochastic_depth_prob, num_classes, norm_layer, block,
+                         downsample_layer)
+        delattr(self, 'avgpool')
+        delattr(self, 'flatten')
+        delattr(self, 'head')
+
+        self.features[1] = SwinSequential(
+            *(self.features[1]._modules.values()))
+        self.features[3] = SwinSequential(
+            *(self.features[3]._modules.values()))
+        self.features[5] = SwinSequential(
+            *(self.features[5]._modules.values()))
+        self.features[7] = SwinSequential(
+            *(self.features[7]._modules.values()))
+
+    def forward(self, x):
+        x = self.features(x)
+        x = self.norm(x)
+        x = self.permute(x)
+        return (x, )
+
+
+##########################################################################
+
+
 class DynamicWindowMSA(WindowMSA, DynamicChannelMixin):
 
     def __init__(self, *args, **kwargs):
@@ -291,71 +402,3 @@ class DynamicWindowMSA(WindowMSA, DynamicChannelMixin):
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
-
-
-class SwinSequential(nn.Sequential):
-    pass
-
-
-class DynamicSwinTransformerBlock(SwinTransformerBlock, DynamicBlockMixin):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.init_args = args
-        self.init_kwargs = kwargs
-        self._dynamic_block_init()
-
-    def forward(self, x):
-        x = x + self.stochastic_depth(self.attn(self.norm1(x))) * self.scale
-        x = x + self.stochastic_depth(self.mlp(self.norm2(x))) * self.scale
-        return x
-
-    def to_static_op(self) -> Module:
-
-        from mmrazor.structures.subnet.fix_subnet import _dynamic_to_static
-        module = SwinTransformerBlock(*self.init_args, **self.init_kwargs)
-        for name, m in self.named_children():
-            assert hasattr(module, name)
-            setattr(module, name, _dynamic_to_static(m))
-        return module
-
-
-@MODELS.register_module()
-class TorchSwinBackbone(SwinTransformer):
-
-    def __init__(self,
-                 patch_size: List[int],
-                 embed_dim: int,
-                 depths: List[int],
-                 num_heads: List[int],
-                 window_size: List[int],
-                 mlp_ratio: float = 4,
-                 dropout: float = 0,
-                 attention_dropout: float = 0,
-                 stochastic_depth_prob: float = 0.1,
-                 num_classes: int = 1000,
-                 norm_layer=None,
-                 block=DynamicSwinTransformerBlock,
-                 downsample_layer=PatchMerging):
-        super().__init__(patch_size, embed_dim, depths, num_heads, window_size,
-                         mlp_ratio, dropout, attention_dropout,
-                         stochastic_depth_prob, num_classes, norm_layer, block,
-                         downsample_layer)
-        delattr(self, 'avgpool')
-        delattr(self, 'flatten')
-        delattr(self, 'head')
-
-        self.features[1] = SwinSequential(
-            *(self.features[1]._modules.values()))
-        self.features[3] = SwinSequential(
-            *(self.features[3]._modules.values()))
-        self.features[5] = SwinSequential(
-            *(self.features[5]._modules.values()))
-        self.features[7] = SwinSequential(
-            *(self.features[7]._modules.values()))
-
-    def forward(self, x):
-        x = self.features(x)
-        x = self.norm(x)
-        x = self.permute(x)
-        return (x, )
