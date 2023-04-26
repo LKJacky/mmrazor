@@ -27,7 +27,7 @@ def dtp_get_importance(v: torch.Tensor,
                        lamda: float = 1.0,
                        space_min: float = 0,
                        space_max: float = 1.0):
-    vm = v.unsqueeze(-1) - v.unsqueeze(0)
+    vm = v.unsqueeze(-1) - v.unsqueeze(-2)
     vm = (vm >= 0).float() - vm.detach() + vm
     v_union = vm.mean(dim=-1)  # big to small
     v_union = 1 - v_union
@@ -44,6 +44,56 @@ def taylor_backward_hook_wrapper(module: 'DTPTMutableChannelImp', input):
             module.update_taylor(input, grad)
 
     return taylor_backward_hook
+
+
+class DMSMutableMixIn():
+
+    def _dms_mutable_mixin_init(self, num_elem):
+        self.e = nn.parameter.Parameter(
+            torch.tensor([1.0]), requires_grad=False)
+
+        taylor = torch.zeros([num_elem])
+        self.register_buffer('taylor', taylor)
+        self.taylor: torch.Tensor
+
+        self.decay = 0.99
+        self.requires_grad_(False)
+
+    @property
+    def current_imp(self):
+        e_imp = dtp_get_importance(self.taylor, self.e)
+        if self.training and e_imp.requires_grad:
+            e_imp.register_hook(
+                taylor_backward_hook_wrapper(self, e_imp.detach()))
+        if self.training:
+            with torch.no_grad():
+                self.mask.data = (e_imp >= 0.5).float()
+        return e_imp
+
+    @property
+    def current_imp_flop(self):
+        e_imp = dtp_get_importance(self.taylor, self.e)
+        return e_imp
+
+    @torch.no_grad()
+    def limit_value(self):
+        self.e.data = torch.clamp(self.e, 1 / self.num_channels, 1.0)
+
+    @torch.no_grad()
+    def update_taylor(self, input, grad):
+        new_taylor = (input * grad)**2
+        all_reduce(new_taylor)
+        self.taylor = self.taylor * self.decay + (1 - self.decay) * new_taylor
+
+    def dump_chosen(self):
+        pass
+
+    def fix_chosen(self, chosen=None):
+        pass
+
+    @property
+    def activated_channels(self):
+        return self.mask.bool().sum().item()
 
 
 class DTPTMutableChannelImp(BaseDTPMutableChannel):

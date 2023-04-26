@@ -3,8 +3,8 @@ import torch
 import torch.nn as nn
 from mmengine.dist import all_reduce
 
-from mmrazor.models.mutables import BaseMutable
-from ...dtp.modules.dtp_taylor import (dtp_get_importance,
+from mmrazor.models.mutables import BaseMutable, SimpleMutableChannel
+from ...dtp.modules.dtp_taylor import (DMSMutableMixIn, dtp_get_importance,
                                        taylor_backward_hook_wrapper)
 
 BlockThreshold = 0.5
@@ -101,3 +101,81 @@ class MutableBlocks(BaseMutable):
 
     def dump_chosen(self):
         return super().dump_chosen()
+
+
+class MutableHead(BaseMutable, DMSMutableMixIn):
+
+    def __init__(self, num_heads) -> None:
+        super().__init__()
+        self.num_heads = num_heads
+        self._dms_mutable_mixin_init(num_heads)
+
+        mask = torch.ones([num_heads])
+        self.register_buffer('mask', mask)
+        self.mask: torch.Tensor
+
+    def dump_chosen(self):
+        pass
+
+    def fix_chosen(self, chosen=None):
+        pass
+
+    @property
+    def current_choice(self):
+        return None
+
+
+class MutableChannelForHead(BaseMutable, DMSMutableMixIn):
+
+    def __init__(self, num_channels, num_heads) -> None:
+        super().__init__()
+        self._dms_mutable_mixin_init(num_channels)
+        self.num_head = num_heads
+        self.num_channels = num_channels
+
+        self.taylor = self.taylor.reshape([num_heads, -1])
+
+        mask = torch.ones([num_channels])
+        self.register_buffer('mask', mask)
+        self.mask: torch.Tensor
+        self.mask = self.mask.reshape([num_heads, -1])
+
+    def dump_chosen(self):
+        pass
+
+    def fix_chosen(self, chosen=None):
+        pass
+
+    @property
+    def current_choice(self):
+        return None
+
+
+class MutableChannelWithHead(SimpleMutableChannel):
+
+    def __init__(self, mutable_head: MutableHead,
+                 mutable_channel: MutableChannelForHead) -> None:
+        super().__init__(mutable_channel.num_channels)
+
+        self.mutable_head = mutable_head
+        self.mutable_channel = mutable_channel
+
+    @property
+    def current_imp(self):
+        channel_imp = self.mutable_channel.current_imp
+        head_imp = self.mutable_head.current_imp
+        imp = head_imp.unsqueeze(-1) * channel_imp
+        imp = imp.flatten()
+        return imp
+
+    @property
+    def current_mask(self):
+        channel = self.mutable_channel.mask
+        head = self.mutable_head.mask.unsqueeze(-1)
+
+        return (channel * head).bool().flatten()
+
+    @torch.no_grad()
+    def limit_value(self):
+        self.mutable_head.limit_value()
+        self.mutable_channel.limit_value()

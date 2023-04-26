@@ -81,7 +81,7 @@ class MutableChannelContainer(BaseMutableChannel):
         """Register a BaseMutableChannel to a module with
         MutableChannelContainers."""
         if end == -1:
-            end = mutable.current_choice + start
+            end = mutable.num_channels + start
         if is_to_output_channel:
             container: MutableChannelContainer = module.get_mutable_attr(
                 'out_channels')

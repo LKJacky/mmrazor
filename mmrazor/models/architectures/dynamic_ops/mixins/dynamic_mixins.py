@@ -384,6 +384,7 @@ class DynamicLinearMixin(DynamicChannelMixin):
                 self.weight.device)
 
         weight = self.weight[out_mask][:, in_mask]
+
         bias = self.bias[out_mask] if self.bias is not None else None
 
         return weight, bias

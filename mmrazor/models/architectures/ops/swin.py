@@ -1,10 +1,31 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+from typing import List
+
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models.swin_transformer import ShiftedWindowAttention
 
 
 class BaseShiftedWindowAttention(ShiftedWindowAttention):
+
+    def __init__(
+        self,
+        dim: int,
+        window_size: List[int],
+        shift_size: List[int],
+        num_heads: int,
+        qkv_bias: bool = True,
+        proj_bias: bool = True,
+        attention_dropout: float = 0.0,
+        dropout: float = 0.0,
+    ):
+        super().__init__(dim, window_size, shift_size, num_heads, qkv_bias,
+                         proj_bias, attention_dropout, dropout)
+        self.q = nn.Linear(dim, dim, bias=qkv_bias)
+        self.k = nn.Linear(dim, dim, bias=qkv_bias)
+        self.v = nn.Linear(dim, dim, bias=qkv_bias)
+        self.qkv = None
 
     def shift_x(self, input: torch.Tensor):
         B, H, W, C = input.shape
@@ -100,11 +121,15 @@ class BaseShiftedWindowAttention(ShiftedWindowAttention):
 
         B_, N, C = x.shape
 
-        qkv = self.qkv(x).reshape(B_, N, 3, self.num_heads,
-                                  self.qkv.out_features // 3 //
-                                  self.num_heads).permute(2, 0, 3, 1, 4)
-        q, k, v = qkv[0], qkv[1], qkv[
-            2]  # make torchscript happy (cannot use tensor as tuple)
+        q = self.q(x).reshape(B_, N, self.num_heads,
+                              self.q.out_features // self.num_heads).permute(
+                                  0, 2, 1, 3)
+        k = self.k(x).reshape(B_, N, self.num_heads,
+                              self.k.out_features // self.num_heads).permute(
+                                  0, 2, 1, 3)
+        v = self.v(x).reshape(B_, N, self.num_heads,
+                              self.v.out_features // self.num_heads).permute(
+                                  0, 2, 1, 3)
 
         q = q * (q.shape[-1]**-0.5)
         attn = (q @ k.transpose(-2, -1))

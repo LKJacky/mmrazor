@@ -18,7 +18,8 @@ from mmrazor.models.architectures.ops.swin import BaseShiftedWindowAttention
 from mmrazor.models.mutables import BaseMutable
 from mmrazor.models.task_modules.estimators.counters import BaseCounter
 from mmrazor.registry import MODELS, TASK_UTILS
-from ...dtp.modules.ops import ImpLinear
+from ...dtp.modules.ops import ImpLinear, soft_mask_sum
+from .mutable import MutableChannelForHead, MutableChannelWithHead, MutableHead
 from .op import DynamicBlockMixin
 
 
@@ -30,16 +31,23 @@ class DynamicShiftedWindowAttention(BaseShiftedWindowAttention,
         self.init_args = args
         self.init_kwargs = kwargs
 
-        self.qkv = DynamicLinear.convert_from(self.qkv)
+        self.q = DynamicLinear.convert_from(self.q)
+        self.k = DynamicLinear.convert_from(self.k)
+        self.v = DynamicLinear.convert_from(self.v)
         self.proj = DynamicLinear.convert_from(self.proj)
+
         self.mutable_attrs: Dict[str, BaseMutable] = nn.ModuleDict()
 
-        self.in_channels = self.qkv.in_features
+        self.in_channels = self.q.in_features
         self.out_channels = self.proj.out_features
+
+        self.init_mutable()
 
     def register_mutable_attr(self, attr: str, mutable):
         if attr == 'in_channels':
-            self.qkv.register_mutable_attr(attr, mutable)
+            self.q.register_mutable_attr(attr, mutable)
+            self.k.register_mutable_attr(attr, mutable)
+            self.v.register_mutable_attr(attr, mutable)
         elif attr == 'out_channels':
             self.proj.register_mutable_attr(attr, mutable)
         else:
@@ -49,22 +57,24 @@ class DynamicShiftedWindowAttention(BaseShiftedWindowAttention,
     @classmethod
     def convert_from(cls, module: ShiftedWindowAttention):
         new_module = cls(
-            dim=module.qkv.in_features,
+            dim=module.q.in_features,
             window_size=module.window_size,
             shift_size=module.shift_size,
             num_heads=module.num_heads,
-            qkv_bias=module.qkv.bias is not None,
+            qkv_bias=module.q.bias is not None,
             proj_bias=module.proj.bias is not None,
             attention_dropout=module.attention_dropout,
             dropout=module.dropout,
         )
-        new_module.load_state_dict(module.state_dict())
+        new_module.load_state_dict(module.state_dict(), strict=False)
         return new_module
 
     def to_static_op(self) -> Module:
         module: WindowMSA = self.static_op_factory(*self.init_args,
                                                    **self.init_kwargs)
-        module.qkv = self.qkv.to_static_op()
+        module.q = self.q.to_static_op()
+        module.k = self.k.to_static_op()
+        module.v = self.v.to_static_op()
         module.proj = self.proj.to_static_op()
 
         return module
@@ -72,6 +82,93 @@ class DynamicShiftedWindowAttention(BaseShiftedWindowAttention,
     @property
     def static_op_factory(self):
         return BaseShiftedWindowAttention
+
+    def init_mutable(self):
+        m_head = MutableHead(self.num_heads)
+        m_qk = MutableChannelForHead(self.q.out_features, self.num_heads)
+        m_v = MutableChannelForHead(self.v.out_features, self.num_heads)
+        mutable_qk = MutableChannelWithHead(m_head, m_qk)
+        mutable_v = MutableChannelWithHead(m_head, m_v)
+
+        self.q.register_mutable_attr('out_features', mutable_qk)
+        self.k.register_mutable_attr('out_features', mutable_qk)
+        self.v.register_mutable_attr('out_features', mutable_v)
+        delattr(self, 'qkv')
+
+        self.proj.register_mutable_attr('in_channels', mutable_v)
+
+        self.attn_mutables = {'head': m_head, 'qk': m_qk, 'v': m_v}
+
+        return m_head, m_qk, m_v
+
+    def forward(self, x, mask=None):
+        B, H, W, _ = x.shape
+        window_size = self.window_size
+        pad_r = (window_size[1] - W % window_size[1]) % window_size[1]
+        pad_b = (window_size[0] - H % window_size[0]) % window_size[0]
+        pad_H = pad_b + H
+        pad_W = pad_r + W
+
+        x = self.shift_x(x)
+
+        B_, N, C = x.shape
+        num_head = self.attn_mutables['head'].activated_channels
+        qk_dim = self.attn_mutables[
+            'qk'].activated_channels // self.attn_mutables['head'].num_heads
+        v_dim = self.attn_mutables[
+            'v'].activated_channels // self.attn_mutables['head'].num_heads
+
+        q = self.q(x).reshape(B_, N, num_head, qk_dim).permute(0, 2, 1, 3)
+        k = self.k(x).reshape(B_, N, num_head, qk_dim).permute(0, 2, 1, 3)
+        v = self.v(x).reshape(B_, N, num_head, v_dim).permute(0, 2, 1, 3)
+
+        q = q * (q.shape[-1]**-0.5)
+        attn = (q @ k.transpose(-2, -1))
+
+        relative_position_bias = self.get_relative_position_bias()
+        head_mask = self.attn_mutables['head'].mask.bool()
+        relative_position_bias = relative_position_bias[:, head_mask, :, :]
+
+        attn = attn + relative_position_bias
+
+        mask = self.get_atten_mask(x, pad_H, pad_W)
+        if mask is not None:
+            nW = mask.shape[0]
+            attn = attn.view(B_ // nW, nW, num_head, N,
+                             N) + mask.unsqueeze(1).unsqueeze(0)
+            attn = attn.view(-1, num_head, N, N)
+            attn = F.softmax(attn, dim=-1)
+        else:
+            attn = F.softmax(attn, dim=-1)
+
+        attn = F.dropout(attn, p=self.attention_dropout)
+
+        x = (attn @ v).transpose(1, 2).reshape(B_, N, -1)
+        x = self.proj(x)
+        x = F.dropout(x, p=self.dropout)
+
+        x = self.un_shift_x(x, B, H, W, pad_H, pad_W)
+        return x
+
+    def soft_flop(self):
+        win_size = self.window_size[0] * self.window_size[1]
+        _, H, W, _ = self.quick_flop_recorded_in_shape[0]
+        n_win = H // self.window_size[0] * W // self.window_size[1]
+
+        flops = 0
+        flops = flops + self.q.soft_flop()
+        flops = flops + self.k.soft_flop()
+        flops = flops + self.v.soft_flop()
+        flops = flops + self.proj.soft_flop()
+        flops = flops * n_win
+
+        head_ratio = soft_mask_sum(self.attn_mutables['head'].current_imp_flop
+                                   ) / self.attn_mutables['head'].num_heads
+        qk_dim = soft_mask_sum(self.q.output_imp_flop) * head_ratio
+        v_dim = soft_mask_sum(self.v.output_imp_flop) * head_ratio
+
+        flops = flops + n_win * (win_size**2) * (qk_dim + v_dim)
+        return flops
 
 
 class ImpShiftedWindowAttention(DynamicShiftedWindowAttention, QuickFlopMixin):
@@ -81,21 +178,14 @@ class ImpShiftedWindowAttention(DynamicShiftedWindowAttention, QuickFlopMixin):
 
         self._quick_flop_init()
 
-        self.qkv = ImpLinear.convert_from(self.qkv)
+        self.q = ImpLinear.convert_from(self.q)
+        self.k = ImpLinear.convert_from(self.k)
+        self.v = ImpLinear.convert_from(self.v)
+        self.qkv = None
         self.proj = ImpLinear.convert_from(self.proj)
 
-    def soft_flop(self):
-        flops = 0
-        flops = flops + self.qkv.soft_flop()
-        flops = flops + self.proj.soft_flop()
-
-        qkv_dim = self.qkv.out_features // 3
-        win_size = self.window_size[0] * self.window_size[1]
-        _, _, H, W = self.quick_flop_recorded_in_shape[0]
-        n_win = H // self.window_size[0] * W // self.window_size[1]
-
-        flops = flops + n_win * (win_size**2) * qkv_dim
-        return flops
+    def forward(self, x, mask=None):
+        return BaseShiftedWindowAttention.forward(self, x, mask=mask)
 
 
 class SwinSequential(nn.Sequential):

@@ -2,12 +2,16 @@ import unittest
 
 import torch
 from mmcls.models.utils.attention import WindowMSA
-from torchvision.models.swin_transformer import ShiftedWindowAttention
 
+from mmrazor.implementations.pruning.dms.core.mutable import (
+    MutableChannelForHead, MutableChannelWithHead, MutableHead)
 from mmrazor.implementations.pruning.dms.core.swin import (
     DynamicShiftedWindowAttention, DynamicWindowMSA)
+from mmrazor.models.architectures.ops.swin import BaseShiftedWindowAttention
 from mmrazor.models.mutables import SquentialMutableChannel
 from mmrazor.utils import log_tools
+
+# from torchvision.models.swin_transformer import ShiftedWindowAttention
 
 log_tools.set_log_level('debug')
 
@@ -44,7 +48,7 @@ class TestAtten(unittest.TestCase):
         H = 52
         W = 52
 
-        attn = ShiftedWindowAttention(128, window_size, shift_size, 4)
+        attn = BaseShiftedWindowAttention(128, window_size, shift_size, 4)
         x = torch.rand([2, H, W, 128])
         y = attn(x)
         self.assertSequenceEqual(y.shape, [2, H, W, 128])
@@ -59,7 +63,9 @@ class TestAtten(unittest.TestCase):
         H = 52
         W = 52
 
-        attn = ShiftedWindowAttention(128, window_size, shift_size, 4)
+        attn = BaseShiftedWindowAttention(128, window_size, shift_size, 4)
+
+        # test dynamic attn
 
         dattn = DynamicShiftedWindowAttention.convert_from(attn)
 
@@ -75,6 +81,21 @@ class TestAtten(unittest.TestCase):
         x = torch.rand([2, H, W, 64])
         y1 = dattn(x)
         self.assertSequenceEqual(y1.shape, [2, H, W, 72])
+
+        # dynamic attn with attn mutables
+
+        dattn = DynamicShiftedWindowAttention.convert_from(attn)
+        head, qk, v = dattn.attn_mutables.values()
+        x = torch.rand([2, H, W, 128])
+
+        head.mask[0] = 0
+        y1 = dattn(x)
+        self.assertSequenceEqual(y1.shape, [2, H, W, 128])
+
+        qk.mask[:, 0] = 0
+        v.mask[:, 1] = 0
+        y1 = dattn(x)
+        self.assertSequenceEqual(y1.shape, [2, H, W, 128])
 
     def test_analyer(self):
 
@@ -129,3 +150,12 @@ class TestAtten(unittest.TestCase):
                 tracer_type='FxTracer'))
         mutator.prepare_from_supernet(model)
         print(model)
+
+    def test_mutable(self):
+        head = MutableHead(4)
+        channel = MutableChannelForHead(20, 4)
+        mutable = MutableChannelWithHead(head, channel)
+        print(mutable.current_imp.shape)
+        head.mask[1] = 0
+        channel.mask[:, 1] = 0
+        print(mutable.current_mask)
