@@ -114,6 +114,22 @@ class MutableHead(BaseMutable, DMSMutableMixIn):
         self.register_buffer('mask', mask)
         self.mask: torch.Tensor
 
+        self.flop_scale_converter = None
+
+    @property
+    def current_imp(self):
+        if self.flop_scale_converter is None:
+            return super().current_imp
+        else:
+            return self.flop_scale_converter(super().current_imp)
+
+    @property
+    def current_imp_flop(self):
+        if self.flop_scale_converter is None:
+            return super().current_imp_flop
+        else:
+            return self.flop_scale_converter(super().current_imp_flop)
+
     def dump_chosen(self):
         pass
 
@@ -123,6 +139,10 @@ class MutableHead(BaseMutable, DMSMutableMixIn):
     @property
     def current_choice(self):
         return None
+
+    @torch.no_grad()
+    def limit_value(self):
+        self.e.data = torch.clamp(self.e, 1 / self.num_heads, 1.0)
 
 
 class MutableChannelForHead(BaseMutable, DMSMutableMixIn):
@@ -165,6 +185,14 @@ class MutableChannelWithHead(SimpleMutableChannel):
         channel_imp = self.mutable_channel.current_imp
         head_imp = self.mutable_head.current_imp
         imp = head_imp.unsqueeze(-1) * channel_imp
+        imp = imp.flatten()
+        return imp
+
+    @property
+    def current_imp_flop(self):
+        current_imp_flop = self.mutable_channel.current_imp_flop
+        head_imp = self.mutable_head.current_imp_flop
+        imp = head_imp.unsqueeze(-1) * current_imp_flop
         imp = imp.flatten()
         return imp
 

@@ -18,6 +18,7 @@ from mmrazor.models.architectures.ops.swin import BaseShiftedWindowAttention
 from mmrazor.models.mutables import BaseMutable
 from mmrazor.models.task_modules.estimators.counters import BaseCounter
 from mmrazor.registry import MODELS, TASK_UTILS
+from ...dtp.modules.mutable_channels import ImpMutableChannelContainer
 from ...dtp.modules.ops import ImpLinear, soft_mask_sum
 from .mutable import MutableChannelForHead, MutableChannelWithHead, MutableHead
 from .op import DynamicBlockMixin
@@ -90,12 +91,32 @@ class DynamicShiftedWindowAttention(BaseShiftedWindowAttention,
         mutable_qk = MutableChannelWithHead(m_head, m_qk)
         mutable_v = MutableChannelWithHead(m_head, m_v)
 
-        self.q.register_mutable_attr('out_features', mutable_qk)
-        self.k.register_mutable_attr('out_features', mutable_qk)
-        self.v.register_mutable_attr('out_features', mutable_v)
+        try:
+            self.q.register_mutable_attr(
+                'out_channels',
+                ImpMutableChannelContainer(self.q.out_features))
+            self.k.register_mutable_attr(
+                'out_channels',
+                ImpMutableChannelContainer(self.k.out_features))
+            self.v.register_mutable_attr(
+                'out_channels',
+                ImpMutableChannelContainer(self.v.out_features))
+            self.proj.register_mutable_attr(
+                'in_channels',
+                ImpMutableChannelContainer(self.proj.in_features))
+        except Exception:
+            pass
+        ImpMutableChannelContainer.register_mutable_channel_to_module(
+            self.q, mutable=mutable_qk, is_to_output_channel=True)
+        ImpMutableChannelContainer.register_mutable_channel_to_module(
+            self.k, mutable=mutable_qk, is_to_output_channel=True)
+        ImpMutableChannelContainer.register_mutable_channel_to_module(
+            self.v, mutable=mutable_v, is_to_output_channel=True)
+
         delattr(self, 'qkv')
 
-        self.proj.register_mutable_attr('in_channels', mutable_v)
+        ImpMutableChannelContainer.register_mutable_channel_to_module(
+            self.proj, mutable_v, is_to_output_channel=False)
 
         self.attn_mutables = {'head': m_head, 'qk': m_qk, 'v': m_v}
 

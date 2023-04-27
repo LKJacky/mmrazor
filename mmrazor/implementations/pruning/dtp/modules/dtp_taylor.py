@@ -95,6 +95,11 @@ class DMSMutableMixIn():
     def activated_channels(self):
         return self.mask.bool().sum().item()
 
+    def info(self):
+        return (f'taylor: {self.taylor.min().item():.3f}\t'
+                f'{self.taylor.max().item():.3f}\t'
+                f'e: {self.e.item():.3f}')  # noqa
+
 
 class DTPTMutableChannelImp(BaseDTPMutableChannel):
 

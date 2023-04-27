@@ -10,11 +10,12 @@ from mmrazor.registry import MODELS, TASK_UTILS
 from ...dtp.modules.dtp_adaptive import DTPAMutator
 from ...dtp.modules.ops import QuickFlopMixin
 from .mobilenet import MobileNetLayers
-from .mutable import BlockThreshold, MutableBlocks
+from .mutable import (BlockThreshold, DMSMutableMixIn, MutableBlocks,
+                      MutableHead)
 from .op import DynamicStage
 from .resnet import ResLayer
 from .resnet_img import ResLayer as ResLayerImg
-from .swin import SwinSequential
+from .swin import ImpShiftedWindowAttention, SwinSequential
 
 
 def replace_modules(model: nn.Module, module_map={}):
@@ -62,6 +63,23 @@ class BlockInitialer:
         return mutables
 
 
+class AttnInitialer():
+
+    def __init__(self) -> None:
+        pass
+
+    def prepare_from_supernet(self, supernet: nn.Module) -> List:
+        attn_mutables = nn.ModuleList()
+
+        for module in supernet.modules():
+            if isinstance(module, ImpShiftedWindowAttention):
+                module.init_mutable()
+                map_dict = nn.ModuleDict(module.attn_mutables)
+                attn_mutables.append(map_dict)
+        attn_mutables.requires_grad_(True)
+        return attn_mutables
+
+
 def to_hard(scale):
     hard = (scale >= BlockThreshold).float()
     return hard.detach() - scale.detach() + scale
@@ -91,11 +109,16 @@ class DMSMutator(BaseMutator):
         self.block_initializer = BlockInitialer()
         self.block_mutables: List[MutableBlocks] = nn.ModuleList()
 
+        self.attn_initialzer = AttnInitialer()
+        self.attn_mutables = nn.ModuleList()
+
     def prepare_from_supernet(self, supernet) -> None:
         self.saved_model = [supernet]
         self.dtp_mutator.prepare_from_supernet(supernet)
         self.block_mutables = nn.ModuleList(
             self.block_initializer.prepare_from_supernet(supernet))
+        self.attn_mutables = self.attn_initialzer.prepare_from_supernet(
+            supernet)
 
     def info(self):
 
@@ -115,7 +138,12 @@ class DMSMutator(BaseMutator):
 
         flop_info = f'soft_flop: {self.get_soft_flop(self.saved_model[0])/1e6}'
 
-        return self.dtp_mutator.info() + '\n' + mutable_info + '\n' + flop_info
+        attn_info = ''
+        for mutables in self.attn_mutables:
+            attn_info += f"head: {mutables['head'].info()}\tqk: {mutables['qk'].info()}\tv: {mutables['v'].info()}\n"  # noqa
+
+        return self.dtp_mutator.info(
+        ) + '\n' + attn_info + '\n' + mutable_info + '\n' + flop_info
 
     @torch.no_grad()
     def init_quick_flop(self, model: nn.Module):
@@ -140,6 +168,9 @@ class DMSMutator(BaseMutator):
         self.dtp_mutator.limit_value()
         for mul in self.block_mutables:
             mul.limit_value()
+        for mutables in self.attn_mutables.modules():
+            if isinstance(mutables, DMSMutableMixIn):
+                mutables.limit_value()
 
     def get_soft_flop(self, model):
         return QuickFlopMixin.get_flop(model)
@@ -148,12 +179,17 @@ class DMSMutator(BaseMutator):
         self.dtp_mutator.ratio_train()
         for mul in self.block_mutables:
             mul.requires_grad_(True)
+        self.attn_mutables.requires_grad_(True)
         self.set_soft_flop_scale_converter(None)
 
     def channel_train(self):
         self.dtp_mutator.ratio_train()
         for mul in self.block_mutables:
             mul.requires_grad_(False)
+        self.attn_mutables.requires_grad_(True)
+        for modele in self.attn_mutables.modules():
+            if isinstance(modele, MutableHead):
+                modele.requires_grad_(False)
         self.set_soft_flop_scale_converter(to_hard)
 
     @property
@@ -167,3 +203,6 @@ class DMSMutator(BaseMutator):
     def set_soft_flop_scale_converter(self, fun):
         for mut in self.block_mutables:
             mut.flop_scale_converter = fun
+        for mut in self.attn_mutables.modules():
+            if isinstance(mut, MutableHead):
+                mut.flop_scale_converter = fun
