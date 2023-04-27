@@ -73,6 +73,14 @@ class DynamicShiftedWindowAttention(BaseShiftedWindowAttention,
     def to_static_op(self) -> Module:
         module: WindowMSA = self.static_op_factory(*self.init_args,
                                                    **self.init_kwargs)
+        module.num_heads = self.attn_mutables['head'].activated_channels
+
+        head_mask = self.attn_mutables['head'].mask.bool()
+        module.relative_position_bias_table = nn.Parameter(
+            self.relative_position_bias_table[:, head_mask],
+            requires_grad=True)
+
+        # self.relative_position_bias_table=
         module.q = self.q.to_static_op()
         module.k = self.k.to_static_op()
         module.v = self.v.to_static_op()
