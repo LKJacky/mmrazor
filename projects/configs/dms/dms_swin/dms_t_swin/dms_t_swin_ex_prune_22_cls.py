@@ -6,7 +6,7 @@ pretrained_path = './work_dirs/pretrained/converted_mobilnetv2.pth'  # noqa
 
 decay_ratio = 0.6
 refine_ratio = 0.4
-target_flop_ratio = 0.19
+target_flop_ratio = 0.23
 flop_loss_weight = 100
 by_epoch = True
 target_scheduler = 'cos'
