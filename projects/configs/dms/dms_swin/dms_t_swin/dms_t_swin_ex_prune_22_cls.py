@@ -25,14 +25,21 @@ mutator_lr = original_lr * 0.1
 if hasattr(_base_, 'param_scheduler'):
     delattr(_base_, 'param_scheduler')
 
-param_scheduler = dict(
-    type='CosineAnnealingLR',
-    T_max=epoch,
-    by_epoch=True,
-    begin=0,
-    end=epoch,
-    _scope_='mmcls')
-
+param_scheduler = [
+    dict(
+        type='LinearLR',
+        start_factor=0.001,
+        by_epoch=True,
+        end=20,
+        convert_to_iter_based=True,
+        _scope_='mmcls'),
+    dict(
+        type='CosineAnnealingLR',
+        eta_min=1e-05,
+        by_epoch=True,
+        begin=20,
+        _scope_='mmcls')
+]
 find_unused_parameters = True
 
 ##############################################################################

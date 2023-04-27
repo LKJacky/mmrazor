@@ -10,14 +10,23 @@ train_cfg = dict(by_epoch=True, max_epochs=epoch)
 # restore lr
 optim_wrapper = {'optimizer': {'lr': _base_.original_lr}}
 
-param_scheduler = dict(
-    _delete_=True,
-    type='StepLR',
-    by_epoch=True,
-    step_size=1,
-    gamma=0.98,
-    _scope_='mmcls')
-find_unused_parameters = False
+param_scheduler = [
+    dict(
+        type='LinearLR',
+        start_factor=0.001,
+        by_epoch=True,
+        end=20,
+        convert_to_iter_based=True,
+        _scope_='mmcls'),
+    dict(
+        type='CosineAnnealingLR',
+        eta_min=1e-05,
+        by_epoch=True,
+        begin=20,
+        _scope_='mmcls')
+]
+
+find_unused_parameters = True
 
 ##############################################################################
 

@@ -31,5 +31,8 @@ model = dict(
     ]),
     _scope_='mmcls')
 
+train_dataloader = dict(batch_size=128)
+val_dataloader = dict(batch_size=128)
+
 # train_dataloader = dict(batch_size=4)
 # val_dataloader = dict(batch_size=4)
