@@ -103,6 +103,9 @@ def GroupFisherSubModel(
         model.init_cfg = None
         model.init_weights = types.MethodType(
             hacky_init_weights_wrapper(pruning_structure), model)
+    backbone = model.backbone
+    if hasattr(backbone, 'to_static_post_process'):
+        backbone.to_static_post_process()
     print_log(model)
     if reset_params:
         print_log('reset parameters')

@@ -320,11 +320,30 @@ class TorchSwinBackbone(SwinTransformer):
         self.features[7] = SwinSequential(
             *(self.features[7]._modules.values()))
 
+        self.stochastic_depth_prob = stochastic_depth_prob
+
     def forward(self, x):
         x = self.features(x)
         x = self.norm(x)
         x = self.permute(x)
         return (x, )
+
+    def reset_sd_prob(self):
+        blocks = list(self.features[1]._modules.values()) + list(
+            self.features[3]._modules.values()) + list(
+                self.features[5]._modules.values()) + list(
+                    self.features[7]._modules.values())
+        total_depth = len(blocks)
+        from mmrazor.utils import print_log
+        print_log(f'reset static depth prob with {total_depth} blocks')
+
+        for i, block in enumerate(blocks):
+            block: DynamicSwinTransformerBlock
+            block.stochastic_depth.p = i / (total_depth -
+                                            1) * self.stochastic_depth_prob
+
+    def to_static_post_process(self):
+        self.reset_sd_prob()
 
 
 ##########################################################################
