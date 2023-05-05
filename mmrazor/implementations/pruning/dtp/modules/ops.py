@@ -171,10 +171,14 @@ class ImpLinear(dynamic_ops.DynamicLinear, ImpModuleMixin, QuickFlopMixin,
         self._quick_flop_init()
         self._imp_init()
         self._collect_init()
+        self.use_out_imp = False
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.imp_forward(x)
-        return nn.Linear.forward(self, x)
+        x = nn.Linear.forward(self, x)
+        if self.use_out_imp:
+            x = self.output_imp * x
+        return x
 
     def soft_flop(self):
         in_c = soft_mask_sum(self.input_imp_flop)

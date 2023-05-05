@@ -216,6 +216,12 @@ class ImpShiftedWindowAttention(DynamicShiftedWindowAttention, QuickFlopMixin):
     def forward(self, x, mask=None):
         return BaseShiftedWindowAttention.forward(self, x, mask=mask)
 
+    def init_mutable(self):
+        res = super().init_mutable()
+        self.q.use_out_imp = True
+        self.k.use_out_imp = True
+        return res
+
 
 class SwinSequential(nn.Sequential):
     pass
