@@ -26,6 +26,33 @@ class ModuleProtocol(Protocol):
     def register_buffer(self, name, tensor):
         pass
 
+    @property
+    def training(self) -> bool:
+        pass
+
+
+class DynamicOpProtocol(ModuleProtocol):
+
+    def convert_from(self, module: nn.Module):
+        pass
+
+    @property
+    def static_op_factory(self):
+        """Corresponding Pytorch OP."""
+        pass
+
+    def to_static_op(self) -> nn.Module:
+        """Convert dynamic OP to static OP.
+
+        Note:
+            The forward result for the same input between dynamic OP and its
+            corresponding static OP must be same.
+
+        Returns:
+            nn.Module: Corresponding static OP.
+        """
+        pass
+
 
 def replace_with_dynamic_ops(model: nn.Module,
                              dynamicop_map: Dict[Type[nn.Module],
