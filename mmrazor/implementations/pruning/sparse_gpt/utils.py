@@ -30,6 +30,10 @@ class ModuleProtocol(Protocol):
     def training(self) -> bool:
         pass
 
+    @training.setter
+    def training(self, value):
+        pass
+
 
 class DynamicOpProtocol(ModuleProtocol):
 

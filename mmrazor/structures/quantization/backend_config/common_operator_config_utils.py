@@ -49,7 +49,7 @@ _ConvMetadata = namedtuple('_ConvMetadata', [
     'relu_qat', 'bn_qat', 'bn_relu_qat', 'func'
 ])
 
-if digit_version(torch.__version__) >= digit_version('1.13.0'):
+if digit_version(torch.__version__) == digit_version('1.13.0'):
     _Conv1dMetadata = _ConvMetadata(
         nn.Conv1d, nn.ConvTranspose1d, nn.BatchNorm1d, nnqr.Conv1d,
         nnqr.ConvTranspose1d, nni.ConvReLU1d, nni.ConvBn1d, nni.ConvBnReLU1d,
