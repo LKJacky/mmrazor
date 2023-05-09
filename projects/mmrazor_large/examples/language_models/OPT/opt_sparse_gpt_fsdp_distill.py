@@ -12,6 +12,7 @@ from torch.distributed.fsdp.api import ShardingStrategy
 from torch.distributed.fsdp.fully_sharded_data_parallel import CPUOffload
 from torch.distributed.fsdp.wrap import size_based_auto_wrap_policy
 from utils import init_on_meta, opt_eval_fsdp, opt_infer_fsdp
+from torch.utils.data import DataLoader
 
 from mmrazor.implementations.pruning import sparse_gpt
 from mmrazor.utils import print_log
@@ -68,6 +69,55 @@ def init_fn_wrapper(model: nn.Module, model_copy: nn.Module):
     return _materialize_meta_module
 
 
+@torch.no_grad()
+def opt_train_fsdp(
+        model: nn.Module,
+        mutator: sparse_gpt.DistillSparseGptMutator,
+        dataloader: DataLoader,
+        dev=torch.device('cuda:0'),
+):
+    print_log('train ...')
+    model.train()
+    use_cache = model.config.use_cache
+    model.config.use_cache = False
+    loss_sum = torch.zeros([1], device=dev)
+    total_seq_len = torch.zeros([1], device=dev, dtype=torch.long)
+
+    for i, batch in enumerate(dataloader):
+        B, seq_len = batch.shape[:2]
+
+        batch = batch.to(dev)
+        batch = torch.cat([batch, batch], dim=0)
+        out: torch.Tensor = model(batch)[0]  # 1
+
+        shift_logits = out[:, :-1, :].contiguous().flatten(0, 1)  # (B N) C
+        shift_labels = batch[:, 1:].flatten()  # (B N)
+
+        loss_fct = nn.CrossEntropyLoss()
+        loss = loss_fct(shift_logits, shift_labels)
+
+        neg_log_likelihood = loss.float() * seq_len * B
+        total_seq_len += seq_len * B
+        loss_sum += neg_log_likelihood
+
+        if dist.is_initialized():
+            world_size = dist.get_world_size()
+        else:
+            world_size = 1
+        infered_batch = (i + 1) * B * world_size
+
+        print_log(f'{infered_batch} / {len(dataloader.dataset)}')
+        print(mutator.gather_distill_loss())
+
+    if dist.is_initialized():
+        dist.all_reduce(loss_sum)
+        dist.all_reduce(total_seq_len)
+
+    ppl = torch.exp(loss_sum / total_seq_len)
+    print_log(f'Perplexity: {ppl.item():3f}')
+    model.config.use_cache = use_cache
+
+
 def main(rank, world_size=8, args=None):
     setup(rank, world_size)
 
@@ -78,7 +128,7 @@ def main(rank, world_size=8, args=None):
         model = get_model(model_name)
 
         # init mutator
-        mutator = sparse_gpt.SparseGptMutator()
+        mutator = sparse_gpt.DistillSparseGptMutator()
         mutator.prepare_from_supernet(model.model.decoder)
         return model, mutator
 
@@ -104,43 +154,6 @@ def main(rank, world_size=8, args=None):
         sync_module_states=True)
     print_log(model)
 
-    # init hessian
-
-    mutator.init_hessian(device='cuda')
-    mutator.start_init_hessian()
-
-    _, testloader = get_loaders(
-        args.dataset, seed=args.seed, model=model_name, seqlen=model.seqlen)
-    testloader = build_language_loader(
-        testloader, world_size, rank, model, batch_size=batch_size)
-    opt_infer_fsdp(model, testloader)
-
-    mutator.end_init_hessian()
-
-    # prune
-    name2module = dict(model.named_modules())
-    module2name = {}
-    module2name = dict([(v, k) for k, v in name2module.items()])
-
-    with torch.no_grad():
-        for fsdp in FSDP.fsdp_modules(model):
-            fsdp._reset_lazy_init()
-            with FSDP.summon_full_params(fsdp, recurse=False):
-                fsdp_name = module2name[fsdp]
-                for name, op in fsdp.named_modules():
-                    if name.count('_fsdp_wrapped_module') <= 1:
-                        if isinstance(op, sparse_gpt.SparseGptMixIn):
-                            try:
-                                op.prune(0.5, prunen=2, prunem=4)
-                                print_log(
-                                    f'prune {fsdp_name}.{name} successfully.',  # noqa
-                                    only_rank0=True)
-                            except Exception as e:
-                                print_log(
-                                    f'prune {fsdp_name}.{name} failed, as {e}',  # noqa
-                                    only_rank0=True)
-            fsdp._reset_lazy_init()
-
     # save
     if args.save:
         print_log(f'save model in {args.save}')
@@ -158,6 +171,8 @@ def main(rank, world_size=8, args=None):
         testloader = build_language_loader(
             testloader, world_size, rank, model, batch_size=batch_size)
         print_log(dataset)
+        if dataset == 'wikitext2':
+            opt_train_fsdp(model, mutator, testloader, torch.device('cuda'))
         opt_eval_fsdp(model, testloader, torch.device('cuda'))
 
 

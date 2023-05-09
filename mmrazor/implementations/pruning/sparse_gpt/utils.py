@@ -11,7 +11,7 @@ from mmrazor.utils import print_log
 class ModuleProtocol(Protocol):
     weight: torch.Tensor
 
-    def forward(self, x):
+    def ditill_forward(self, x):
         pass
 
     def register_forward_hook(self, hook):

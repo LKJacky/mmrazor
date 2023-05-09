@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from datasets import Dataset, concatenate_datasets
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset as TorchDataset
 from torch.utils.data import DistributedSampler
@@ -12,8 +13,13 @@ def set_seed(seed):
 
 def get_wikitext2(nsamples, seed, seqlen, model):
     from datasets import load_dataset
-    traindata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='train')
-    testdata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
+
+    traindata = Dataset.from_file(
+        '/nvme/liukai/.cache/huggingface/datasets/wikitext/wikitext-2-raw-v1/1.0.0/a241db52902eaf2c6aa732210bead40c090019a499ceb13bcbfa3f8ab646a126/wikitext-train.arrow'
+    )
+    testdata = Dataset.from_file(
+        '/nvme/liukai/.cache/huggingface/datasets/wikitext/wikitext-2-raw-v1/1.0.0/a241db52902eaf2c6aa732210bead40c090019a499ceb13bcbfa3f8ab646a126/wikitext-test.arrow'
+    )
 
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
@@ -35,8 +41,12 @@ def get_wikitext2(nsamples, seed, seqlen, model):
 
 def get_ptb(nsamples, seed, seqlen, model):
     from datasets import load_dataset
-    traindata = load_dataset('ptb_text_only', 'penn_treebank', split='train')
-    testdata = load_dataset('ptb_text_only', 'penn_treebank', split='test')
+    traindata = Dataset.from_file(
+        '/nvme/liukai/.cache/huggingface/datasets/ptb_text_only/penn_treebank/1.1.0/8d1b97746fb9765d140e569ec5ddd35e20af4d37761f5e1bf357ea0b081f2c1f/ptb_text_only-train.arrow'
+    )
+    testdata = Dataset.from_file(
+        '/nvme/liukai/.cache/huggingface/datasets/ptb_text_only/penn_treebank/1.1.0/8d1b97746fb9765d140e569ec5ddd35e20af4d37761f5e1bf357ea0b081f2c1f/ptb_text_only-validation.arrow'
+    )
 
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)
@@ -58,16 +68,23 @@ def get_ptb(nsamples, seed, seqlen, model):
 
 def get_c4(nsamples, seed, seqlen, model):
     from datasets import load_dataset
-    traindata = load_dataset(
-        'allenai/c4',
-        'allenai--c4',
-        data_files={'train': 'en/c4-train.00000-of-01024.json.gz'},
-        split='train')
-    valdata = load_dataset(
-        'allenai/c4',
-        'allenai--c4',
-        data_files={'validation': 'en/c4-validation.00000-of-00008.json.gz'},
-        split='validation')
+
+    # traindata = load_dataset(
+    #     'allenai/c4', 'allenai--c4', data_files={'train': 'en/c4-train.00000-of-01024.json.gz'}, split='train', use_auth_token=True
+    # )
+    # valdata = load_dataset(
+    #     'allenai/c4', 'allenai--c4', data_files={'validation': 'en/c4-validation.00000-of-00008.json.gz'}, split='validation',use_auth_token=True
+    # )
+    traindata0 = Dataset.from_file(
+        '/nvme/liukai/.cache/huggingface/datasets/allenai___json/allenai--c4-6fbe877195f42de5/0.0.0/0f7e3662623656454fcd2b650f34e886a7db4b9104504885bd462096cc7a9f51/json-train-00000-of-00002.arrow'
+    )
+    traindata1 = Dataset.from_file(
+        '/nvme/liukai/.cache/huggingface/datasets/allenai___json/allenai--c4-6fbe877195f42de5/0.0.0/0f7e3662623656454fcd2b650f34e886a7db4b9104504885bd462096cc7a9f51/json-train-00001-of-00002.arrow'
+    )
+    traindata = concatenate_datasets([traindata0, traindata1])
+    valdata = Dataset.from_file(
+        '/nvme/liukai/.cache/huggingface/datasets/allenai___json/allenai--c4-efc3d4f4606f44bd/0.0.0/0f7e3662623656454fcd2b650f34e886a7db4b9104504885bd462096cc7a9f51/json-validation.arrow'
+    )
 
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(model, use_fast=False)

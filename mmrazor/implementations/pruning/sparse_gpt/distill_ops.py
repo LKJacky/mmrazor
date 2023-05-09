@@ -6,6 +6,7 @@ import torch.nn as nn
 from mmrazor.models.architectures.dynamic_ops import (DynamicConv2d,
                                                       DynamicLinear)
 from .utils import DynamicOpProtocol, replace_with_dynamic_ops
+import torch.nn.functional as F
 
 
 class DistillSparseGptMixin(DynamicOpProtocol):
@@ -15,25 +16,45 @@ class DistillSparseGptMixin(DynamicOpProtocol):
             *init_args, **int_kwargs)
         self.init_args = init_args
         self.init_kwargs = int_kwargs
+        self.mask = nn.Parameter(
+            torch.ones_like(self.weight), requires_grad=True)
 
         self.loss = None
 
     def distill(self, y1, y2):
         return (y1 - y2).norm(2)
 
-    def forward(self, x: torch.Tensor):
-        x1, x2 = torch.split(x, x.shape[0] // 2, dim=0)
-
-        y1 = self.forward(x1)
-        y2 = self.copy_module(x2)
-        y = torch.cat([y1, y2], dim=-1)
-
+    def ditill_forward(self, x: torch.Tensor):
         if self.training:
-            loss = self.distill(y1, y2)
-            self.loss = loss
+            self.update_mask()
+            from mmrazor.utils import print_log
+            print_log(f'{x.shape}')
+            x1, x2 = torch.split(x, x.shape[0] // 2, dim=0)
+
+            y1 = self.self_forward(x1)
+            y2 = self.copy_module(x2)
+            y = torch.cat([y1, y2], dim=0)
+
+            if self.training:
+                loss = self.distill(y1, y2)
+                self.loss = loss
+            else:
+                self.loss = None
+            print_log
+            return y
         else:
-            self.loss = None
-        return y
+            return self.self_forward(x)
+
+    def self_forward(self, x: torch.Tensor):
+        raise NotImplementedError()
+
+    @torch.no_grad()
+    def update_mask(self):
+        weight = self.weight.reshape([-1, 4])
+        index = weight.topk(2, dim=-1)[1]  # N 2
+        mask = torch.zeros_like(weight)
+        mask.scatter_(dim=-1, index=index, value=1)
+        self.mask.copy_(mask)
 
 
 class DistillSparseGptLinear(DynamicLinear, DistillSparseGptMixin):
@@ -51,6 +72,15 @@ class DistillSparseGptLinear(DynamicLinear, DistillSparseGptMixin):
         new_module = new_module.to(dtype)
 
         return new_module
+
+    def forward(self, x: torch.Tensor):
+
+        return DistillSparseGptMixin.ditill_forward(self, x)
+
+    def self_forward(self, x: torch.Tensor):
+        weight = self.weight * self.mask
+        y = F.linear(x, weight, self.bias)
+        return y
 
 
 class DistillSparseGptMutator():
@@ -70,6 +100,11 @@ class DistillSparseGptMutator():
             if op.loss is not None:
                 loss = loss + op.loss
         return loss
+
+    @torch.no_grad()
+    def update_masks(self):
+        for op in self.sparse_ops:
+            op.update_mask()
 
     @property
     def sparse_ops(self):
