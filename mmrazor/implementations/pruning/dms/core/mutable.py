@@ -144,6 +144,19 @@ class MutableHead(BaseMutable, DMSMutableMixIn):
     def limit_value(self):
         self.e.data = torch.clamp(self.e, 1 / self.num_heads, 1.0)
 
+    def info(self):
+
+        def get_mask_str():
+            mask_str = ''
+            for i in range(self.num_heads):
+                if self.mask[i] == 1:
+                    mask_str += '1'
+                else:
+                    mask_str += '0'
+            return mask_str
+
+        return super().info() + f'\t{get_mask_str()}\t'
+
 
 class MutableChannelForHead(BaseMutable, DMSMutableMixIn):
 

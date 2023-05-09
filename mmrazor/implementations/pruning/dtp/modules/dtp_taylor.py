@@ -61,7 +61,10 @@ class DMSMutableMixIn():
 
     @property
     def current_imp(self):
-        e_imp = dtp_get_importance(self.taylor, self.e)
+        if self.taylor.max() == self.taylor.min():
+            e_imp = torch.ones_like(self.taylor, requires_grad=True)
+        else:
+            e_imp = dtp_get_importance(self.taylor, self.e)
         if self.training and e_imp.requires_grad:
             e_imp.register_hook(
                 taylor_backward_hook_wrapper(self, e_imp.detach()))
@@ -118,7 +121,10 @@ class DTPTMutableChannelImp(BaseDTPMutableChannel):
 
     @property
     def current_imp(self):
-        e_imp = dtp_get_importance(self.taylor, self.e)
+        if self.taylor.max() == self.taylor.min():
+            e_imp = torch.ones_like(self.taylor, requires_grad=True)
+        else:
+            e_imp = dtp_get_importance(self.taylor, self.e)
         if self.training and e_imp.requires_grad:
             e_imp.register_hook(
                 taylor_backward_hook_wrapper(self, e_imp.detach()))

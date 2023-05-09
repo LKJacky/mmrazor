@@ -63,6 +63,7 @@ model = dict(
     architecture=architecture,
     mutator_cfg=dict(
         type='DMSMutator',
+        prune_qkv=False,
         dtp_mutator_cfg=dict(
             type='DTPAMutator',
             channel_unit_cfg=dict(type='DTPTUnit', default_args=dict()),

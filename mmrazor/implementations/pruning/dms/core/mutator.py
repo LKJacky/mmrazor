@@ -89,6 +89,7 @@ def to_hard(scale):
 class DMSMutator(BaseMutator):
 
     def __init__(self,
+                 prune_qkv=True,
                  dtp_mutator_cfg=dict(
                      type='DTPAMutator',
                      channel_unit_cfg=dict(
@@ -112,6 +113,8 @@ class DMSMutator(BaseMutator):
         self.attn_initialzer = AttnInitialer()
         self.attn_mutables = nn.ModuleList()
 
+        self.prune_qkv = prune_qkv
+
     def prepare_from_supernet(self, supernet) -> None:
         self.saved_model = [supernet]
         self.dtp_mutator.prepare_from_supernet(supernet)
@@ -119,6 +122,8 @@ class DMSMutator(BaseMutator):
             self.block_initializer.prepare_from_supernet(supernet))
         self.attn_mutables = self.attn_initialzer.prepare_from_supernet(
             supernet)
+        if not self.prune_qkv:
+            self.fix_qkv()
 
     def info(self):
 
@@ -175,12 +180,19 @@ class DMSMutator(BaseMutator):
     def get_soft_flop(self, model):
         return QuickFlopMixin.get_flop(model)
 
+    def fix_qkv(self):
+        for mutables in self.attn_mutables:
+            mutables['qk'].requires_grad_(False)
+            mutables['v'].requires_grad_(False)
+
     def channel_depth_train(self):
         self.dtp_mutator.ratio_train()
         for mul in self.block_mutables:
             mul.requires_grad_(True)
         self.attn_mutables.requires_grad_(True)
         self.set_soft_flop_scale_converter(None)
+        if not self.prune_qkv:
+            self.fix_qkv()
 
     def channel_train(self):
         self.dtp_mutator.ratio_train()
@@ -191,6 +203,8 @@ class DMSMutator(BaseMutator):
             if isinstance(modele, MutableHead):
                 modele.requires_grad_(False)
         self.set_soft_flop_scale_converter(to_hard)
+        if not self.prune_qkv:
+            self.fix_qkv()
 
     @property
     def choice_template(self):
