@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 from mmrazor.utils import print_log
+from .obc_ops import OBCConv2d, OBCLinear
 from .ops import SparseGptConv2d, SparseGptLinear, SparseGptMixIn
 from .utils import replace_with_dynamic_ops
 
@@ -94,3 +95,18 @@ class SparseGptMutator():
         for name, module in self.model.named_modules():
             if isinstance(module, SparseGptMixIn):
                 yield name, module
+
+
+class OBCMutator(SparseGptMutator):
+
+    def prepare_from_supernet(self,
+                              model,
+                              prune_conv=True,
+                              prune_linear=True) -> None:
+        self.model = model
+        prune_modules: dict = {}
+        if prune_conv:
+            prune_modules[nn.Conv2d] = OBCConv2d
+        if prune_linear:
+            prune_modules[nn.Linear] = OBCLinear
+        replace_with_dynamic_ops(model, prune_modules)

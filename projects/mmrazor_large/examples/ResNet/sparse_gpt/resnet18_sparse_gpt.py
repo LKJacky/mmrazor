@@ -119,7 +119,7 @@ if __name__ == '__main__':
     model = torchvision.models.resnet18(pretrained=True)
     train_loader, test_loader = get_dataloaders(batch_size, 4, data_path)
 
-    mutator = sparse_gpt.SparseGptMutator()
+    mutator = sparse_gpt.OBCMutator()
     mutator.prepare_from_supernet(model)
 
     model.cuda()

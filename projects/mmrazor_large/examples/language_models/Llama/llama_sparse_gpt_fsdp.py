@@ -78,7 +78,7 @@ def main(rank, world_size=8, args=None):
         model = get_model(model_name)
 
         # init mutator
-        mutator = sparse_gpt.SparseGptMutator()
+        mutator = sparse_gpt.OBCMutator()
         mutator.prepare_from_supernet(model.model.layers)
         return model, mutator
 
