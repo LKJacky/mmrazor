@@ -42,11 +42,11 @@ param_scheduler = [
 ]
 find_unused_parameters = True
 
+architecture = _base_.model
+architecture['backbone']['stochastic_depth_prob'] = 0.0
 ##############################################################################
 
 custom_imports = dict(imports=['projects'])
-
-architecture = _base_.model
 
 if hasattr(_base_, 'data_preprocessor'):
     architecture.update({'data_preprocessor': _base_.data_preprocessor})

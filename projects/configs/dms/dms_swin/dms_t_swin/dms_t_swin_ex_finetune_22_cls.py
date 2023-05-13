@@ -27,10 +27,10 @@ param_scheduler = [
 ]
 
 find_unused_parameters = True
-
+algorithm = _base_.model
+algorithm['architecture']['backbone']['stochastic_depth_prob'] = 0.2
 ##############################################################################
 
-algorithm = _base_.model
 algorithm.init_cfg = dict(type='Pretrained', checkpoint=pruned_path)
 
 model = dict(

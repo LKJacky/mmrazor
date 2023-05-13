@@ -86,7 +86,9 @@ class DMSMutableMixIn():
     def update_taylor(self, input, grad):
         new_taylor = (input * grad)**2
         all_reduce(new_taylor)
-        self.taylor = self.taylor * self.decay + (1 - self.decay) * new_taylor
+        if new_taylor.max() != new_taylor.min():
+            self.taylor = self.taylor * self.decay + (1 -
+                                                      self.decay) * new_taylor
 
     def dump_chosen(self):
         pass
@@ -146,7 +148,9 @@ class DTPTMutableChannelImp(BaseDTPMutableChannel):
     def update_taylor(self, input, grad):
         new_taylor = (input * grad)**2
         all_reduce(new_taylor)
-        self.taylor = self.taylor * self.decay + (1 - self.decay) * new_taylor
+        if new_taylor.max() != new_taylor.min():
+            self.taylor = self.taylor * self.decay + (1 -
+                                                      self.decay) * new_taylor
 
 
 @MODELS.register_module()
