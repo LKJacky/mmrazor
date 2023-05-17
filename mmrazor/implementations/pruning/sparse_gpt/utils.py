@@ -26,13 +26,13 @@ class ModuleProtocol(Protocol):
     def register_buffer(self, name, tensor):
         pass
 
-    @property
-    def training(self) -> bool:
-        pass
+    # @property
+    # def training(self) -> bool:
+    #     pass
 
-    @training.setter
-    def training(self, value):
-        pass
+    # @training.setter
+    # def training(self, value):
+    #     pass
 
 
 class DynamicOpProtocol(ModuleProtocol):
