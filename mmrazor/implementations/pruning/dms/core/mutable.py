@@ -66,7 +66,7 @@ class MutableBlocks(BaseMutable):
 
     @torch.no_grad()
     def limit_value(self):
-        self.e.data = torch.clip(self.e.data, 1 / self.num_blocks, 1.0)
+        self.e.data = torch.clip(self.e.data, 0, 1.0)
 
     @torch.no_grad()
     def update_taylor(self, input, grad):
@@ -142,7 +142,7 @@ class MutableHead(BaseMutable, DMSMutableMixIn):
 
     @torch.no_grad()
     def limit_value(self):
-        self.e.data = torch.clamp(self.e, 1 / self.num_heads, 1.0)
+        self.e.data = torch.clamp(self.e, 0, 1.0)
 
     def info(self):
 
