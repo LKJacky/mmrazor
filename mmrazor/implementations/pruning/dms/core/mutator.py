@@ -90,6 +90,7 @@ class DMSMutator(BaseMutator):
 
     def __init__(self,
                  prune_qkv=True,
+                 use_tayler=True,
                  dtp_mutator_cfg=dict(
                      type='DTPAMutator',
                      channel_unit_cfg=dict(
@@ -115,6 +116,8 @@ class DMSMutator(BaseMutator):
 
         self.prune_qkv = prune_qkv
 
+        self.use_tayler = use_tayler
+
     def prepare_from_supernet(self, supernet) -> None:
         self.saved_model = [supernet]
         self.dtp_mutator.prepare_from_supernet(supernet)
@@ -124,6 +127,19 @@ class DMSMutator(BaseMutator):
             supernet)
         if not self.prune_qkv:
             self.fix_qkv()
+
+        if not self.use_tayler:
+            self.to_index_importance()
+
+    def to_index_importance(self):
+        for unit in self.dtp_mutator.mutable_units:
+            unit.mutable_channel.to_index_importance()
+        for mutable in self.block_mutables:
+            mutable.to_index_importance()
+        for mutable in self.attn_mutables:
+            mutable['qk'].to_index_importance()
+            mutable['v'].to_index_importance()
+            mutable['head'].to_index_importance()
 
     def info(self):
 

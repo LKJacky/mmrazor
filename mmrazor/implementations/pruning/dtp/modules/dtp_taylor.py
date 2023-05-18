@@ -9,6 +9,7 @@ from mmrazor.registry import MODELS
 from .mutable_channels import SimpleMutableChannel
 from .unit import BaseDTPUnit
 
+MaskThreshold = 0.5
 # dtp with taylor importance base dtp with adaptive importance
 
 
@@ -81,6 +82,9 @@ class DrivedDTPMutableChannelImp(DerivedMutable):
 class DMSMutableMixIn():
 
     def _dms_mutable_mixin_init(self, num_elem):
+
+        self.use_tayler = True
+
         self.e = nn.parameter.Parameter(
             torch.tensor([1.0]), requires_grad=False)
 
@@ -89,6 +93,7 @@ class DMSMutableMixIn():
         self.taylor: torch.Tensor
 
         self.decay = 0.99
+        self.lda = 1.0
         self.requires_grad_(False)
 
     @property
@@ -96,13 +101,13 @@ class DMSMutableMixIn():
         if self.taylor.max() == self.taylor.min():
             e_imp = torch.ones_like(self.taylor, requires_grad=True)
         else:
-            e_imp = dtp_get_importance(self.taylor, self.e)
-        if self.training and e_imp.requires_grad:
+            e_imp = dtp_get_importance(self.taylor, self.e, lamda=self.lda)
+        if self.training and e_imp.requires_grad and self.use_tayler:
             e_imp.register_hook(
                 taylor_backward_hook_wrapper(self, e_imp.detach()))
         if self.training:
             with torch.no_grad():
-                self.mask.data = (e_imp >= 0.5).float()
+                self.mask.data = (e_imp >= MaskThreshold).float()
         return e_imp
 
     @property
@@ -147,6 +152,12 @@ class DMSMutableMixIn():
 
         return DrivedDTPMutableChannelImp(_expand_mask, _expand_mask,
                                           expand_ratio, [self])
+
+    @torch.no_grad()
+    def to_index_importance(self):
+        self.use_tayler = False
+        self.taylor.data = 1 - torch.linspace(
+            0, 1, self.taylor.numel(), device=self.taylor.device)
 
 
 class DTPTMutableChannelImp(SimpleMutableChannel, DMSMutableMixIn):
