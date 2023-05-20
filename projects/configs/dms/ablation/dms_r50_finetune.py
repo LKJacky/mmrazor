@@ -2,7 +2,7 @@
 import os
 
 _base_ = ['./dms_r50_prune.py']
-pruned_path = f"./work_dirs/{os.environ['JOB_NAME']}/{os.environ.get('PTH_NAME','epoch_30')}.pth"  # noqa
+pruned_path = f"./work_dirs/{os.environ['JOB_NAME_']}/{os.environ.get('PTH_NAME','epoch_30')}.pth"  # noqa
 
 epoch = 100
 train_cfg = dict(by_epoch=True, max_epochs=epoch)
