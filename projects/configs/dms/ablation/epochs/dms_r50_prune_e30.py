@@ -15,7 +15,7 @@ log_interval = 1000
 
 input_shape = (1, 3, 224, 224)
 
-epoch = 10
+epoch = 30
 train_cfg = dict(by_epoch=True, max_epochs=epoch)
 
 original_lr = _base_.optim_wrapper.optimizer.lr
