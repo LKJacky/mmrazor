@@ -36,3 +36,23 @@ export JOB_NAME_=${EXP_NAME}/dms_r50_prune_e30
 export PTH_NAME=epoch_30
 sh ./tools/slurm_train.sh eval test projects/configs/dms/ablation/epochs/dms_r50_prune_e30.py work_dirs/${JOB_NAME_}
 sh ./tools/slurm_train.sh eval test projects/configs/dms/ablation/dms_r50_finetune.py work_dirs/${JOB_NAME_}_finetune
+
+export JOB_NAME_=${EXP_NAME}/dms_r50_prune_e5_e
+export PTH_NAME=epoch_5
+sh ./tools/slurm_train.sh eval test projects/configs/dms/ablation/epochs/dms_r50_prune_e5_e.py work_dirs/${JOB_NAME_}
+sh ./tools/slurm_train.sh eval test projects/configs/dms/ablation/dms_r50_finetune.py work_dirs/${JOB_NAME_}_finetune
+
+export JOB_NAME_=${EXP_NAME}/dms_r50_prune_e10_e
+export PTH_NAME=epoch_10
+sh ./tools/slurm_train.sh eval test projects/configs/dms/ablation/epochs/dms_r50_prune_e10_e.py work_dirs/${JOB_NAME_}
+sh ./tools/slurm_train.sh eval test projects/configs/dms/ablation/dms_r50_finetune.py work_dirs/${JOB_NAME_}_finetune
+
+export JOB_NAME_=${EXP_NAME}/dms_r50_prune_e20_e
+export PTH_NAME=epoch_20
+sh ./tools/slurm_train.sh eval test projects/configs/dms/ablation/epochs/dms_r50_prune_e20_e.py work_dirs/${JOB_NAME_}
+sh ./tools/slurm_train.sh eval test projects/configs/dms/ablation/dms_r50_finetune.py work_dirs/${JOB_NAME_}_finetune
+
+export JOB_NAME_=${EXP_NAME}/dms_r50_prune_e30_e
+export PTH_NAME=epoch_30
+sh ./tools/slurm_train.sh eval test projects/configs/dms/ablation/epochs/dms_r50_prune_e30_e.py work_dirs/${JOB_NAME_}
+sh ./tools/slurm_train.sh eval test projects/configs/dms/ablation/dms_r50_finetune.py work_dirs/${JOB_NAME_}_finetune
