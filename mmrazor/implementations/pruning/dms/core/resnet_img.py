@@ -304,7 +304,7 @@ class BasicBlock(BaseBasicBlock, DynamicBlockMixin):
 
             out = self.drop_path(out)
 
-            out += identity * self.scale
+            out = identity + out * self.scale
 
             return out
 
@@ -322,7 +322,12 @@ class BasicBlock(BaseBasicBlock, DynamicBlockMixin):
         return self.downsample is None
 
     def to_static_op(self) -> nn.Module:
-        raise NotImplementedError()
+        from mmrazor.structures.subnet.fix_subnet import _dynamic_to_static
+        module = BaseBasicBlock(*self.init_args, **self.init_kwargs)
+        for name, m in self.named_children():
+            assert hasattr(module, name)
+            setattr(module, name, _dynamic_to_static(m))
+        return module
 
 
 class Bottleneck(BaseBottleneck, DynamicBlockMixin):
