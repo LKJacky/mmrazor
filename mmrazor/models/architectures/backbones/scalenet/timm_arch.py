@@ -9,9 +9,8 @@ from timm.models.registry import register_model
 
 
 @register_model
-def scale_net_timm(**kwargs):
-    variant = 'scalenet'
-    pretrained = False
+def scale_net_timm(pretrained=False, **kwargs):
+    variant = 'scale_net_timm'
 
     def get_block(out_c, kernel=3, stride=2, repeat=1, expand=6):
         return f'ir_r{repeat}_k{kernel}_s{stride}_e{expand}_c{out_c}_se0.25'
@@ -50,3 +49,6 @@ def scale_net_timm(**kwargs):
     )
     model = _create_effnet(variant, pretrained, **model_kwargs)
     return model
+
+
+# sh ./timm_distributed_train.sh 1 data/imagenet_torch --model scale_net_timm -b 128 --sched step --epochs 300 --decay-epochs 2.4 --decay-rate .97 --opt rmsproptf --opt-eps .001 -j 8 --warmup-lr 1e-6 --weight-decay 1e-5 --drop 0.2 --drop-path 0.2 --model-ema --model-ema-decay 0.9999 --aa rand-m9-mstd0.5 --remode pixel --reprob 0.2 --amp --lr 0.08 --warmup-epochs=3 # noqa

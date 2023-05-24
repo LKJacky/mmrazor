@@ -42,6 +42,9 @@ from timm.scheduler import create_scheduler_v2, scheduler_kwargs
 from timm.utils import ApexScaler, NativeScaler
 from torch.nn.parallel import DistributedDataParallel as NativeDDP
 
+from mmrazor.models.architectures.backbones.scalenet.timm_arch import \
+    scale_net_timm
+
 try:
     from apex import amp
     from apex.parallel import DistributedDataParallel as ApexDDP
