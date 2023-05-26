@@ -63,9 +63,12 @@ class SequentialMutableChannelUnit(MutableChannelUnit):
         # register MutableMask
         from torchvision.models.swin_transformer import ShiftedWindowAttention
 
+        from mmrazor.implementations.pruning.dms.core.opt import (
+            DynamicEmbedding, DynamicOPTAttention,
+            DynamicOPTLearnedPositionalEmbedding, OPTAttention,
+            OPTLearnedPositionalEmbedding)
         from mmrazor.implementations.pruning.dms.core.swin import (
             BaseShiftedWindowAttention, DynamicShiftedWindowAttention)
-
         self._replace_with_dynamic_ops(
             model, {
                 Conv2dAdaptivePadding:
@@ -79,6 +82,10 @@ class SequentialMutableChannelUnit(MutableChannelUnit):
                 ShiftedWindowAttention: DynamicShiftedWindowAttention,
                 BaseShiftedWindowAttention: DynamicShiftedWindowAttention,
                 nn.LayerNorm: dynamic_ops.DynamicLayerNorm,
+                OPTAttention: DynamicOPTAttention,
+                nn.Embedding: DynamicEmbedding,
+                OPTLearnedPositionalEmbedding:
+                DynamicOPTLearnedPositionalEmbedding
             })
         self._register_channel_container(model, MutableChannelContainer)
         self._register_mutable_channel(self.mutable_channel)
