@@ -51,4 +51,12 @@ def scale_net_timm(pretrained=False, **kwargs):
     return model
 
 
+if __name__ == '__main__':
+    import torch
+    model = scale_net_timm()
+    print(model)
+    import thop
+    res = thop.profile(model, (torch.rand(1, 3, 224, 224), ))
+    print(res[0] / 1e6, res[1] / 1e6)
+
 # sh ./timm_distributed_train.sh 1 data/imagenet_torch --model scale_net_timm -b 128 --sched step --epochs 300 --decay-epochs 2.4 --decay-rate .97 --opt rmsproptf --opt-eps .001 -j 8 --warmup-lr 1e-6 --weight-decay 1e-5 --drop 0.2 --drop-path 0.2 --model-ema --model-ema-decay 0.9999 --aa rand-m9-mstd0.5 --remode pixel --reprob 0.2 --amp --lr 0.08 --warmup-epochs=3 # noqa
