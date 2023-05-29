@@ -1,12 +1,10 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import torch.nn as nn
 
-from mmrazor.registry import TASK_UTILS
 from mmrazor.utils import print_log
 from .mutator import BaseDTPMutator
 
 
-@TASK_UTILS.register_module()
 class BaseDTPScheduler:
 
     def __init__(

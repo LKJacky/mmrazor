@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from mmrazor.registry import MODELS, TASK_UTILS
+from mmrazor.registry import MODELS
 from .mutable_channels import BaseDTPMutableChannel, dtp_get_importance
 from .mutator import BaseDTPMutator
 # dtp with feature norm
@@ -90,7 +90,6 @@ class DTPAMutator(BaseDTPMutator):
             unit.requires_grad_(True)
 
 
-@TASK_UTILS.register_module()
 class DTPAScheduler(BaseDTPScheduler):
     mutator: DTPAMutator
 
