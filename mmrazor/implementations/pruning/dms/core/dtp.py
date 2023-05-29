@@ -9,7 +9,7 @@ from mmrazor.models.task_modules.demo_inputs import DefaultDemoInput
 from mmrazor.registry import MODELS, TASK_UTILS
 from ...chip.collect.mutator import CollectMutatorMixin
 from ...dtp.modules.dtp_adaptive import DTPAUnit
-from ...dtp.modules.ops import QuickFlopMixin
+from .op import QuickFlopMixin
 
 
 class BaseDTPMutator(ChannelMutator, CollectMutatorMixin):

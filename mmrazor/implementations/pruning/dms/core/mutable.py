@@ -4,6 +4,7 @@ import torch.nn as nn
 from mmengine.dist import all_reduce
 
 from mmrazor.models.mutables import (BaseMutable, DerivedMutable,
+                                     MutableChannelContainer,
                                      SimpleMutableChannel)
 
 BlockThreshold = 0.5
@@ -170,6 +171,47 @@ class DTPTMutableChannelImp(SimpleMutableChannel, DMSMutableMixIn):
 
     def fix_chosen(self, chosen=None):
         return super().fix_chosen(chosen)
+
+
+class ImpMutableChannelContainer(MutableChannelContainer):
+
+    def __init__(self, num_channels: int, **kwargs):
+        super().__init__(num_channels, **kwargs)
+        self.register_buffer(
+            '_tmp_imp', torch.ones([self.num_channels]), persistent=False)
+        self._tmp_imp: torch.Tensor
+
+    @property
+    def current_imp(self):
+        """Get current choices."""
+        if len(self.mutable_channels) == 0:
+            return self._tmp_imp
+        else:
+            self._fill_unregistered_range()
+            self._assert_mutables_valid()
+            mutable_channels = list(self.mutable_channels.values())
+            imps = [mutable.current_imp for mutable in mutable_channels]
+            if len(imps) == 1:
+                return imps[0]
+            else:
+                imp = torch.cat(imps)
+                return imp
+
+    @property
+    def current_imp_flop(self):
+        """Get current choices."""
+        if len(self.mutable_channels) == 0:
+            return self._tmp_imp
+        else:
+            self._fill_unregistered_range()
+            self._assert_mutables_valid()
+            mutable_channels = list(self.mutable_channels.values())
+            imps = [mutable.current_imp_flop for mutable in mutable_channels]
+            if len(imps) == 1:
+                imp = imps[0]
+            else:
+                imp = torch.cat(imps)
+            return imp
 
 
 #############################################################################

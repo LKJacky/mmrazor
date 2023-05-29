@@ -7,11 +7,10 @@ from mmrazor.models.architectures import dynamic_ops
 from mmrazor.models.mutables import L1MutableChannelUnit
 from mmrazor.registry import MODELS
 from ...chip.collect.unit import CollectUnitMixin
-from ...dtp.modules.dtp_taylor import DMSMutableMixIn
-from ...dtp.modules.mutable_channels import (DTPMutableChannelImp,
-                                             ImpMutableChannelContainer,
-                                             SimpleMutableChannel)
-from ...dtp.modules.ops import ImpBatchnorm2d, ImpConv2d, ImpLinear
+from .mutable import DTPTMutableChannelImp, ImpMutableChannelContainer
+from .op import ImpBatchnorm2d, ImpConv2d, ImpLinear
+
+DTPMutableChannelImp = DTPTMutableChannelImp
 
 
 class BaseDTPUnit(L1MutableChannelUnit, CollectUnitMixin):
@@ -44,16 +43,6 @@ class BaseDTPUnit(L1MutableChannelUnit, CollectUnitMixin):
 
     def info(self):
         raise NotImplementedError()
-
-
-class DTPTMutableChannelImp(SimpleMutableChannel, DMSMutableMixIn):
-
-    def __init__(self, num_channels: int, **kwargs) -> None:
-        super().__init__(num_channels, **kwargs)
-        self._dms_mutable_mixin_init(self.num_channels)
-
-    def fix_chosen(self, chosen=None):
-        return super().fix_chosen(chosen)
 
 
 @MODELS.register_module()
