@@ -6,8 +6,9 @@ from .models.resnet_img import ResNetDMS
 from .models.swin import TorchSwinBackbone
 from .mutator import DMSMutator
 from .scheduler import DMSScheduler
+from .unit import DTPTUnit
 
 __all__ = [
     'ResNetCifarDMS', 'DMSMutator', 'ResNetDMS', 'DMSScheduler',
-    'DmsMobileNetV2', 'TorchSwinBackbone', 'DTPAMutator'
+    'DmsMobileNetV2', 'TorchSwinBackbone', 'DTPAMutator', 'DTPTUnit'
 ]

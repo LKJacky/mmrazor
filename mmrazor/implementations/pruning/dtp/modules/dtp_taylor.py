@@ -5,7 +5,6 @@ import torch.nn as nn
 from mmengine.dist import all_reduce
 
 from mmrazor.models.mutables import DerivedMutable
-from mmrazor.registry import MODELS
 from .mutable_channels import SimpleMutableChannel
 from .unit import BaseDTPUnit
 
@@ -170,7 +169,6 @@ class DTPTMutableChannelImp(SimpleMutableChannel, DMSMutableMixIn):
         return super().fix_chosen(chosen)
 
 
-@MODELS.register_module()
 class DTPTUnit(BaseDTPUnit):
 
     def __init__(

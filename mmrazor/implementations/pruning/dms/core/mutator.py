@@ -7,8 +7,7 @@ import torch.nn as nn
 from mmrazor.models.mutators.base_mutator import BaseMutator
 from mmrazor.models.task_modules.demo_inputs import DefaultDemoInput
 from mmrazor.registry import MODELS, TASK_UTILS
-from ...dtp.modules.dtp_adaptive import DTPAMutator
-from ...dtp.modules.ops import QuickFlopMixin
+from .dtp import DTPAMutator, QuickFlopMixin
 from .models.mobilenet import MobileNetLayers
 from .models.resnet import ResLayer
 from .models.resnet_img import ResLayer as ResLayerImg
