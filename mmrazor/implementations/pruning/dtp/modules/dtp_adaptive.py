@@ -62,7 +62,6 @@ class DTPAUnit(BaseDTPUnit):
                 f'{self.mutable_channel.e.item():.3f}')  # noqa
 
 
-@MODELS.register_module()
 class DTPAMutator(BaseDTPMutator):
 
     def __init__(
