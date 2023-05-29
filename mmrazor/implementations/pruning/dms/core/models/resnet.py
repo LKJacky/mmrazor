@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from mmrazor.registry import MODELS
-from .op import DynamicBlockMixin
+from ..op import DynamicBlockMixin
 
 
 class ResLayer(nn.Sequential):

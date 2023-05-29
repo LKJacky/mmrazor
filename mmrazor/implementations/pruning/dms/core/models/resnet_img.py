@@ -11,7 +11,7 @@ from mmengine.model.weight_init import constant_init
 from mmengine.utils.dl_utils.parrots_wrapper import _BatchNorm
 
 from mmrazor.registry import MODELS
-from .op import DynamicBlockMixin
+from ..op import DynamicBlockMixin
 
 eps = 1.0e-5
 

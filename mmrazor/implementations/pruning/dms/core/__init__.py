@@ -1,11 +1,11 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from .dtp import DTPAMutator
-from .mobilenet import DmsMobileNetV2
+from .models.mobilenet import DmsMobileNetV2
+from .models.resnet import ResNetCifarDMS
+from .models.resnet_img import ResNetDMS
+from .models.swin import TorchSwinBackbone
 from .mutator import DMSMutator
-from .resnet import ResNetCifarDMS
-from .resnet_img import ResNetDMS
 from .scheduler import DMSScheduler
-from .swin import TorchSwinBackbone
 
 __all__ = [
     'ResNetCifarDMS', 'DMSMutator', 'ResNetDMS', 'DMSScheduler',

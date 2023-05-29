@@ -8,7 +8,7 @@ from mmcls.models.backbones.mobilenet_v2 import \
 from mmcls.models.backbones.mobilenet_v2 import MobileNetV2
 
 from mmrazor.registry import MODELS
-from .op import DynamicBlockMixin
+from ..op import DynamicBlockMixin
 
 
 class InvertedResidual(BaseInvertedResidual, DynamicBlockMixin):

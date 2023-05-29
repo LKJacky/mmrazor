@@ -9,13 +9,13 @@ from mmrazor.models.task_modules.demo_inputs import DefaultDemoInput
 from mmrazor.registry import MODELS, TASK_UTILS
 from ...dtp.modules.dtp_adaptive import DTPAMutator
 from ...dtp.modules.ops import QuickFlopMixin
-from .mobilenet import MobileNetLayers
+from .models.mobilenet import MobileNetLayers
+from .models.resnet import ResLayer
+from .models.resnet_img import ResLayer as ResLayerImg
+from .models.swin import ImpShiftedWindowAttention, SwinSequential
 from .mutable import (BlockThreshold, DMSMutableMixIn, MutableBlocks,
                       MutableHead)
 from .op import DynamicStage
-from .resnet import ResLayer
-from .resnet_img import ResLayer as ResLayerImg
-from .swin import ImpShiftedWindowAttention, SwinSequential
 
 
 def replace_modules(model: nn.Module, module_map={}):

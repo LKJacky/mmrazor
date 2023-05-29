@@ -18,10 +18,11 @@ from mmrazor.models.architectures.ops.swin import BaseShiftedWindowAttention
 from mmrazor.models.mutables import BaseMutable
 from mmrazor.models.task_modules.estimators.counters import BaseCounter
 from mmrazor.registry import MODELS, TASK_UTILS
-from ...dtp.modules.mutable_channels import ImpMutableChannelContainer
-from ...dtp.modules.ops import ImpLinear, soft_mask_sum
-from .mutable import MutableChannelForHead, MutableChannelWithHead, MutableHead
-from .op import DynamicBlockMixin
+from ....dtp.modules.mutable_channels import ImpMutableChannelContainer
+from ....dtp.modules.ops import ImpLinear, soft_mask_sum
+from ..mutable import (MutableChannelForHead, MutableChannelWithHead,
+                       MutableHead)
+from ..op import DynamicBlockMixin
 
 
 class DynamicShiftedWindowAttention(BaseShiftedWindowAttention,

@@ -3,10 +3,10 @@ import unittest
 import torch
 from mmcls.models.utils.attention import WindowMSA
 
+from mmrazor.implementations.pruning.dms.core.models.swin import (
+    DynamicShiftedWindowAttention, DynamicWindowMSA)
 from mmrazor.implementations.pruning.dms.core.mutable import (
     MutableChannelForHead, MutableChannelWithHead, MutableHead)
-from mmrazor.implementations.pruning.dms.core.swin import (
-    DynamicShiftedWindowAttention, DynamicWindowMSA)
 from mmrazor.models.architectures.ops.swin import BaseShiftedWindowAttention
 from mmrazor.models.mutables import SquentialMutableChannel
 from mmrazor.utils import log_tools

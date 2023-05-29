@@ -28,7 +28,7 @@ class BaseDTPUnit(L1MutableChannelUnit, CollectUnitMixin):
 
     def prepare_for_pruning(self, model: nn.Module):
 
-        from mmrazor.implementations.pruning.dms.core.swin import (
+        from mmrazor.implementations.pruning.dms.core.models.swin import (
             BaseShiftedWindowAttention, ImpShiftedWindowAttention)
         from .ops import ImpLayerNorm
         self._replace_with_dynamic_ops(

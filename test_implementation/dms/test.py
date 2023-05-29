@@ -3,10 +3,10 @@ import unittest
 
 import torch
 
+from mmrazor.implementations.pruning.dms.core.models.resnet import (
+    ResNetCifarDMS, ResNetCifarSuper)
 from mmrazor.implementations.pruning.dms.core.mutator import (BlockInitialer,
                                                               DMSMutator)
-from mmrazor.implementations.pruning.dms.core.resnet import (ResNetCifarDMS,
-                                                             ResNetCifarSuper)
 from mmrazor.registry import MODELS
 
 
@@ -62,7 +62,7 @@ class TestDMS(unittest.TestCase):
     #             print(a, scale_polarize(a, lam=lam), lam)
 
     def test_mobilenet(self):
-        from mmrazor.implementations.pruning.dms.core.mobilenet import (
+        from mmrazor.implementations.pruning.dms.core.models.mobilenet import (
             DmsMobileNetV2, MobileNetV2)
         model = DmsMobileNetV2()
         x = torch.rand([1, 3, 224, 224])

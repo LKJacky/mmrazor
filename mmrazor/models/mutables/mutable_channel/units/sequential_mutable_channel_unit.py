@@ -63,11 +63,11 @@ class SequentialMutableChannelUnit(MutableChannelUnit):
         # register MutableMask
         from torchvision.models.swin_transformer import ShiftedWindowAttention
 
-        from mmrazor.implementations.pruning.dms.core.opt import (
+        from mmrazor.implementations.pruning.dms.core.models.opt import (
             DynamicEmbedding, DynamicOPTAttention,
             DynamicOPTLearnedPositionalEmbedding, OPTAttention,
             OPTLearnedPositionalEmbedding)
-        from mmrazor.implementations.pruning.dms.core.swin import (
+        from mmrazor.implementations.pruning.dms.core.models.swin import (
             BaseShiftedWindowAttention, DynamicShiftedWindowAttention)
         self._replace_with_dynamic_ops(
             model, {
