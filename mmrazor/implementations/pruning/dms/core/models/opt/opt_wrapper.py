@@ -7,6 +7,7 @@ from mmrazor.implementations.pruning.dms.core.mutator import DMSMutator
 from mmrazor.implementations.pruning.dms.core.scheduler import DMSScheduler
 from mmrazor.models.task_modules.demo_inputs import BaseDemoInput
 from mmrazor.registry import MODELS, TASK_UTILS
+from mmrazor.utils import print_log
 
 
 @TASK_UTILS.register_module()
@@ -26,11 +27,14 @@ class OptDemoInput(BaseDemoInput):
         return data
 
 
+import copy
+
+
 class DmsOptAlgorithm(nn.Module):
 
     def __init__(self, model: OPTForCausalLM) -> None:
         super().__init__()
-        self.model = model
+        self.model = copy.deepcopy(model)
 
         self.mutator: DMSMutator = MODELS.build(
             dict(
@@ -60,6 +64,8 @@ class DmsOptAlgorithm(nn.Module):
             by_epoch=False,
             target_scheduler='cos',
         )
+        self.model.load_state_dict(
+            model.state_dict(), strict=False)  # remain a bug
 
     def forward(
         self,
@@ -85,6 +91,33 @@ class DmsOptAlgorithm(nn.Module):
             return super().__getattr__(name)
         except AttributeError:
             return getattr(self.model, name)
+
+
+from transformers import TrainingArguments
+from transformers.trainer_callback import (TrainerCallback, TrainerControl,
+                                           TrainerState)
+
+
+class DmsCallbacks(TrainerCallback):
+
+    def on_step_begin(self, args: TrainingArguments, state: TrainerState,
+                      control: TrainerControl, **kwargs):
+        super().on_step_begin(args, state, control, **kwargs)
+        model: DmsOptAlgorithm = kwargs['model']
+        model.scheduler.before_train_forward(state.global_step, state.epoch,
+                                             state.max_steps,
+                                             state.num_train_epochs)
+
+        if state.global_step % model.scheduler.structure_log_interval == 0:
+            print_log(model.mutator.info())
+
+    def on_step_end(self, args: TrainingArguments, state: TrainerState,
+                    control: TrainerControl, **kwargs):
+        super().on_step_end(args, state, control, **kwargs)
+        model: DmsOptAlgorithm = kwargs['model']
+        model.scheduler.after_train_forward(state.global_step, state.epoch,
+                                            state.max_steps,
+                                            state.num_train_epochs)
 
 
 if __name__ == '__main__':

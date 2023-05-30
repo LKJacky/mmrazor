@@ -30,7 +30,7 @@ def get_default_out_index(module: nn.Module):
     if isinstance(module, nn.Embedding):
         return (0, module.embedding_dim)
     else:
-        raise NotImplementedError()
+        raise NotImplementedError(f'{type(module)}')
 
 
 class OutChannel(Channel):
@@ -62,9 +62,10 @@ class OPTChannelAnalyer():
             unit_fc = SequentialMutableChannelUnit(module.fc1.out_features)
             unit_fc.add_output_related(OutChannel(preffix + 'fc1', module.fc1))
             unit_fc.add_input_related(InChannel(preffix + 'fc2', module.fc2))
-            units[preffix + 'fc'] = unit_fc.config_template(
+            unit_fc_cfg = unit_fc.config_template(
                 with_init_args=True, with_channels=True)
-
+            unit_fc_cfg.pop('choice')
+            units[preffix + 'fc'] = unit_fc_cfg
             return units
 
         def parse_decoder(module: OPTDecoder, preffix=''):
@@ -85,9 +86,10 @@ class OPTChannelAnalyer():
             unit.add_output_related(
                 OutChannel(preffix + 'embed_positions',
                            module.embed_positions))
-            unit.add_output_related(
-                OutChannel(preffix + 'final_layer_norm',
-                           module.final_layer_norm))
+            if module.final_layer_norm is not None:
+                unit.add_output_related(
+                    OutChannel(preffix + 'final_layer_norm',
+                               module.final_layer_norm))
             for name, layer in module.layers.named_children():
                 layer: OPTDecoderLayer  # type: ignore
                 unit.add_output_related(
@@ -113,8 +115,10 @@ class OPTChannelAnalyer():
                               layer.self_attn_layer_norm))
                 unit.add_input_related(
                     InChannel(preffix_layer + f'{name}.fc1', layer.fc1))
-            return unit.config_template(
+            config = unit.config_template(
                 with_channels=True, with_init_args=True)
+            config.pop('choice')
+            return config
 
         def parse_model(module: OPTModel):
             units = {}

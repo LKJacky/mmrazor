@@ -174,7 +174,15 @@ class ImpOPTAttention(DynamicOPTAttention, ImpModuleMixin):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.init_args = args
+        self.init_kwargs = kwargs
+        self.mutable_attrs: Dict[str, BaseMutable] = nn.ModuleDict()
+
         self.q_proj = ImpLinear.convert_from(self.q_proj)
         self.k_proj = ImpLinear.convert_from(self.k_proj)
         self.v_proj = ImpLinear.convert_from(self.v_proj)
+
         self.out_proj = ImpLinear.convert_from(self.out_proj)
+
+        self.in_channels = self.q_proj.in_features
+        self.out_channels = self.out_proj.out_features
