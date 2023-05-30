@@ -3,8 +3,10 @@ import torch
 import torch.nn as nn
 from transformers.models.opt.modeling_opt import OPTForCausalLM, OPTModel
 
+from mmrazor.implementations.pruning.dms.core.mutator import DMSMutator
+from mmrazor.implementations.pruning.dms.core.scheduler import DMSScheduler
 from mmrazor.models.task_modules.demo_inputs import BaseDemoInput
-from mmrazor.registry import TASK_UTILS
+from mmrazor.registry import MODELS, TASK_UTILS
 
 
 @TASK_UTILS.register_module()
@@ -24,11 +26,40 @@ class OptDemoInput(BaseDemoInput):
         return data
 
 
-class SelfDistillAlgorithm(nn.Module):
+class DmsOptAlgorithm(nn.Module):
 
-    def __init__(self, model: nn.Module) -> None:
+    def __init__(self, model: OPTForCausalLM) -> None:
         super().__init__()
         self.model = model
+
+        self.mutator: DMSMutator = MODELS.build(
+            dict(
+                type='DMSMutator',
+                dtp_mutator_cfg=dict(
+                    type='DTPAMutator',
+                    channel_unit_cfg=dict(
+                        type='DTPTUnit', default_args=dict()),
+                    parse_cfg=dict(
+                        _scope_='mmrazor',
+                        type='ChannelAnalyzer',
+                        demo_input=dict(
+                            type='OptDemoInput',
+                            input_shape=(1, 128),
+                        ),
+                        tracer_type='FxTracer'),
+                ),
+            ))
+        self.scheduler = DMSScheduler(
+            self.model.model,
+            self.mutator,
+            flops_target=0.5,
+            decay_ratio=0.8,
+            refine_ratio=0.2,
+            flop_loss_weight=100,
+            structure_log_interval=100,
+            by_epoch=False,
+            target_scheduler='cos',
+        )
 
     def forward(
         self,
@@ -57,9 +88,9 @@ class SelfDistillAlgorithm(nn.Module):
 
 
 if __name__ == '__main__':
+
     model: OPTModel = OPTForCausalLM.from_pretrained('facebook/opt-125m').model
 
-    from mmrazor.implementations.pruning.dms.core.mutator import DMSMutator
     mutator = DMSMutator(
         dtp_mutator_cfg=dict(
             type='DTPAMutator',
@@ -81,3 +112,6 @@ if __name__ == '__main__':
     x = torch.rand([1, 128]).long()
     y = model(x)
     print(y['last_hidden_state'].shape)
+
+    model: OPTForCausalLM = OPTForCausalLM.from_pretrained('facebook/opt-125m')
+    algorithm = DmsOptAlgorithm(model)
