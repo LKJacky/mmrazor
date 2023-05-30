@@ -53,7 +53,7 @@ class ImpUnit(L1MutableChannelUnit):
     def __init__(
         self,
         num_channels: int,
-        imp_type='l1',
+        imp_type='dtp',
         grad_clip=-1,
         grad_mode=None,
         index_revert=False,

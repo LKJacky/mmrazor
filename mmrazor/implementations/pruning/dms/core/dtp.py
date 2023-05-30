@@ -1,14 +1,17 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import copy
 from typing import List
 
 import torch
 from torch import nn
+from transformers.models.opt.modeling_opt import OPTModel
 
 from mmrazor.models.mutators import ChannelMutator
 from mmrazor.models.task_modules.demo_inputs import DefaultDemoInput
 from mmrazor.registry import MODELS, TASK_UTILS
 from ...chip.collect.mutator import CollectMutatorMixin
 from ...dtp.modules.dtp_adaptive import DTPAUnit
+from .models.opt.opt_analyzer import OPTChannelAnalyer
 from .op import QuickFlopMixin
 
 
@@ -31,10 +34,34 @@ class BaseDTPMutator(ChannelMutator, CollectMutatorMixin):
         self.demo_input = parse_cfg['demo_input']
 
     def prepare_from_supernet(self, supernet) -> None:
-        res = super().prepare_from_supernet(supernet)
+        if isinstance(supernet, OPTModel):
+            analyzer = OPTChannelAnalyer(supernet)
+            config = analyzer.get_config()
+
+            units = self._prepare_from_unit_cfg(supernet, config)
+            for unit in units:
+                unit.prepare_for_pruning(supernet)
+                self._name2unit[unit.name] = unit
+            self.units = nn.ModuleList(units)
+            res = None
+        else:
+            res = super().prepare_from_supernet(supernet)
         for unit in self.mutable_units:
             unit.requires_grad_(True)
         return res
+
+    def _prepare_from_unit_cfg(self, model, config: dict):
+        """Initialize units using config dict."""
+        assert isinstance(config, dict)
+        units = []
+        for unit_key in config:
+            init_args = copy.deepcopy(self.unit_default_args)
+            if 'init_args' in config[unit_key]:
+                init_args.update(config[unit_key]['init_args'])
+            config[unit_key]['init_args'] = init_args
+            unit = self.unit_class.init_from_cfg(model, config[unit_key])
+            units.append(unit)
+        return units
 
     @torch.no_grad()
     def init_quick_flop(self, model: nn.Module):
