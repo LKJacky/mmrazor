@@ -175,7 +175,8 @@ class DMSMutator(BaseMutator):
         model.eval()
         input = demo_input.get_data(model, training=False)
         if isinstance(input, dict):
-            input['mode'] = 'tensor'
+            if 'mode' in input:
+                input['mode'] = 'tensor'
             model(**input)
         else:
             model(input)
