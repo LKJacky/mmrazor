@@ -42,6 +42,7 @@ if __name__ == '__main__':
     from mmrazor.implementations.pruning.dms.core.mutator import DMSMutator
     mutator = DMSMutator()
     mutator.prepare_from_supernet(model)
+    assert len(mutator.dtp_mutator.mutable_units) == 13
     # print(len(mutator.info()))
     print(model)
     x = torch.rand([1, 128]).long()

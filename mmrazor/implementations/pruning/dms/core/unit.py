@@ -7,6 +7,9 @@ from mmrazor.models.architectures import dynamic_ops
 from mmrazor.models.mutables import L1MutableChannelUnit
 from mmrazor.registry import MODELS
 from ...chip.collect.unit import CollectUnitMixin
+from .models.opt.opt_ops import (ImpEmbedding, ImpOPTAttention,
+                                 ImpOPTLearnedPositionalEmbedding,
+                                 OPTAttention, OPTLearnedPositionalEmbedding)
 from .mutable import DTPTMutableChannelImp, ImpMutableChannelContainer
 from .op import ImpBatchnorm2d, ImpConv2d, ImpLinear
 
@@ -37,6 +40,10 @@ class BaseDTPUnit(L1MutableChannelUnit, CollectUnitMixin):
                 nn.SyncBatchNorm: dynamic_ops.DynamicSyncBatchNorm,
                 BaseShiftedWindowAttention: ImpShiftedWindowAttention,
                 nn.LayerNorm: ImpLayerNorm,
+                nn.Embedding: ImpEmbedding,
+                OPTLearnedPositionalEmbedding:
+                ImpOPTLearnedPositionalEmbedding,
+                OPTAttention: ImpOPTAttention,
             })
         self._register_channel_container(model, ImpMutableChannelContainer)
         self._register_mutable_channel(self.mutable_channel)

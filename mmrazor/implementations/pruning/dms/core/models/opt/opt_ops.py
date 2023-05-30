@@ -13,6 +13,7 @@ from transformers.models.opt.modeling_opt import (OPTAttention,
 from mmrazor.models.architectures.dynamic_ops import (DynamicChannelMixin,
                                                       DynamicLinear)
 from mmrazor.models.mutables import BaseMutable
+from ...op import ImpLinear, ImpModuleMixin  # type: ignore
 
 
 class DynamicEmbedding(nn.Embedding, DynamicChannelMixin):
@@ -151,3 +152,29 @@ class DynamicOPTAttention(OPTAttention, DynamicChannelMixin):
     @property
     def static_op_factory(self):
         return OPTAttention
+
+
+class ImpEmbedding(DynamicEmbedding, ImpModuleMixin):
+
+    def forward(self, input: Tensor) -> Tensor:
+        return nn.Embedding.forward(self, input)
+
+
+class ImpOPTLearnedPositionalEmbedding(DynamicOPTLearnedPositionalEmbedding,
+                                       ImpModuleMixin):
+
+    def forward(self,
+                attention_mask: torch.LongTensor,
+                past_key_values_length: int = 0):
+        return DynamicOPTLearnedPositionalEmbedding.forward(
+            self, attention_mask, past_key_values_length)
+
+
+class ImpOPTAttention(DynamicOPTAttention, ImpModuleMixin):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.q_proj = ImpLinear.convert_from(self.q_proj)
+        self.k_proj = ImpLinear.convert_from(self.k_proj)
+        self.v_proj = ImpLinear.convert_from(self.v_proj)
+        self.out_proj = ImpLinear.convert_from(self.out_proj)
