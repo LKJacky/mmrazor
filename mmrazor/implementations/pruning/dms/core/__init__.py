@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+from .algorithm import BaseDTPAlgorithm
 from .dtp import DTPAMutator
 from .models.mobilenet import DmsMobileNetV2
 from .models.resnet import ResNetCifarDMS
@@ -10,5 +11,6 @@ from .unit import DTPTUnit
 
 __all__ = [
     'ResNetCifarDMS', 'DMSMutator', 'ResNetDMS', 'DMSScheduler',
-    'DmsMobileNetV2', 'TorchSwinBackbone', 'DTPAMutator', 'DTPTUnit'
+    'DmsMobileNetV2', 'TorchSwinBackbone', 'DTPAMutator', 'DTPTUnit',
+    'BaseDTPAlgorithm'
 ]

@@ -20,7 +20,7 @@ def convert_float_to_tenosr(res: dict, device):
     return res
 
 
-@MODELS.register_module()
+# @MODELS.register_module()
 class BaseDTPAlgorithm(BaseAlgorithm):
 
     def __init__(
