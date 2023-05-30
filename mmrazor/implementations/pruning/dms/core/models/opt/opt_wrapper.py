@@ -1,7 +1,12 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import copy
+
 import torch
 import torch.nn as nn
+from transformers import TrainingArguments
 from transformers.models.opt.modeling_opt import OPTForCausalLM, OPTModel
+from transformers.trainer_callback import (TrainerCallback, TrainerControl,
+                                           TrainerState)
 
 from mmrazor.implementations.pruning.dms.core.mutator import DMSMutator
 from mmrazor.implementations.pruning.dms.core.scheduler import DMSScheduler
@@ -27,7 +32,11 @@ class OptDemoInput(BaseDemoInput):
         return data
 
 
-import copy
+def convert_float_to_tenosr(res: dict, device):
+    for k in res:
+        if not isinstance(res[k], torch.Tensor):
+            res[k] = torch.tensor(res[k], device=device)
+    return res
 
 
 class DmsOptAlgorithm(nn.Module):
@@ -67,6 +76,10 @@ class DmsOptAlgorithm(nn.Module):
         self.model.load_state_dict(
             model.state_dict(), strict=False)  # remain a bug
 
+        self.runtime_info = None
+
+        print(self.model)
+
     def forward(
         self,
         input_ids=None,
@@ -84,6 +97,13 @@ class DmsOptAlgorithm(nn.Module):
         out = self.model(input_ids, attention_mask, position_ids,
                          past_key_values, inputs_embeds, labels, use_cache,
                          output_attentions, output_hidden_states, return_dict)
+        if self.training:
+            if self.runtime_info is not None:
+                extra_dict = self.scheduler.after_train_forward(
+                    *self.runtime_info)
+                extra_dict = convert_float_to_tenosr(extra_dict,
+                                                     input_ids.device)
+                out['loss'] = out['loss'] + extra_dict['flops_loss']
         return out
 
     def __getattr__(self, name: str):
@@ -93,31 +113,19 @@ class DmsOptAlgorithm(nn.Module):
             return getattr(self.model, name)
 
 
-from transformers import TrainingArguments
-from transformers.trainer_callback import (TrainerCallback, TrainerControl,
-                                           TrainerState)
-
-
 class DmsCallbacks(TrainerCallback):
 
     def on_step_begin(self, args: TrainingArguments, state: TrainerState,
                       control: TrainerControl, **kwargs):
-        super().on_step_begin(args, state, control, **kwargs)
-        model: DmsOptAlgorithm = kwargs['model']
-        model.scheduler.before_train_forward(state.global_step, state.epoch,
-                                             state.max_steps,
-                                             state.num_train_epochs)
 
+        model: DmsOptAlgorithm = kwargs['model']
+        model.runtime_info: list = [
+            state.global_step, state.epoch, state.max_steps,
+            state.num_train_epochs
+        ]
         if state.global_step % model.scheduler.structure_log_interval == 0:
             print_log(model.mutator.info())
-
-    def on_step_end(self, args: TrainingArguments, state: TrainerState,
-                    control: TrainerControl, **kwargs):
-        super().on_step_end(args, state, control, **kwargs)
-        model: DmsOptAlgorithm = kwargs['model']
-        model.scheduler.after_train_forward(state.global_step, state.epoch,
-                                            state.max_steps,
-                                            state.num_train_epochs)
+            print(model.scheduler.current_target(*model.runtime_info))
 
 
 if __name__ == '__main__':

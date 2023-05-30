@@ -166,8 +166,8 @@ class ImpOPTLearnedPositionalEmbedding(DynamicOPTLearnedPositionalEmbedding,
     def forward(self,
                 attention_mask: torch.LongTensor,
                 past_key_values_length: int = 0):
-        return DynamicOPTLearnedPositionalEmbedding.forward(
-            self, attention_mask, past_key_values_length)
+        return OPTLearnedPositionalEmbedding.forward(self, attention_mask,
+                                                     past_key_values_length)
 
 
 class ImpOPTAttention(DynamicOPTAttention, ImpModuleMixin):
