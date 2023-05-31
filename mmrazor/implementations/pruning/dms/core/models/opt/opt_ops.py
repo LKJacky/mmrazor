@@ -45,7 +45,13 @@ class DynamicEmbedding(nn.Embedding, DynamicChannelMixin):
         return nn.Embedding
 
     def to_static_op(self) -> Module:
-        raise NotImplementedError()
+        out_channel = self.mutable_attrs['embedding_dim'].current_mask
+        new_module = nn.Embedding(self.num_embeddings,
+                                  out_channel.sum().item(), self.padding_idx,
+                                  self.max_norm, self.scale_grad_by_freq,
+                                  self.sparse)
+        new_module.weight.data = self.weight[:, out_channel]
+        return new_module
 
     def forward(self, input: Tensor) -> Tensor:
         weight = self.weight
@@ -83,7 +89,12 @@ class DynamicOPTLearnedPositionalEmbedding(OPTLearnedPositionalEmbedding,
         return OPTLearnedPositionalEmbedding
 
     def to_static_op(self) -> Module:
-        raise NotImplementedError()
+        out_channel = self.mutable_attrs['embedding_dim'].current_mask
+        new_module = OPTLearnedPositionalEmbedding(
+            self.num_embeddings - self.offset,
+            out_channel.sum().item())
+        new_module.weight.data = self.weight[:, out_channel]
+        return new_module
 
     def forward(self,
                 attention_mask: torch.LongTensor,

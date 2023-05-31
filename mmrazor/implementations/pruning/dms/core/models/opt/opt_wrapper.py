@@ -1,5 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import copy
+import json
 
 import torch
 import torch.nn as nn
@@ -12,6 +13,8 @@ from mmrazor.implementations.pruning.dms.core.mutator import DMSMutator
 from mmrazor.implementations.pruning.dms.core.scheduler import DMSScheduler
 from mmrazor.models.task_modules.demo_inputs import BaseDemoInput
 from mmrazor.registry import MODELS, TASK_UTILS
+from mmrazor.structures.subnet.fix_subnet import (export_fix_subnet,
+                                                  load_fix_subnet)
 from mmrazor.utils import print_log
 
 
@@ -30,6 +33,31 @@ class OptDemoInput(BaseDemoInput):
             output_hidden_states=False,
             return_dict=False)
         return data
+
+
+def to_static_model(
+    algorithm,
+    reset_params=False,
+    **kargs,
+):
+
+    pruning_structure = algorithm.mutator.choice_template
+    print_log('PruneSubModel get pruning structure:')
+    print_log(json.dumps(pruning_structure, indent=4))
+
+    # to static model
+    fix_mutable = export_fix_subnet(algorithm.architecture)[0]
+    load_fix_subnet(algorithm.architecture, fix_mutable)
+    model = algorithm.architecture
+
+    print_log(model)
+    if reset_params:
+        print_log('reset parameters')
+        for module in model.modules():
+            if hasattr(module, 'reset_parameters'):
+                module.reset_parameters()
+
+    return model
 
 
 def convert_float_to_tenosr(res: dict, device):
@@ -119,7 +147,7 @@ class DmsCallbacks(TrainerCallback):
                       control: TrainerControl, **kwargs):
 
         model: DmsOptAlgorithm = kwargs['model']
-        model.runtime_info: list = [
+        model.runtime_info = [
             state.global_step, state.epoch, state.max_steps,
             state.num_train_epochs
         ]
