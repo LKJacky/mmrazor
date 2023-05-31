@@ -606,6 +606,24 @@ def main():
             preds = preds[:, :-1].reshape(-1)
             return metric.compute(predictions=preds, references=labels)
 
+    from transformers import AdamW, get_linear_schedule_with_warmup
+    mutater_param = model.mutator.parameters()
+    llm_param = model.model.parameters()
+    optimizer = AdamW(
+        [{
+            'params': llm_param,
+        }, {
+            'params': mutater_param,
+            'lr': 1e-2
+        }],
+        lr=training_args.learning_rate,
+    )
+    lr_schedular = get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=1000,
+        num_training_steps=training_args.num_train_epochs *
+        len(train_dataset) // training_args.per_device_train_batch_size)
+
     # Initialize our Trainer
     trainer = Trainer(
         model=model,
@@ -620,7 +638,7 @@ def main():
         if training_args.do_eval and not is_torch_tpu_available() else None,
         preprocess_logits_for_metrics=preprocess_logits_for_metrics
         if training_args.do_eval and not is_torch_tpu_available() else None,
-    )
+        optimizers=[optimizer, lr_schedular])
 
     # Training
     if training_args.do_train:

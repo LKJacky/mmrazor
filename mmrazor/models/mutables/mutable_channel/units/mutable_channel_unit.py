@@ -1,7 +1,12 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 """This module defines MutableChannelUnit."""
 import abc
-from collections import Set
+
+try:
+    from collections.abc import Set
+except:
+    from collections import Set
+
 from typing import Dict, List, Type, TypeVar
 
 import torch
