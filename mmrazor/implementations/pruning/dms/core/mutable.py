@@ -120,7 +120,7 @@ class DMSMutableMixIn():
 
     @torch.no_grad()
     def limit_value(self):
-        self.e.data = torch.clamp(self.e, 0, 1.0)
+        self.e.data = torch.clamp(self.e, 1 / self.taylor.numel() / 2, 1.0)
 
     @torch.no_grad()
     def update_taylor(self, input, grad):
