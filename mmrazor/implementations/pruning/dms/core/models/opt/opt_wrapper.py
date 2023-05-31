@@ -76,6 +76,7 @@ class DmsOptAlgorithm(nn.Module):
         self.mutator: DMSMutator = MODELS.build(
             dict(
                 type='DMSMutator',
+                prune_qkv=False,
                 dtp_mutator_cfg=dict(
                     type='DTPAMutator',
                     channel_unit_cfg=dict(

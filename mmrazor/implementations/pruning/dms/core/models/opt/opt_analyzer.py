@@ -125,7 +125,7 @@ class OPTChannelAnalyer():
             decoder_unit = parse_decoder(module.decoder, preffix='decoder.')
             res_unit = parse_res_structure(module.decoder, preffix='decoder.')
 
-            units['res'] = res_unit
+            # units['res'] = res_unit
             units.update(decoder_unit)
             return units
 

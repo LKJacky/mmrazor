@@ -10,6 +10,9 @@ from transformers.models.opt.modeling_opt import (OPTAttention,
                                                   OPTLearnedPositionalEmbedding
                                                   )
 
+from mmrazor.implementations.pruning.dms.core.mutable import (
+    ImpMutableChannelContainer, MutableChannelForHead, MutableChannelWithHead,
+    MutableHead)
 from mmrazor.models.architectures.dynamic_ops import (DynamicChannelMixin,
                                                       DynamicLinear)
 from mmrazor.models.mutables import BaseMutable
@@ -197,3 +200,54 @@ class ImpOPTAttention(DynamicOPTAttention, ImpModuleMixin):
 
         self.in_channels = self.q_proj.in_features
         self.out_channels = self.out_proj.out_features
+
+    def init_mutables(self):
+        m_head = MutableHead(self.num_heads)
+        m_qk = MutableChannelForHead(self.q_proj.out_features, self.num_heads)
+        m_v = MutableChannelForHead(self.v_proj.out_features, self.num_heads)
+        mutable_qk = MutableChannelWithHead(m_head, m_qk)
+        mutable_v = MutableChannelWithHead(m_head, m_v)
+
+        try:
+            self.q_proj.register_mutable_attr(
+                'out_channels',
+                ImpMutableChannelContainer(self.q.out_features))
+            self.k_proj.register_mutable_attr(
+                'out_channels',
+                ImpMutableChannelContainer(self.k.out_features))
+            self.v_proj.register_mutable_attr(
+                'out_channels',
+                ImpMutableChannelContainer(self.v.out_features))
+            self.out_proj.register_mutable_attr(
+                'in_channels',
+                ImpMutableChannelContainer(self.proj.in_features))
+        except Exception:
+            pass
+        ImpMutableChannelContainer.register_mutable_channel_to_module(
+            self.q_proj, mutable=mutable_qk, is_to_output_channel=True)
+        ImpMutableChannelContainer.register_mutable_channel_to_module(
+            self.k_proj, mutable=mutable_qk, is_to_output_channel=True)
+        ImpMutableChannelContainer.register_mutable_channel_to_module(
+            self.v_proj, mutable=mutable_v, is_to_output_channel=True)
+
+        ImpMutableChannelContainer.register_mutable_channel_to_module(
+            self.out_proj, mutable_v, is_to_output_channel=False)
+
+        self.attn_mutables = {'head': m_head, 'qk': m_qk, 'v': m_v}
+
+        return m_head, m_qk, m_v
+
+    def to_static_op(self) -> Module:
+        num_heads = int(self.attn_mutables['head'].mask.sum().item())
+
+        module: OPTAttention = OPTAttention(
+            embed_dim=self.head_dim * num_heads,
+            num_heads=num_heads,
+            dropout=self.dropout,
+            is_decoder=self.is_decoder,
+            bias=self.q_proj.bias is not None)
+        module.k_proj = self.k_proj.to_static_op()
+        module.q_proj = self.q_proj.to_static_op()
+        module.v_proj = self.v_proj.to_static_op()
+        module.out_proj = self.out_proj.to_static_op()
+        return module

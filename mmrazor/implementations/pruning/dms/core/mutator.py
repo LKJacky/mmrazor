@@ -68,11 +68,16 @@ class AttnInitialer():
         pass
 
     def prepare_from_supernet(self, supernet: nn.Module) -> List:
+        from .models.opt.opt_ops import ImpOPTAttention
         attn_mutables = nn.ModuleList()
 
         for module in supernet.modules():
             if isinstance(module, ImpShiftedWindowAttention):
                 module.init_mutable()
+                map_dict = nn.ModuleDict(module.attn_mutables)
+                attn_mutables.append(map_dict)
+            elif isinstance(module, ImpOPTAttention):
+                module.init_mutables()
                 map_dict = nn.ModuleDict(module.attn_mutables)
                 attn_mutables.append(map_dict)
         attn_mutables.requires_grad_(True)
@@ -118,6 +123,9 @@ class DMSMutator(BaseMutator):
         self.use_tayler = use_tayler
 
     def prepare_from_supernet(self, supernet) -> None:
+        from .models.opt.opt_ops import ImpOPTAttention, OPTAttention
+        replace_modules(supernet, module_map={OPTAttention: ImpOPTAttention})
+
         self.saved_model = [supernet]
         self.dtp_mutator.prepare_from_supernet(supernet)
         self.block_mutables = nn.ModuleList(

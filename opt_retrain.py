@@ -471,7 +471,7 @@ def main():
     from mmrazor.implementations.pruning.group_fisher import \
         GroupFisherSubModel
 
-    pruned_path = 'tmp/test-clm/checkpoint-1000/pytorch_model.bin'
+    pruned_path = 'tmp/test-clm-pruning/checkpoint-2000/pytorch_model.bin'
     state = torch.load(pruned_path)
     model = DmsOptAlgorithm(model)
     model.load_state_dict(state)
