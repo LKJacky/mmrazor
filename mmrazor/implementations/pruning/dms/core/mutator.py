@@ -3,12 +3,16 @@ from typing import List
 
 import torch
 import torch.nn as nn
+from transformers.models.opt.modeling_opt import OPTModel
 
 from mmrazor.models.mutators.base_mutator import BaseMutator
 from mmrazor.models.task_modules.demo_inputs import DefaultDemoInput
 from mmrazor.registry import MODELS, TASK_UTILS
 from .dtp import DTPAMutator, QuickFlopMixin
 from .models.mobilenet import MobileNetLayers
+from .models.opt.opt_ops import (DynamicOPTDecoderLayer, DynamicOptLayers,
+                                 ImpOPTAttention, OPTAttention,
+                                 OPTDecoderLayer)
 from .models.resnet import ResLayer
 from .models.resnet_img import ResLayer as ResLayerImg
 from .models.swin import ImpShiftedWindowAttention, SwinSequential
@@ -112,7 +116,11 @@ class DMSMutator(BaseMutator):
         super().__init__(init_cfg)
 
         self.dtp_mutator: DTPAMutator = MODELS.build(dtp_mutator_cfg)
-        self.block_initializer = BlockInitialer()
+
+        self.block_initializer = BlockInitialer(block_mixin_layers=[
+            ResLayer, ResLayerImg, SwinSequential, MobileNetLayers,
+            DynamicOptLayers
+        ])
         self.block_mutables: List[MutableBlocks] = nn.ModuleList()
 
         self.attn_initialzer = AttnInitialer()
@@ -123,8 +131,16 @@ class DMSMutator(BaseMutator):
         self.use_tayler = use_tayler
 
     def prepare_from_supernet(self, supernet) -> None:
-        from .models.opt.opt_ops import ImpOPTAttention, OPTAttention
-        replace_modules(supernet, module_map={OPTAttention: ImpOPTAttention})
+
+        if isinstance(supernet, OPTModel):
+            supernet.decoder.layers = DynamicOptLayers.convert_from(
+                supernet.decoder.layers)
+        replace_modules(
+            supernet,
+            module_map={
+                OPTAttention: ImpOPTAttention,
+                OPTDecoderLayer: DynamicOPTDecoderLayer,
+            })
 
         self.saved_model = [supernet]
         self.dtp_mutator.prepare_from_supernet(supernet)

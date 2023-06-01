@@ -176,7 +176,7 @@ if __name__ == '__main__':
         ), )
     mutator.prepare_from_supernet(model)
     mutator.init_quick_flop(model)
-    assert len(mutator.dtp_mutator.mutable_units) == 13
+    assert len(mutator.dtp_mutator.mutable_units) == 12
     print(mutator.info())
     print(model)
     x = torch.rand([1, 128]).long()
@@ -185,3 +185,4 @@ if __name__ == '__main__':
 
     model: OPTForCausalLM = OPTForCausalLM.from_pretrained('facebook/opt-125m')
     algorithm = DmsOptAlgorithm(model)
+    y = model(x)
