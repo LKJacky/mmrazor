@@ -202,6 +202,7 @@ class ImpOPTAttention(DynamicOPTAttention, ImpModuleMixin):
 
         self.in_channels = self.q_proj.in_features
         self.out_channels = self.out_proj.out_features
+        self.attn_mutables = {}
 
     def init_mutables(self):
         m_head = MutableHead(self.num_heads)
@@ -240,7 +241,10 @@ class ImpOPTAttention(DynamicOPTAttention, ImpModuleMixin):
         return m_head, m_qk, m_v
 
     def to_static_op(self) -> Module:
-        num_heads = int(self.attn_mutables['head'].mask.sum().item())
+        if 'head' in self.attn_mutables:
+            num_heads = int(self.attn_mutables['head'].mask.sum().item())
+        else:
+            num_heads = self.num_heads
 
         module: OPTAttention = OPTAttention(
             embed_dim=self.head_dim * num_heads,

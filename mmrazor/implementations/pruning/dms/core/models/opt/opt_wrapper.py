@@ -122,7 +122,8 @@ class DmsOptAlgorithm(nn.Module):
         output_hidden_states=None,
         return_dict=None,
     ):
-
+        if self.training:
+            self.scheduler.before_train_forward(*self.runtime_info)
         out = self.model(input_ids, attention_mask, position_ids,
                          past_key_values, inputs_embeds, labels, use_cache,
                          output_attentions, output_hidden_states, return_dict)

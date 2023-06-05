@@ -143,6 +143,7 @@ class DMSMutableMixIn():
     def info(self):
         return (f'taylor: {self.taylor.min().item():.3f}\t'
                 f'{self.taylor.max().item():.3f}\t'
+                f'{self.taylor.min()==self.taylor.max()}\t'
                 f'e: {self.e.item():.3f}')  # noqa
 
     def expand_mutable_channel(self, expand_ratio):

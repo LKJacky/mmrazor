@@ -66,6 +66,6 @@ class DTPTUnit(BaseDTPUnit):
 
     @torch.no_grad()
     def info(self) -> str:
-        return (f'taylor: {self.mutable_channel.taylor.min().item():.3f}\t'
+        return (f'taylor: {self.mutable_channel.info()}\t'
                 f'{self.mutable_channel.taylor.max().item():.3f}\t'
                 f'e: {self.mutable_channel.e.item():.3f}')  # noqa
