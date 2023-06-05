@@ -10,6 +10,8 @@ from transformers.models.llama.modeling_llama import (LlamaConfig,
 from mmrazor.models.mutables import SequentialMutableChannelUnit
 from mmrazor.models.mutables.mutable_channel.units.channel_unit import Channel
 from mmrazor.models.mutators import ChannelMutator
+from mmrazor.models.task_modules.demo_inputs import BaseDemoInput
+from mmrazor.registry import TASK_UTILS
 
 
 def get_default_in_index(module: nn.Module):
@@ -89,6 +91,22 @@ class LLamaChannelAnalyer():
         return post_process(parse_model(self.model))
 
 
+@TASK_UTILS.register_module()
+class LlamaDemoInput(BaseDemoInput):
+
+    def _get_data(self, model, input_shape, training):
+        data = dict(
+            input_ids=torch.randint(0, 32000, input_shape).long(),
+            attention_mask=None,
+            past_key_values=None,
+            inputs_embeds=None,
+            use_cache=False,
+            output_attentions=False,
+            output_hidden_states=False,
+            return_dict=False)
+        return data
+
+
 if __name__ == '__main__':
     config = LlamaConfig(
         hidden_size=512, intermediate_size=512, num_hidden_layers=5)
@@ -112,3 +130,27 @@ if __name__ == '__main__':
     x = torch.rand([1, 128]).long()
     y = model(x)
     print(y['last_hidden_state'].shape)
+
+    from mmrazor.implementations.pruning.dms.core.mutator import DMSMutator
+
+    config = LlamaConfig(
+        hidden_size=512, intermediate_size=512, num_hidden_layers=5)
+    model = LlamaModel(config)
+    mutator: DMSMutator = DMSMutator(
+        prune_qkv=False,
+        dtp_mutator_cfg=dict(
+            type='DTPAMutator',
+            channel_unit_cfg=dict(type='DTPTUnit', default_args=dict()),
+            parse_cfg=dict(
+                _scope_='mmrazor',
+                type='ChannelAnalyzer',
+                demo_input=dict(
+                    type='LlamaDemoInput',
+                    input_shape=(1, 128),
+                ),
+                tracer_type='FxTracer'),
+        ),
+    )
+    mutator.prepare_from_supernet(model)
+    mutator.init_quick_flop(model)
+    print(mutator.info())

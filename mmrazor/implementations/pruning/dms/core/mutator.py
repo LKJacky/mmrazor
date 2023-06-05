@@ -3,12 +3,14 @@ from typing import List
 
 import torch
 import torch.nn as nn
+from transformers.models.llama.modeling_llama import LlamaAttention
 from transformers.models.opt.modeling_opt import OPTModel
 
 from mmrazor.models.mutators.base_mutator import BaseMutator
 from mmrazor.models.task_modules.demo_inputs import DefaultDemoInput
 from mmrazor.registry import MODELS, TASK_UTILS
 from .dtp import DTPAMutator, QuickFlopMixin
+from .models.llama.op import DynamicLlamaAttention
 from .models.mobilenet import MobileNetLayers
 from .models.opt.opt_ops import (DynamicOPTDecoderLayer, DynamicOptLayers,
                                  ImpOPTAttention, OPTAttention,
@@ -80,7 +82,8 @@ class AttnInitialer():
                 module.init_mutable()
                 map_dict = nn.ModuleDict(module.attn_mutables)
                 attn_mutables.append(map_dict)
-            elif isinstance(module, ImpOPTAttention):
+            elif isinstance(module, ImpOPTAttention) or isinstance(
+                    module, DynamicLlamaAttention):
                 module.init_mutables()
                 map_dict = nn.ModuleDict(module.attn_mutables)
                 attn_mutables.append(map_dict)
@@ -140,6 +143,7 @@ class DMSMutator(BaseMutator):
             module_map={
                 OPTAttention: ImpOPTAttention,
                 OPTDecoderLayer: DynamicOPTDecoderLayer,
+                LlamaAttention: DynamicLlamaAttention,
             })
 
         self.saved_model = [supernet]
