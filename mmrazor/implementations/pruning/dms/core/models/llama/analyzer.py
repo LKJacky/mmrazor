@@ -1,0 +1,114 @@
+# Copyright (c) OpenMMLab. All rights reserved.
+import copy
+
+import torch
+import torch.nn as nn
+from transformers.models.llama.modeling_llama import (LlamaConfig,
+                                                      LlamaDecoderLayer,
+                                                      LlamaModel)
+
+from mmrazor.models.mutables import SequentialMutableChannelUnit
+from mmrazor.models.mutables.mutable_channel.units.channel_unit import Channel
+from mmrazor.models.mutators import ChannelMutator
+
+
+def get_default_in_index(module: nn.Module):
+    if isinstance(module, nn.Linear):
+        return (0, module.in_features)
+    if isinstance(module, nn.LayerNorm):
+        return (0, module.normalized_shape[-1])
+    if isinstance(module, nn.Embedding):
+        return (0, module.num_embeddings)
+    else:
+        raise NotImplementedError()
+
+
+def get_default_out_index(module: nn.Module):
+    if isinstance(module, nn.Linear):
+        return (0, module.out_features)
+    if isinstance(module, nn.LayerNorm):
+        return (0, module.normalized_shape[-1])
+    if isinstance(module, nn.Embedding):
+        return (0, module.embedding_dim)
+    else:
+        raise NotImplementedError(f'{type(module)}')
+
+
+class OutChannel(Channel):
+
+    def __init__(self, name, module, index=None, node=None) -> None:
+        if index is None:
+            index = get_default_out_index(module)
+        super().__init__(name, module, index, node, is_output_channel=True)
+
+
+class InChannel(Channel):
+
+    def __init__(self, name, module, index=None, node=None) -> None:
+        if index is None:
+            index = get_default_in_index(module)
+        super().__init__(name, module, index, node, is_output_channel=False)
+
+
+class LLamaChannelAnalyer():
+
+    def __init__(self, model: LlamaModel) -> None:
+        self.model = model
+
+    def get_config(self):
+
+        def parse_layer(module: LlamaDecoderLayer, prefix=''):
+            unit1 = SequentialMutableChannelUnit(
+                module.mlp.gate_proj.out_features)
+            unit1.add_output_related(
+                OutChannel(f'{prefix}mlp.gate_proj', module.mlp.gate_proj))
+            unit1.add_output_related(
+                OutChannel(f'{prefix}mlp.up_proj', module.mlp.up_proj))
+            unit1.add_input_related(
+                InChannel(f'{prefix}mlp.down_proj', module.mlp.down_proj))
+
+            return {
+                f'{prefix}unit1':
+                unit1.config_template(with_init_args=True, with_channels=True),
+            }
+
+        def parse_model(module: LlamaModel):
+            units = {}
+            for name, layer in module.layers.named_children():
+                units.update(parse_layer(layer, prefix=f'layers.{name}.'))
+
+            return units
+
+        def post_process(config: dict):
+            for unit_name in config:
+                for key in copy.copy(config[unit_name]['init_args']):
+                    if key != 'num_channels':
+                        config[unit_name]['init_args'].pop(key)
+            return config
+
+        return post_process(parse_model(self.model))
+
+
+if __name__ == '__main__':
+    config = LlamaConfig(
+        hidden_size=512, intermediate_size=512, num_hidden_layers=5)
+    model = LlamaModel(config)
+    analyser = LLamaChannelAnalyer(model)
+    config = analyser.get_config()
+    import json
+
+    print(json.dumps(config, indent=4))
+    mutator: ChannelMutator = ChannelMutator(
+        parse_cfg={'type': 'Config'},
+        channel_unit_cfg={
+            'units': config,
+            'type': 'SequentialMutableChannelUnit'
+        })
+    mutator.prepare_from_supernet(model)
+    print(len(mutator.mutable_units))
+    mutator.set_choices(mutator.sample_choices())
+    print(model)
+
+    x = torch.rand([1, 128]).long()
+    y = model(x)
+    print(y['last_hidden_state'].shape)

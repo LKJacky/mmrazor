@@ -4,6 +4,7 @@ from typing import List
 
 import torch
 from torch import nn
+from transformers.models.llama.modeling_llama import LlamaModel
 from transformers.models.opt.modeling_opt import OPTModel
 
 from mmrazor.models.mutators import ChannelMutator
@@ -11,6 +12,7 @@ from mmrazor.models.task_modules.demo_inputs import DefaultDemoInput
 from mmrazor.registry import MODELS, TASK_UTILS
 from ...chip.collect.mutator import CollectMutatorMixin
 from ...dtp.modules.dtp_adaptive import DTPAUnit
+from .models.llama.analyzer import LLamaChannelAnalyer
 from .models.opt.opt_analyzer import OPTChannelAnalyer
 from .op import QuickFlopMixin
 
@@ -34,8 +36,12 @@ class BaseDTPMutator(ChannelMutator, CollectMutatorMixin):
         self.demo_input = parse_cfg['demo_input']
 
     def prepare_from_supernet(self, supernet) -> None:
-        if isinstance(supernet, OPTModel):
-            analyzer = OPTChannelAnalyer(supernet)
+        if isinstance(supernet, OPTModel) or isinstance(supernet, LlamaModel):
+            analyzer_type = {
+                OPTModel: OPTChannelAnalyer,
+                LlamaModel: LLamaChannelAnalyer
+            }[type(supernet)]
+            analyzer = analyzer_type(supernet)
             config = analyzer.get_config()
 
             units = self._prepare_from_unit_cfg(supernet, config)
