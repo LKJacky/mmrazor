@@ -115,6 +115,7 @@ class DMSMutator(BaseMutator):
                          ),
                          tracer_type='FxTracer'),
                  ),
+                 extra_module_mapping={},
                  init_cfg=None) -> None:
         super().__init__(init_cfg)
 
@@ -133,18 +134,19 @@ class DMSMutator(BaseMutator):
 
         self.use_tayler = use_tayler
 
+        self.module_mapping = {
+            OPTAttention: ImpOPTAttention,
+            OPTDecoderLayer: DynamicOPTDecoderLayer,
+            LlamaAttention: DynamicLlamaAttention,
+        }
+        self.module_mapping.update(extra_module_mapping)
+
     def prepare_from_supernet(self, supernet) -> None:
 
         if isinstance(supernet, OPTModel):
             supernet.decoder.layers = DynamicOptLayers.convert_from(
                 supernet.decoder.layers)
-        replace_modules(
-            supernet,
-            module_map={
-                OPTAttention: ImpOPTAttention,
-                OPTDecoderLayer: DynamicOPTDecoderLayer,
-                LlamaAttention: DynamicLlamaAttention,
-            })
+        replace_modules(supernet, module_map=self.module_mapping)
 
         self.saved_model = [supernet]
         self.dtp_mutator.prepare_from_supernet(supernet)

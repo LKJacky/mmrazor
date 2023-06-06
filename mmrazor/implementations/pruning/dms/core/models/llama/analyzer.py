@@ -86,6 +86,7 @@ class LLamaChannelAnalyer():
                 for key in copy.copy(config[unit_name]['init_args']):
                     if key != 'num_channels':
                         config[unit_name]['init_args'].pop(key)
+                config[unit_name].pop('choice')
             return config
 
         return post_process(parse_model(self.model))
