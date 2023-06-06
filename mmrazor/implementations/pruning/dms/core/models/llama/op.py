@@ -54,6 +54,8 @@ class DynamicLlamaAttention(LlamaAttention, DynamicChannelMixin):
         module.q_proj = self.q_proj.to_static_op()
         module.v_proj = self.v_proj.to_static_op()
         module.o_proj = self.o_proj.to_static_op()
+        module.load_state_dict(self.state_dict(), strict=False)
+
         return module
 
     @property
