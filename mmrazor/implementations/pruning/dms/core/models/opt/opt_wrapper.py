@@ -34,21 +34,16 @@ class OptDemoInput(BaseDemoInput):
             return_dict=False)
         return data
 
-
 def to_static_model(
     algorithm,
     reset_params=False,
     **kargs,
 ):
 
-    pruning_structure = algorithm.mutator.choice_template
-    print_log('PruneSubModel get pruning structure:')
-    print_log(json.dumps(pruning_structure, indent=4))
-
     # to static model
-    fix_mutable = export_fix_subnet(algorithm.architecture)[0]
-    load_fix_subnet(algorithm.architecture, fix_mutable)
-    model = algorithm.architecture
+    fix_mutable = export_fix_subnet(algorithm.model)[0]
+    load_fix_subnet(algorithm.model, fix_mutable)
+    model = algorithm.model
 
     print_log(model)
     if reset_params:

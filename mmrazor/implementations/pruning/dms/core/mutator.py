@@ -101,6 +101,7 @@ class DMSMutator(BaseMutator):
 
     def __init__(self,
                  prune_qkv=True,
+                 prune_block=True,
                  use_tayler=True,
                  dtp_mutator_cfg=dict(
                      type='DTPAMutator',
@@ -131,6 +132,7 @@ class DMSMutator(BaseMutator):
         self.attn_mutables = nn.ModuleList()
 
         self.prune_qkv = prune_qkv
+        self.prune_block = prune_block
 
         self.use_tayler = use_tayler
 
@@ -150,8 +152,11 @@ class DMSMutator(BaseMutator):
 
         self.saved_model = [supernet]
         self.dtp_mutator.prepare_from_supernet(supernet)
-        self.block_mutables = nn.ModuleList(
-            self.block_initializer.prepare_from_supernet(supernet))
+        if self.prune_block:
+            self.block_mutables = nn.ModuleList(
+                self.block_initializer.prepare_from_supernet(supernet))
+        else:
+            self.block_mutables = nn.ModuleList()
         self.attn_mutables = self.attn_initialzer.prepare_from_supernet(
             supernet)
         if not self.prune_qkv:

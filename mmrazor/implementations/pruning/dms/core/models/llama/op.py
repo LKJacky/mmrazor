@@ -48,13 +48,21 @@ class DynamicLlamaAttention(LlamaAttention, DynamicChannelMixin):
         return new_module
 
     def to_static_op(self) -> Module:
-        module: LlamaAttention = self.static_op_factory(
-            *self.init_args, **self.init_kwargs)
+        config = self.config
+
+        if 'head' in self.attn_mutables:
+            num_heads = int(self.attn_mutables['head'].mask.sum().item())
+        else:
+            num_heads = self.num_heads
+
+        config.num_attention_heads = num_heads
+        config.hidden_size = num_heads * self.head_dim
+
+        module: LlamaAttention = LlamaAttention(config)
         module.k_proj = self.k_proj.to_static_op()
         module.q_proj = self.q_proj.to_static_op()
         module.v_proj = self.v_proj.to_static_op()
         module.o_proj = self.o_proj.to_static_op()
-        module.load_state_dict(self.state_dict(), strict=False)
 
         return module
 

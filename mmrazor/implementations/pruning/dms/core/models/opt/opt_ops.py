@@ -367,6 +367,11 @@ class DynamicOPTDecoderLayer(OPTDecoderLayer, DynamicBlockMixin):
             elementwise_affine,
         )
         new_module = cls(config)
+        new_module.self_attn = module.self_attn
+        new_module.self_attn_layer_norm = module.self_attn_layer_norm
+        new_module.fc1 = module.fc1
+        new_module.fc2 = module.fc2
+        new_module.final_layer_norm = module.final_layer_norm
         new_module.load_state_dict(module.state_dict())
         return new_module
 
