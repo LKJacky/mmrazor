@@ -263,6 +263,11 @@ class ImpLayerNorm(dynamic_ops.DynamicLayerNorm, QuickFlopMixin):
 
 class DynamicBlockMixin(DynamicMixin, QuickFlopMixin):
 
+    def __init__(self) -> None:
+        self._dynamic_block_init()
+        self.init_args = []
+        self.init_kwargs = {}
+
     def _dynamic_block_init(self):
         self._scale_func = None
         self._flop_scale_func = None
@@ -298,7 +303,13 @@ class DynamicBlockMixin(DynamicMixin, QuickFlopMixin):
         pass
 
     def to_static_op(self) -> nn.Module:
-        raise NotImplementedError()
+        from mmrazor.structures.subnet.fix_subnet import _dynamic_to_static
+
+        module = self.static_op_factory(*self.init_args, **self.init_kwargs)
+        for name, m in self.named_children():
+            assert hasattr(module, name)
+            setattr(module, name, _dynamic_to_static(m))
+        return module
 
     def register_mutable_attr(self, attr: str, mutable):
         raise NotImplementedError()
@@ -315,7 +326,10 @@ class DynamicBlockMixin(DynamicMixin, QuickFlopMixin):
 
     @property
     def out_channel(self):
-        raise NotImplementedError()
+        raise NotImplementedError('unuseful property')
+
+    def __repr__(self) -> str:
+        return f'::rm_{self.is_removable}'
 
 
 class DynamicStage(nn.Sequential, DynamicMixin):
@@ -352,7 +366,11 @@ class DynamicStage(nn.Sequential, DynamicMixin):
 
     @classmethod
     def convert_from(cls, module):
-        return cls(module._modules)
+        new_module = cls(module._modules)
+        if len(list(new_module.removable_block)) == 0:
+            return module
+        else:
+            return new_module
 
     def to_static_op(self) -> nn.Module:
         from mmrazor.structures.subnet.fix_subnet import _dynamic_to_static

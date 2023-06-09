@@ -33,28 +33,30 @@ def replace_modules(model: nn.Module, module_map={}):
         setattr(model, names[-1], module)
 
     for name, module in model.named_modules():
-        if type(module) in module_map:
+        if name != '' and type(module) in module_map:
             new_module = module_map[type(module)].convert_from(module)
             replace_op(model, name, new_module)
 
 
 class BlockInitialer:
 
-    def __init__(
-        self,
-        dynamic_statge_module=DynamicStage,
-        block_mixin_layers=[
-            ResLayer, ResLayerImg, SwinSequential, MobileNetLayers
-        ]
-    ) -> None:
+    def __init__(self,
+                 dynamic_statge_module=DynamicStage,
+                 stage_mixin_layers=[
+                     ResLayer, ResLayerImg, SwinSequential, MobileNetLayers,
+                     DynamicOptLayers
+                 ],
+                 dynamic_block_mapping={}) -> None:
         self.dyanmic_stage_module = dynamic_statge_module
-        self.block_mixin_layers = block_mixin_layers
+        self.block_mixin_layers = stage_mixin_layers
         self.stages: List[DynamicStage] = []
+        self.dynamic_block_mapping = dynamic_block_mapping
 
     def prepare_from_supernet(self, supernet: nn.Module) -> List:
         map_dict = {}
         for block in self.block_mixin_layers:
             map_dict[block] = self.dyanmic_stage_module
+        replace_modules(supernet, self.dynamic_block_mapping)
         replace_modules(
             supernet,
             module_map=map_dict,
@@ -117,15 +119,13 @@ class DMSMutator(BaseMutator):
                          tracer_type='FxTracer'),
                  ),
                  extra_module_mapping={},
+                 block_initilizer_kwargs={},
                  init_cfg=None) -> None:
         super().__init__(init_cfg)
 
         self.dtp_mutator: DTPAMutator = MODELS.build(dtp_mutator_cfg)
 
-        self.block_initializer = BlockInitialer(block_mixin_layers=[
-            ResLayer, ResLayerImg, SwinSequential, MobileNetLayers,
-            DynamicOptLayers
-        ])
+        self.block_initializer = BlockInitialer(**block_initilizer_kwargs)
         self.block_mutables: List[MutableBlocks] = nn.ModuleList()
 
         self.attn_initialzer = AttnInitialer()
