@@ -271,3 +271,8 @@ class DMSMutator(BaseMutator):
         for mut in self.attn_mutables.modules():
             if isinstance(mut, MutableHead):
                 mut.flop_scale_converter = fun
+
+    def mutables(self):
+        for m in self.modules():
+            if isinstance(m,DMSMutableMixIn):
+                yield m

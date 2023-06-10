@@ -99,6 +99,8 @@ class DMSMutableMixIn():
         self.lda = 1.0
         self.requires_grad_(False)
 
+        self.grad_scaler = 1
+
     @property
     def current_imp(self):
         if self.taylor.max() == self.taylor.min():
@@ -124,6 +126,8 @@ class DMSMutableMixIn():
 
     @torch.no_grad()
     def update_taylor(self, input, grad):
+        if self.grad_scaler != 0:
+            grad = grad.float() / self.grad_scaler
         new_taylor = (input * grad)**2
         all_reduce(new_taylor)
         if new_taylor.max() != new_taylor.min():
