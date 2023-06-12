@@ -130,7 +130,7 @@ class DMSMutableMixIn():
             grad = grad.float() / self.grad_scaler
         new_taylor = (input * grad)**2
         all_reduce(new_taylor)
-        if not new_taylor.isnan().any():
+        if (not new_taylor.isnan().any()) and (not new_taylor.isinf().any()):
             if new_taylor.max() != new_taylor.min():
                 self.taylor = self.taylor * self.decay + (
                     1 - self.decay) * new_taylor
