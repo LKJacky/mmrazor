@@ -23,6 +23,7 @@ class DMSScheduler():
                  refine_ratio=0.2,
                  flop_loss_weight=1,
                  by_epoch=False,
+                 step=1,
                  target_scheduler='linear',
                  loss_type='l2',
                  structure_log_interval=100) -> None:
@@ -45,12 +46,12 @@ class DMSScheduler():
 
         if isinstance(by_epoch, bool):
             self.by_epoch = by_epoch
-            self.epoch_T = 1
         elif isinstance(by_epoch, int):
             self.by_epoch = True
-            self.epoch_T = by_epoch
         else:
             raise NotImplementedError()
+
+        self.step = step
 
     def _init(self):
         self.mutator.prepare_from_supernet(self.model)
@@ -95,10 +96,12 @@ class DMSScheduler():
         if iter < self.decay_ratio * max_iters:
             if self.by_epoch:
                 ratio = (
-                    epoch // self.epoch_T * self.epoch_T /
+                    epoch // self.step * self.step /
                     (self.decay_ratio * max_epochs))
             else:
-                ratio = (iter / (self.decay_ratio * max_iters))
+                ratio = (
+                    iter // self.step * self.step /
+                    (self.decay_ratio * max_iters))
         elif iter < (self.decay_ratio + self.refine_ratio) * max_iters:
             ratio = 1.0
         else:
