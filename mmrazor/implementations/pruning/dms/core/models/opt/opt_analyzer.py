@@ -18,8 +18,10 @@ def get_default_in_index(module: nn.Module):
         return (0, module.normalized_shape[-1])
     if isinstance(module, nn.Embedding):
         return (0, module.num_embeddings)
+    if isinstance(module, nn.Conv2d):
+        return (0, module.in_channels)
     else:
-        raise NotImplementedError()
+        return 0, getattr(module, 'in_channels')
 
 
 def get_default_out_index(module: nn.Module):
@@ -29,8 +31,10 @@ def get_default_out_index(module: nn.Module):
         return (0, module.normalized_shape[-1])
     if isinstance(module, nn.Embedding):
         return (0, module.embedding_dim)
+    if isinstance(module, nn.Conv2d):
+        return (0, module.out_channels)
     else:
-        raise NotImplementedError(f'{type(module)}')
+        return 0, getattr(module, 'out_channels')
 
 
 class OutChannel(Channel):
@@ -123,7 +127,7 @@ class OPTChannelAnalyer():
         def parse_model(module: OPTModel):
             units = {}
             decoder_unit = parse_decoder(module.decoder, preffix='decoder.')
-            res_unit = parse_res_structure(module.decoder, preffix='decoder.')
+            # res_unit = parse_res_structure(module.decoder, preffix='decoder.') # noqa
 
             # units['res'] = res_unit
             units.update(decoder_unit)

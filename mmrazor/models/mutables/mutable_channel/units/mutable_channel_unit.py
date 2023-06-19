@@ -4,7 +4,7 @@ import abc
 
 try:
     from collections.abc import Set
-except:
+except:  # noqa
     from collections import Set
 
 from typing import Dict, List, Type, TypeVar
@@ -300,7 +300,8 @@ class MutableChannelUnit(ChannelUnit):
                             mutable_channel is mutable
                             for mutable in source_mutables
                         ]
-                        assert any(is_same), 'existed a mutable channel.'
+                        assert any(
+                            is_same), f'existed a mutable channel in {channel}'
 
                 else:
                     container.register_mutable(mutable_channel_, start, end)

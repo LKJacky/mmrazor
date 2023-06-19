@@ -75,6 +75,9 @@ class QuickFlopMixin:
 
 class ImpModuleMixin():
 
+    def __init__(self):
+        self._imp_init()
+
     def _imp_init(self):
         self.ste = False
 
@@ -265,8 +268,8 @@ class DynamicBlockMixin(DynamicMixin, QuickFlopMixin):
 
     def __init__(self) -> None:
         self._dynamic_block_init()
-        self.init_args = []
-        self.init_kwargs = {}
+        self.init_args: list = []
+        self.init_kwargs: dict = {}
 
     def _dynamic_block_init(self):
         self._scale_func = None
@@ -306,7 +309,7 @@ class DynamicBlockMixin(DynamicMixin, QuickFlopMixin):
         from mmrazor.structures.subnet.fix_subnet import _dynamic_to_static
 
         module = self.static_op_factory(*self.init_args, **self.init_kwargs)
-        for name, m in self.named_children():
+        for name, m in self.named_children():  # type: ignore
             assert hasattr(module, name)
             setattr(module, name, _dynamic_to_static(m))
         return module
@@ -314,6 +317,7 @@ class DynamicBlockMixin(DynamicMixin, QuickFlopMixin):
     def register_mutable_attr(self, attr: str, mutable):
         raise NotImplementedError()
 
+    @property
     def static_op_factory(self):
         raise NotImplementedError()
 
