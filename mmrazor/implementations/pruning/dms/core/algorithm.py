@@ -117,6 +117,7 @@ class DmsGeneralAlgorithm(nn.Module):
             self.mutator,
             **scheduler_kargs,
         )
+        self.mutator.channel_depth_train()
 
         self.runtime_info = None
 

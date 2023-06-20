@@ -107,7 +107,7 @@ class DMSMutableMixIn():
             e_imp = torch.ones_like(self.taylor, requires_grad=True)
         else:
             e_imp = dtp_get_importance(self.taylor, self.e, lamda=self.lda)
-        if self.training and e_imp.requires_grad and self.use_tayler:
+        if self.training and self.e.requires_grad and self.use_tayler:
             e_imp.register_hook(
                 taylor_backward_hook_wrapper(self, e_imp.detach()))
         if self.training:
