@@ -20,7 +20,7 @@ from .models.resnet_img import ResLayer as ResLayerImg
 from .models.swin import ImpShiftedWindowAttention, SwinSequential
 from .mutable import (BlockThreshold, DMSMutableMixIn, MutableBlocks,
                       MutableHead)
-from .op import DynamicStage
+from .op import DynamicStage, MutableAttn
 
 
 def replace_modules(model: nn.Module, module_map={}):
@@ -86,6 +86,10 @@ class AttnInitialer():
                 attn_mutables.append(map_dict)
             elif isinstance(module, ImpOPTAttention) or isinstance(
                     module, DynamicLlamaAttention):
+                module.init_mutables()
+                map_dict = nn.ModuleDict(module.attn_mutables)
+                attn_mutables.append(map_dict)
+            elif isinstance(module, MutableAttn):
                 module.init_mutables()
                 map_dict = nn.ModuleDict(module.attn_mutables)
                 attn_mutables.append(map_dict)
@@ -274,5 +278,5 @@ class DMSMutator(BaseMutator):
 
     def mutables(self):
         for m in self.modules():
-            if isinstance(m,DMSMutableMixIn):
+            if isinstance(m, DMSMutableMixIn):
                 yield m

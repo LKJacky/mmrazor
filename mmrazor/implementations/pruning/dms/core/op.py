@@ -26,6 +26,9 @@ def soft_ceil(x):
 
 class QuickFlopMixin:
 
+    def __init__(self) -> None:
+        self._quick_flop_init()
+
     def _quick_flop_init(self) -> None:
         self.quick_flop_handlers: list = []
         self.quick_flop_recorded_out_shape: List = []
@@ -398,3 +401,12 @@ class DynamicStage(nn.Sequential, DynamicMixin):
 
     def register_mutable_attr(self, attr: str, mutable):
         self.mutable_attrs[attr] = mutable
+
+
+class MutableAttn:
+
+    def __init__(self) -> None:
+        self.attn_mutables = {'head': None, 'qk': None, 'v': None}
+
+    def init_mutables(self):
+        raise NotImplementedError()
