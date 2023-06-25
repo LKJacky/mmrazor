@@ -109,6 +109,8 @@ class DmsGeneralAlgorithm(nn.Module):
         )
     ) -> None:
         super().__init__()
+        import copy
+        origin_model = copy.deepcopy(model)
         self.architecture = model
         self.mutator: DMSMutator = DMSMutator(**mutator_kwargs)
 
@@ -118,6 +120,8 @@ class DmsGeneralAlgorithm(nn.Module):
             **scheduler_kargs,
         )
         self.mutator.channel_depth_train()
+        self.architecture.load_state_dict(
+            origin_model.state_dict(), strict=False)
 
         self.runtime_info = None
 
