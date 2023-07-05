@@ -29,8 +29,9 @@ import torch.nn as nn
 import torchvision.utils
 import yaml
 from timm import utils
-from timm.data import (AugMixDataset, FastCollateMixup, Mixup, create_dataset,
+from timm.data import (AugMixDataset, FastCollateMixup, Mixup, 
                        create_loader, resolve_data_config)
+from timm_dataset import create_dataset
 from timm.layers import (convert_splitbn_model, convert_sync_batchnorm,
                          set_fast_norm)
 from timm.loss import (BinaryCrossEntropy, JsdCrossEntropy,
