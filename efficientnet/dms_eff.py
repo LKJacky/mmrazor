@@ -145,16 +145,15 @@ class ImpBatchNormAct2d(DynamicBatchNormAct2d):
         return y
 
 
-if __name__ == '__main__':
-    # set_log_level('debug')
-    model = efficientnet_b0()
-    print(model)
+# Algo ####################################################################################
 
-    algo = DmsGeneralAlgorithm(
-        model,
-        mutator_kwargs=dict(
+
+class EffDmsAlgorithm(DmsGeneralAlgorithm):
+
+    def __init__(self, model, mutator_kwargs={}, scheduler_kargs={}) -> None:
+        default_mutator_kwargs = dict(
             prune_qkv=False,
-            prune_block=False,
+            prune_block=True,
             dtp_mutator_cfg=dict(
                 type='DTPAMutator',
                 channel_unit_cfg=dict(
@@ -169,12 +168,36 @@ if __name__ == '__main__':
                         input_shape=(1, 3, 224, 224),
                     ),
                     tracer_type='FxTracer',
-                    extra_mapping={BatchNormAct2d: DynamicBatchNormAct2d}),
-            ),
-            extra_module_mapping={}),
-    )
+                    extra_mapping={BatchNormAct2d: DynamicBatchNormAct2d},
+                )),
+            extra_module_mapping={},
+            block_initilizer_kwargs=dict(
+                stage_mixin_layers=[], dynamic_block_mapping={}),
+        )
+        default_scheduler_kargs = dict(
+            flops_target=0.8,
+            decay_ratio=0.8,
+            refine_ratio=0.2,
+            flop_loss_weight=1000,
+            structure_log_interval=1000,
+            by_epoch=True,
+            target_scheduler='cos',
+        )
+        default_mutator_kwargs.update(mutator_kwargs)
+        default_scheduler_kargs.update(scheduler_kargs)
+        super().__init__(
+            model,
+            mutator_kwargs=default_mutator_kwargs,
+            scheduler_kargs=default_scheduler_kargs,
+        )
+
+
+if __name__ == '__main__':
+    model = efficientnet_b0()
+    print(model)
+
+    algo = EffDmsAlgorithm(model)
     print(algo.mutator.info())
-    # print(algo)
 
     config = algo.mutator.dtp_mutator.config_template(with_channels=True)
     print(config)
