@@ -32,13 +32,15 @@ class SequentialMutableChannelUnit(MutableChannelUnit):
     """
 
     def __init__(
-            self,
-            num_channels: int,
-            choice_mode='number',
-            # args for make divisible
-            divisor=1,
-            min_value=1,
-            min_ratio=0.9) -> None:
+        self,
+        num_channels: int,
+        choice_mode='number',
+        # args for make divisible
+        divisor=1,
+        min_value=1,
+        min_ratio=0.9,
+        extra_mapping={},
+    ) -> None:
         super().__init__(num_channels)
         assert choice_mode in ['ratio', 'number']
         self.choice_mode = choice_mode
@@ -51,6 +53,31 @@ class SequentialMutableChannelUnit(MutableChannelUnit):
         self.min_value = min_value
         self.min_ratio = min_ratio
 
+        from torchvision.models.swin_transformer import ShiftedWindowAttention
+
+        from mmrazor.implementations.pruning.dms.core.models.opt.opt_ops import (  # noqa
+            DynamicEmbedding, DynamicOPTAttention,
+            DynamicOPTLearnedPositionalEmbedding, OPTAttention,
+            OPTLearnedPositionalEmbedding)
+        from mmrazor.implementations.pruning.dms.core.models.swin import (
+            BaseShiftedWindowAttention, DynamicShiftedWindowAttention)
+        self.module_mapping = {
+            Conv2dAdaptivePadding: dynamic_ops.DynamicConv2dAdaptivePadding,
+            nn.Conv2d: dynamic_ops.DynamicConv2d,
+            nn.BatchNorm2d: dynamic_ops.DynamicBatchNorm2d,
+            nn.Linear: dynamic_ops.DynamicLinear,
+            nn.SyncBatchNorm: dynamic_ops.DynamicSyncBatchNorm,
+            EngineSyncBatchNorm: dynamic_ops.DynamicSyncBatchNorm,
+            _BatchNormXd: dynamic_ops.DynamicBatchNormXd,
+            ShiftedWindowAttention: DynamicShiftedWindowAttention,
+            BaseShiftedWindowAttention: DynamicShiftedWindowAttention,
+            nn.LayerNorm: dynamic_ops.DynamicLayerNorm,
+            OPTAttention: DynamicOPTAttention,
+            nn.Embedding: DynamicEmbedding,
+            OPTLearnedPositionalEmbedding: DynamicOPTLearnedPositionalEmbedding
+        }
+        self.module_mapping.update(extra_mapping)
+
     @classmethod
     def init_from_mutable_channel(cls,
                                   mutable_channel: SquentialMutableChannel):
@@ -61,32 +88,8 @@ class SequentialMutableChannelUnit(MutableChannelUnit):
     def prepare_for_pruning(self, model: nn.Module):
         """Prepare for pruning, including register mutable channels."""
         # register MutableMask
-        from torchvision.models.swin_transformer import ShiftedWindowAttention
 
-        from mmrazor.implementations.pruning.dms.core.models.opt.opt_ops import (  # noqa
-            DynamicEmbedding, DynamicOPTAttention,
-            DynamicOPTLearnedPositionalEmbedding, OPTAttention,
-            OPTLearnedPositionalEmbedding)
-        from mmrazor.implementations.pruning.dms.core.models.swin import (
-            BaseShiftedWindowAttention, DynamicShiftedWindowAttention)
-        self._replace_with_dynamic_ops(
-            model, {
-                Conv2dAdaptivePadding:
-                dynamic_ops.DynamicConv2dAdaptivePadding,
-                nn.Conv2d: dynamic_ops.DynamicConv2d,
-                nn.BatchNorm2d: dynamic_ops.DynamicBatchNorm2d,
-                nn.Linear: dynamic_ops.DynamicLinear,
-                nn.SyncBatchNorm: dynamic_ops.DynamicSyncBatchNorm,
-                EngineSyncBatchNorm: dynamic_ops.DynamicSyncBatchNorm,
-                _BatchNormXd: dynamic_ops.DynamicBatchNormXd,
-                ShiftedWindowAttention: DynamicShiftedWindowAttention,
-                BaseShiftedWindowAttention: DynamicShiftedWindowAttention,
-                nn.LayerNorm: dynamic_ops.DynamicLayerNorm,
-                OPTAttention: DynamicOPTAttention,
-                nn.Embedding: DynamicEmbedding,
-                OPTLearnedPositionalEmbedding:
-                DynamicOPTLearnedPositionalEmbedding
-            })
+        self._replace_with_dynamic_ops(model, self.module_mapping)
         self._register_channel_container(model, MutableChannelContainer)
         self._register_mutable_channel(self.mutable_channel)
 

@@ -18,8 +18,13 @@ DTPMutableChannelImp = DTPTMutableChannelImp
 
 class BaseDTPUnit(L1MutableChannelUnit, CollectUnitMixin):
 
-    def __init__(self, num_channels: int) -> None:
-        super().__init__(num_channels, choice_mode='number')
+    def __init__(
+        self,
+        num_channels: int,
+        extra_mapping={},
+    ) -> None:
+        super().__init__(
+            num_channels, choice_mode='number', extra_mapping=extra_mapping)
         self.mutable_channel: DTPMutableChannelImp = DTPMutableChannelImp(
             self.num_channels)
         self.requires_grad_(False)
@@ -37,6 +42,7 @@ class BaseDTPUnit(L1MutableChannelUnit, CollectUnitMixin):
             OPTLearnedPositionalEmbedding: ImpOPTLearnedPositionalEmbedding,
             OPTAttention: ImpOPTAttention,
         }
+        self.module_mapping.update(extra_mapping)
 
     def prepare_for_pruning(self, model: nn.Module):
         self._replace_with_dynamic_ops(model, self.module_mapping)
@@ -55,7 +61,7 @@ class DTPTUnit(BaseDTPUnit):
         num_channels: int,
         extra_mapping={},
     ) -> None:
-        super().__init__(num_channels)
+        super().__init__(num_channels, extra_mapping=extra_mapping)
         self.mutable_channel: DTPTMutableChannelImp = DTPTMutableChannelImp(
             self.num_channels)
         self.requires_grad_(False)
