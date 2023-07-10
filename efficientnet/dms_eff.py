@@ -10,6 +10,7 @@ from mmrazor.models.architectures.dynamic_ops import (DynamicChannelMixin,
                                                       DynamicLinear)
 import torch.nn as nn
 import torch.nn.functional as F
+from timm.layers import DropPath
 # OPS ####################################################################################
 
 
@@ -70,60 +71,6 @@ class DynamicBatchNormAct2d(BatchNormAct2d, DynamicBatchNormMixin):
             static_bn.bias = nn.Parameter(bias)
 
         return static_bn
-
-    def forward(self, x):
-        running_mean, running_var, weight, bias = self.get_dynamic_params()
-
-        # cut & paste of torch.nn.BatchNorm2d.forward impl to avoid issues with torchscript and tracing
-        # _assert(x.ndim == 4, f'expected 4D input (got {x.ndim}D input)')
-
-        # exponential_average_factor is set to self.momentum
-        # (when it is available) only so that it gets updated
-        # in ONNX graph when this node is exported to ONNX.
-        if self.momentum is None:
-            exponential_average_factor = 0.0
-        else:
-            exponential_average_factor = self.momentum
-
-        if self.training and self.track_running_stats:
-            # TODO: if statement only here to tell the jit to skip emitting this when it is None
-            if self.num_batches_tracked is not None:  # type: ignore[has-type]
-                self.num_batches_tracked.add_(1)  # type: ignore[has-type]
-                if self.momentum is None:  # use cumulative moving average
-                    exponential_average_factor = 1.0 / float(
-                        self.num_batches_tracked)
-                else:  # use exponential moving average
-                    exponential_average_factor = self.momentum
-        r"""
-        Decide whether the mini-batch stats should be used for normalization rather than the buffers.
-        Mini-batch stats are used in training mode, and in eval mode when buffers are None.
-        """
-        if self.training:
-            bn_training = True
-        else:
-            bn_training = (self.running_mean is None) and (self.running_var is
-                                                           None)
-        r"""
-        Buffers are only updated if they are to be tracked and we are in training mode. Thus they only need to be
-        passed when the update should occur (i.e. in training mode when they are tracked), or when buffer stats are
-        used for normalization (i.e. in eval mode when buffers are not None).
-        """
-        x = F.batch_norm(
-            x,
-            # If buffers are not to be tracked, ensure that they won't be updated
-            running_mean
-            if not self.training or self.track_running_stats else None,
-            running_var
-            if not self.training or self.track_running_stats else None,
-            weight,
-            bias,
-            bn_training,
-            exponential_average_factor,
-            self.eps,
-        )
-        x = self.drop(x)
-        x = self.act(x)
-        return x
 
     @classmethod
     def convert_from(cls, module: BatchNormAct2d):
@@ -203,12 +150,12 @@ class DynamicInvertedResidual(InvertedResidual, DynamicBlockMixin):
 
     def to_static_op(self):
         static = InvertedResidual(
-            in_chs=module.conv_pw.in_channels,
-            out_chs=module.conv_pwl.out_channels,
-            dw_kernel_size=module.conv_dw.kernel_size[0],
-            stride=module.conv_dw.stride,
-            dilation=module.conv_dw.dilation,
-            pad_type=module.conv_dw.padding,
+            in_chs=self.conv_pw.in_channels,
+            out_chs=self.conv_pwl.out_channels,
+            dw_kernel_size=self.conv_dw.kernel_size[0],
+            stride=self.conv_dw.stride,
+            dilation=self.conv_dw.dilation,
+            pad_type=self.conv_dw.padding,
         )
         static.has_skip = self.has_skip
         static.conv_pw = self.conv_pw
@@ -294,9 +241,27 @@ class EffDmsAlgorithm(DmsGeneralAlgorithm):
             scheduler_kargs=default_scheduler_kargs,
         )
 
+    def to_static_model(self, drop_path=-1, drop=-1):
+
+        model: EfficientNet = super().to_static_model()
+        if drop_path != -1:
+            num_blocks = sum([len(stage) for stage in model.blocks])
+            i = 0
+            for stage in model.blocks:
+                for block in stage:
+                    drop_path_rate = drop_path * i / num_blocks
+                    block.drop_path = DropPath(
+                        drop_path_rate
+                    ) if drop_path_rate != 0 else nn.Identity()
+                    i += 1
+            assert i == num_blocks
+        if drop != -1:
+            model.drop_rate = drop
+        return model
+
 
 if __name__ == '__main__':
-    model = efficientnet_b0()
+    model = efficientnet_b0(drop_path_rate=0.3, drop_rate=0.2)
     print(model)
 
     algo = EffDmsAlgorithm(model)
@@ -307,3 +272,5 @@ if __name__ == '__main__':
     import json
     print(json.dumps(config['channel_unit_cfg']['units'], indent=4))
     print(algo.mutator.info())
+
+    print(algo.to_static_model(drop_path=0.5, drop=0.4))

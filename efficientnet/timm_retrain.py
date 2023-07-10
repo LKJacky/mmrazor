@@ -45,9 +45,6 @@ from torch.nn.parallel import DistributedDataParallel as NativeDDP
 
 from mmrazor.models.architectures.backbones.scalenet.timm_arch import \
     scale_net_timm
-from mmrazor.utils import print_log
-
-DEBUG = os.environ.get('DEBUG', 'false') == 'true'
 
 try:
     from apex import amp
@@ -75,6 +72,10 @@ try:
     has_functorch = True
 except ImportError as e:
     has_functorch = False
+from mmrazor.utils import print_log
+
+DEBUG = os.environ.get('DEBUG', 'false') == 'true'
+print("DEBUG", DEBUG)
 
 has_compile = hasattr(torch, 'compile')
 
@@ -842,10 +843,9 @@ group.add_argument(
 
 # for dms
 group = parser.add_argument_group('dms')
-group.add_argument('--target', type=float, default=1.0)
+group.add_argument('--pruned', type=str, default='')
 group.add_argument('--sub_space', type=str, default='')
-group.add_argument('--mutator_lr', type=float, default=4e-4)
-group.add_argument('--loss_weight', type=float, default=100)
+group.add_argument('--reset', type=str, default='false')
 
 
 def _parse_args():
@@ -964,18 +964,17 @@ def main():
         assert num_aug_splits > 1 or args.resplit
         model = convert_splitbn_model(model, max(num_aug_splits, 2))
 
-    #######################################################################################################
+    #############################################################################################################
     # build algorithm
     from dms_eff import EffDmsAlgorithm
-
     if args.sub_space != '':
         algorithm = EffDmsAlgorithm(
             model,
             scheduler_kargs=dict(
-                flops_target=args.target,
+                flops_target=1.0,
                 decay_ratio=0.8,
                 refine_ratio=0.2,
-                flop_loss_weight=args.loss_weight,
+                flop_loss_weight=1000,
                 structure_log_interval=1000,
                 by_epoch=True,
                 target_scheduler='cos',
@@ -984,20 +983,30 @@ def main():
         algorithm.load_state_dict(subspace)
         model = algorithm.to_static_model(
             drop_path=args.drop_path, head_dropout=args.head_dropout)
-        print(model)
-    algorithm = EffDmsAlgorithm(
-        model,
-        scheduler_kargs=dict(
-            flops_target=args.target,
-            decay_ratio=0.8,
-            refine_ratio=0.2,
-            flop_loss_weight=args.loss_weight,
-            structure_log_interval=1000,
-            by_epoch=True,
-            target_scheduler='cos',
-        ))
-    model = algorithm
-    #######################################################################################################
+        print_log('loaded sub space')
+    if args.pruned != '':
+        algorithm = EffDmsAlgorithm(
+            model,
+            scheduler_kargs=dict(
+                flops_target=1.0,
+                decay_ratio=0.8,
+                refine_ratio=0.2,
+                flop_loss_weight=1000,
+                structure_log_interval=1000,
+                by_epoch=True,
+                target_scheduler='cos',
+            ))
+        state_dict = torch.load(args.pruned, map_location='cpu')['state_dict']
+        algorithm.load_state_dict(state_dict)
+        print_log(algorithm.mutator.info())
+        model = algorithm.to_static_model(
+            drop_path=args.drop_path, drop=args.drop)
+        if args.reset == 'true':
+            for module in model.modules():
+                if hasattr(module, 'dms_reset_parameters'):
+                    module.dms_reset_parameters()
+            print_log('reset parameter')
+    #############################################################################################################
 
     # move model to GPU, enable channels last layout if set
     model.to(device=device)
@@ -1042,19 +1051,12 @@ def main():
                 f'and effective global batch size ({global_batch_size}) with {args.lr_base_scale} scaling.'
             )
 
-    ###################################################################################
-    from timm.optim.optim_factory import param_groups_weight_decay
-    parameters = [
-        *param_groups_weight_decay(
-            model.architecture, weight_decay=args.weight_decay),
-        {
-            'params': model.mutator.parameters(),
-            'lr': args.mutator_lr,
-            'weight_decay': 0.0
-        },
-    ]
-    optimizer = create_optimizer_v2(parameters, **optimizer_kwargs(cfg=args))
-    ###################################################################################
+    optimizer = create_optimizer_v2(
+        model,
+        **optimizer_kwargs(cfg=args),
+        **args.opt_kwargs,
+    )
+
     # setup automatic mixed-precision (AMP) loss scaling and op casting
     amp_autocast = suppress  # do nothing
     loss_scaler = None
@@ -1088,7 +1090,6 @@ def main():
     if not os.path.exists(args.resume):
         args.resume = ''
     ###########################################################################################
-
     if args.resume:
         resume_epoch = resume_checkpoint(
             model,
@@ -1122,7 +1123,6 @@ def main():
             model = NativeDDP(
                 model,
                 device_ids=[device],
-                find_unused_parameters=True,
                 broadcast_buffers=not args.no_ddp_bb)
         # NOTE: EMA model does not need to be wrapped by DDP
 
@@ -1446,13 +1446,6 @@ def train_one_epoch(
     last_accum_steps = len(loader) % accum_steps
     updates_per_epoch = (len(loader) + accum_steps - 1) // accum_steps
     num_updates = epoch * updates_per_epoch
-    #############################################################################################
-    if isinstance(model, NativeDDP):
-        base_model = model.module
-    else:
-        base_model = model
-    #############################################################################################
-
     last_batch_idx = len(loader) - 1
     last_batch_idx_to_accum = len(loader) - last_accum_steps
 
@@ -1473,43 +1466,19 @@ def train_one_epoch(
         if args.channels_last:
             input = input.contiguous(memory_format=torch.channels_last)
 
-        #############################################################################################
-        if DEBUG and batch_idx > 10:
-            break
-        num_epochs = args.epochs
-        base_model.runtime_info = [
-            batch_idx + epoch * len(loader), epoch,
-            len(loader) * num_epochs, num_epochs
-        ]
-        if batch_idx % base_model.scheduler.structure_log_interval == 0:
-            print_log(base_model.mutator.info())
-            print_log(
-                base_model.scheduler.current_target(*base_model.runtime_info))
-            print_log(f'runtime:{base_model.runtime_info}')
-        #############################################################################################
-
         # multiply by accum steps to get equivalent for full update
         data_time_m.update(accum_steps * (time.time() - data_start_time))
 
         def _forward():
             with amp_autocast():
                 output = model(input)
-                #############################################################################################
-                logits, flop_loss = output
-                loss = loss_fn(logits, target) + flop_loss
-                ##############################################################
+                loss = loss_fn(output, target)
             if accum_steps > 1:
                 loss /= accum_steps
             return loss
 
         def _backward(_loss):
-            ###############################################################################
-            if loss_scaler._scaler._scale is not None:
-                for mutable in base_model.mutator.mutables():
-                    mutable.grad_scaler = loss_scaler._scaler._scale.item()
-            ###############################################################################
             if loss_scaler is not None:
-
                 loss_scaler(
                     _loss,
                     optimizer,
@@ -1623,8 +1592,6 @@ def validate(model,
     last_idx = len(loader) - 1
     with torch.no_grad():
         for batch_idx, (input, target) in enumerate(loader):
-            if DEBUG and batch_idx > 10:
-                break
             last_batch = batch_idx == last_idx
             if not args.prefetcher:
                 input = input.to(device)
