@@ -1,8 +1,10 @@
-from timm.models.efficientnet import efficientnet_b0
+from timm.models.efficientnet import efficientnet_b0, EfficientNet
+from timm.models._efficientnet_blocks import InvertedResidual, DepthwiseSeparableConv
 from timm.layers import BatchNormAct2d
 from torch import nn, nn as nn
 from torch.nn.modules.batchnorm import _BatchNorm
 from mmrazor.implementations.pruning.dms.core.algorithm import DmsGeneralAlgorithm
+from mmrazor.implementations.pruning.dms.core.op import DynamicBlockMixin
 from mmrazor.models.architectures.dynamic_ops import (DynamicChannelMixin,
                                                       DynamicBatchNormMixin,
                                                       DynamicLinear)
@@ -145,12 +147,110 @@ class ImpBatchNormAct2d(DynamicBatchNormAct2d):
         return y
 
 
+# blocks ####################################################################################
+
+
+class DynamicInvertedResidual(InvertedResidual, DynamicBlockMixin):
+
+    def __init__(self, *args, **kwargs):
+        InvertedResidual.__init__(self, *args, **kwargs)
+        DynamicBlockMixin.__init__(self)
+        self.init_args = args
+        self.init_kwargs = kwargs
+
+    @property
+    def is_removable(self):
+        return self.has_skip
+
+    @classmethod
+    def convert_from(cls, module: InvertedResidual):
+        static = cls(
+            in_chs=module.conv_pw.in_channels,
+            out_chs=module.conv_pwl.out_channels,
+            dw_kernel_size=module.conv_dw.kernel_size[0],
+            stride=module.conv_dw.stride,
+            dilation=module.conv_dw.dilation,
+            pad_type=module.conv_dw.padding,
+        )
+        static.has_skip = module.has_skip
+        static.conv_pw = module.conv_pw
+        static.bn1 = module.bn1
+        static.conv_dw = module.conv_dw
+        static.bn2 = module.bn2
+        static.se = module.se
+        static.conv_pwl = module.conv_pwl
+        static.bn3 = module.bn3
+        static.drop_path = module.drop_path
+        static.load_state_dict(module.state_dict())
+        return static
+
+    @property
+    def static_op_factory(self):
+        return InvertedResidual
+
+    def forward(self, x):
+        shortcut = x
+        x = self.conv_pw(x)
+        x = self.bn1(x)
+        x = self.conv_dw(x)
+        x = self.bn2(x)
+        x = self.se(x)
+        x = self.conv_pwl(x)
+        x = self.bn3(x)
+        if self.has_skip:
+            x = self.drop_path(x) * self.scale + shortcut
+        return x
+
+    def to_static_op(self):
+        static = InvertedResidual(
+            in_chs=module.conv_pw.in_channels,
+            out_chs=module.conv_pwl.out_channels,
+            dw_kernel_size=module.conv_dw.kernel_size[0],
+            stride=module.conv_dw.stride,
+            dilation=module.conv_dw.dilation,
+            pad_type=module.conv_dw.padding,
+        )
+        static.has_skip = self.has_skip
+        static.conv_pw = self.conv_pw
+        static.bn1 = self.bn1
+        static.conv_dw = self.conv_dw
+        static.bn2 = self.bn2
+        static.se = self.se
+        static.conv_pwl = self.conv_pwl
+        static.bn3 = self.bn3
+        static.drop_path = self.drop_path
+        static.load_state_dict(self.state_dict())
+        from mmrazor.structures.subnet.fix_subnet import _dynamic_to_static
+        module = static
+        for name, m in self.named_children():  # type: ignore
+            assert hasattr(module, name)
+            setattr(module, name, _dynamic_to_static(m))
+        return module
+
+
+class EffStage(nn.Sequential):
+
+    @classmethod
+    def convert_from(cls, module: nn.Sequential):
+        return cls(module._modules)
+
+
 # Algo ####################################################################################
 
 
 class EffDmsAlgorithm(DmsGeneralAlgorithm):
 
-    def __init__(self, model, mutator_kwargs={}, scheduler_kargs={}) -> None:
+    def __init__(self,
+                 model: EfficientNet,
+                 mutator_kwargs={},
+                 scheduler_kargs={}) -> None:
+
+        # nn.Sequential -> EffStage
+        new_seq = nn.Sequential()
+        for name, block in model.blocks.named_children():
+            new_seq.add_module(name, EffStage.convert_from(block))
+        model.blocks = new_seq
+        print(model)
         default_mutator_kwargs = dict(
             prune_qkv=False,
             prune_block=True,
@@ -172,7 +272,10 @@ class EffDmsAlgorithm(DmsGeneralAlgorithm):
                 )),
             extra_module_mapping={},
             block_initilizer_kwargs=dict(
-                stage_mixin_layers=[], dynamic_block_mapping={}),
+                stage_mixin_layers=[EffStage],
+                dynamic_block_mapping={
+                    InvertedResidual: DynamicInvertedResidual
+                }),
         )
         default_scheduler_kargs = dict(
             flops_target=0.8,
@@ -203,4 +306,4 @@ if __name__ == '__main__':
     print(config)
     import json
     print(json.dumps(config['channel_unit_cfg']['units'], indent=4))
-    print(algo)
+    print(algo.mutator.info())
