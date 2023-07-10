@@ -273,6 +273,9 @@ class MutableBlocks(BaseMutable, DMSMutableMixIn):
             f'self.taylor: \t{self.taylor.min().item():.3f}\t{self.taylor.max().item():.3f}\t'  # noqa
             f'mask:\t{get_mask_str()}\t')
 
+    def limit_value(self):
+        self.e.data = torch.clamp(self.e, 0, 1.0)  # num of blocks can be zero
+
     # inherit from BaseMutable
 
     @property
