@@ -74,7 +74,7 @@ class DynamicBatchNormAct2d(BatchNormAct2d, DynamicBatchNormMixin):
 
     @classmethod
     def convert_from(cls, module: BatchNormAct2d):
-        new_module = DynamicBatchNormAct2d(
+        new_module = cls(
             num_features=module.num_features,
             eps=module.eps,
             momentum=module.momentum,
@@ -85,6 +85,60 @@ class DynamicBatchNormAct2d(BatchNormAct2d, DynamicBatchNormMixin):
         new_module.drop = module.drop
         new_module.load_state_dict(module.state_dict())
         return new_module
+
+    def forward(self, x):
+        running_mean, running_var, weight, bias = self.get_dynamic_params()
+
+        # cut & paste of torch.nn.BatchNorm2d.forward impl to avoid issues with torchscript and tracing
+        # _assert(x.ndim == 4, f'expected 4D input (got {x.ndim}D input)')
+
+        # exponential_average_factor is set to self.momentum
+        # (when it is available) only so that it gets updated
+        # in ONNX graph when this node is exported to ONNX.
+        if self.momentum is None:
+            exponential_average_factor = 0.0
+        else:
+            exponential_average_factor = self.momentum
+
+        if self.training and self.track_running_stats:
+            # TODO: if statement only here to tell the jit to skip emitting this when it is None
+            if self.num_batches_tracked is not None:  # type: ignore[has-type]
+                self.num_batches_tracked.add_(1)  # type: ignore[has-type]
+                if self.momentum is None:  # use cumulative moving average
+                    exponential_average_factor = 1.0 / float(
+                        self.num_batches_tracked)
+                else:  # use exponential moving average
+                    exponential_average_factor = self.momentum
+        r"""
+        Decide whether the mini-batch stats should be used for normalization rather than the buffers.
+        Mini-batch stats are used in training mode, and in eval mode when buffers are None.
+        """
+        if self.training:
+            bn_training = True
+        else:
+            bn_training = (self.running_mean is None) and (self.running_var is
+                                                           None)
+        r"""
+        Buffers are only updated if they are to be tracked and we are in training mode. Thus they only need to be
+        passed when the update should occur (i.e. in training mode when they are tracked), or when buffer stats are
+        used for normalization (i.e. in eval mode when buffers are not None).
+        """
+        x = F.batch_norm(
+            x,
+            # If buffers are not to be tracked, ensure that they won't be updated
+            running_mean
+            if not self.training or self.track_running_stats else None,
+            running_var
+            if not self.training or self.track_running_stats else None,
+            weight,
+            bias,
+            bn_training,
+            exponential_average_factor,
+            self.eps,
+        )
+        x = self.drop(x)
+        x = self.act(x)
+        return x
 
 
 class ImpBatchNormAct2d(DynamicBatchNormAct2d):
@@ -272,5 +326,6 @@ if __name__ == '__main__':
     import json
     print(json.dumps(config['channel_unit_cfg']['units'], indent=4))
     print(algo.mutator.info())
+    print(algo)
 
     print(algo.to_static_model(drop_path=0.5, drop=0.4))
