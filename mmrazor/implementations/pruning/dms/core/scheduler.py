@@ -26,11 +26,13 @@ class DMSScheduler():
                  step=1,
                  target_scheduler='linear',
                  loss_type='l2',
-                 structure_log_interval=100) -> None:
+                 structure_log_interval=100,
+                 train_model=True) -> None:
 
         self.model = model
         self.mutator: DMSMutator = mutator
         self._init()
+        self.model.requires_grad_(train_model)
 
         self.decay_ratio = decay_ratio
         self.refine_ratio = refine_ratio
@@ -50,6 +52,8 @@ class DMSScheduler():
             self.by_epoch = True
         else:
             raise NotImplementedError()
+        self.train_model=train_model
+        
 
         self.step = step
 
@@ -65,8 +69,10 @@ class DMSScheduler():
         self.mutator.limit_value()
         if iter < (self.decay_ratio) * max_iters:
             self.mutator.channel_depth_train()
+            self.model.requires_grad_(self.train_model)
         elif iter < (self.decay_ratio + self.refine_ratio) * max_iters:
             self.mutator.channel_train()
+            self.model.requires_grad_(self.train_model)
         else:
             self.mutator.requires_grad_(False)
 

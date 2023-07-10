@@ -124,6 +124,7 @@ class DMSMutator(BaseMutator):
                  ),
                  extra_module_mapping={},
                  block_initilizer_kwargs={},
+                 train_model=True,
                  init_cfg=None) -> None:
         super().__init__(init_cfg)
 
@@ -146,6 +147,8 @@ class DMSMutator(BaseMutator):
             LlamaAttention: DynamicLlamaAttention,
         }
         self.module_mapping.update(extra_module_mapping)
+
+        self.train_model = train_model
 
     def prepare_from_supernet(self, supernet) -> None:
 
