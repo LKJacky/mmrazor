@@ -252,6 +252,16 @@ class EffDmsAlgorithm(DmsGeneralAlgorithm):
             new_seq.add_module(name, EffStage.convert_from(block))
         model.blocks = new_seq
         print(model)
+
+        def update_dict_reverse(config1: dict, config2: dict):
+            for key in config2:
+                if key in config1 and isinstance(
+                        config2[key], dict) and isinstance(config1[key], dict):
+                    update_dict_reverse(config1[key], config2[key])
+                else:
+                    config1[key] = config2[key]
+            return config1
+
         default_mutator_kwargs = dict(
             prune_qkv=False,
             prune_block=True,
@@ -287,8 +297,10 @@ class EffDmsAlgorithm(DmsGeneralAlgorithm):
             by_epoch=True,
             target_scheduler='cos',
         )
-        default_mutator_kwargs.update(mutator_kwargs)
-        default_scheduler_kargs.update(scheduler_kargs)
+        default_mutator_kwargs = update_dict_reverse(default_mutator_kwargs,
+                                                     mutator_kwargs)
+        default_scheduler_kargs = update_dict_reverse(default_scheduler_kargs,
+                                                      scheduler_kargs)
         super().__init__(
             model,
             mutator_kwargs=default_mutator_kwargs,
@@ -318,7 +330,12 @@ if __name__ == '__main__':
     model = efficientnet_b0(drop_path_rate=0.3, drop_rate=0.2)
     print(model)
 
-    algo = EffDmsAlgorithm(model)
+    algo = EffDmsAlgorithm(
+        model,
+        mutator_kwargs=dict(
+            dtp_mutator_cfg=dict(
+                parse_cfg=dict(
+                    demo_input=dict(input_shape=(1, 3, 240, 240), ), )), ))
     print(algo.mutator.info())
 
     config = algo.mutator.dtp_mutator.config_template(with_channels=True)

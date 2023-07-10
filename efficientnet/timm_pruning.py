@@ -987,6 +987,12 @@ def main():
         print(model)
     algorithm = EffDmsAlgorithm(
         model,
+        mutator_kwargs=dict(
+            dtp_mutator_cfg=dict(
+                parse_cfg=dict(
+                    demo_input=dict(
+                        input_shape=(1, 3, data_config['input_size'][-1],
+                                     data_config['input_size'][-1]), ), )), ),
         scheduler_kargs=dict(
             flops_target=args.target,
             decay_ratio=0.8,
