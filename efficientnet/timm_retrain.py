@@ -875,7 +875,37 @@ def main():
 
     args.prefetcher = not args.no_prefetcher
     args.grad_accum_steps = max(1, args.grad_accum_steps)
-    device = utils.init_distributed_device(args)
+    #########################################################################################################
+    args.distributed = False
+    args.device = "cuda:0"
+    args.world_size = 1
+    args.rank = 0  # global rank
+
+    from mmengine.dist.utils import init_dist
+    if 'SLURM_PROCID' in os.environ:
+        args.distributed = int(True)
+        init_dist('slurm', backend='nccl')
+        print('init on slurm')
+
+    elif "WORLD_SIZE" in os.environ:
+        args.distributed = int(os.environ["WORLD_SIZE"]) > 1
+        if args.distributed:
+            init_dist('pytorch', backend='nccl')
+            print('init on torch dist')
+    else:
+        pass
+
+    if args.distributed:
+        args.local_rank = int(os.environ['LOCAL_RANK'])
+        args.device = 'cuda:%d' % args.local_rank
+        args.world_size = torch.distributed.get_world_size()
+        args.rank = torch.distributed.get_rank()
+    else:
+        args.device = 'cuda:0'
+    assert args.rank >= 0
+    device = torch.device(args.device)
+    # device = utils.init_distributed_device(args)
+    #########################################################################################################
     if args.distributed:
         _logger.info(
             'Training in distributed mode with multiple processes, 1 device per process.'
