@@ -71,6 +71,7 @@ class SplitAttention(MultiheadAttention):
             v_shortcut=attn.v_shortcut,
             use_layer_scale=not isinstance(attn.gamma1, nn.Identity),
         )
+        module.load_state_dict(attn.state_dict(), strict=False)
         return module
 
 
@@ -188,6 +189,74 @@ class DynamicAttention(SplitAttention, DynamicChannelMixin, MutableAttn,
         return flops
 
 
+class DeitLayers(nn.Sequential):
+
+    @classmethod
+    def convert_from(cls, module):
+        return cls(module._modules)
+
+
+class DyTransformerEncoderLayer(TransformerEncoderLayer, DynamicBlockMixin):
+
+    def __init__(self, *args, **kwargs):
+        TransformerEncoderLayer.__init__(self, *args, **kwargs)
+        DynamicBlockMixin.__init__(self)
+        self.init_args = args
+        self.init_kwargs = kwargs
+
+    @property
+    def is_removable(self):
+        return True
+
+    @classmethod
+    def convert_from(cls, module: TransformerEncoderLayer):
+        new_module = DyTransformerEncoderLayer(
+            embed_dims=module.embed_dims,
+            num_heads=module.attn.num_heads,
+            feedforward_channels=module.ffn.feedforward_channels,
+            drop_rate=0.,
+            attn_drop_rate=0.,
+            drop_path_rate=0.,
+            num_fcs=2,
+            qkv_bias=True,
+            act_cfg=dict(type='GELU'),
+            norm_cfg=dict(type='LN'),
+            init_cfg=None)
+        new_module.embed_dims = module.embed_dims
+        new_module.norm1_name = module.norm1_name
+        new_module.norm2_name = module.norm2_name
+
+        for name, child in module.named_children():
+            setattr(new_module, name, child)
+        return new_module
+
+    def to_static_op(self):
+        from mmrazor.structures.subnet.fix_subnet import _dynamic_to_static
+
+        module = self.static_op_factory(*self.init_args, **self.init_kwargs)
+
+        module.embed_dims = self.embed_dims
+        module.norm1_name = self.norm1_name
+        module.norm2_name = self.norm2_name
+
+        for name, m in self.named_children():  # type: ignore
+            assert hasattr(module, name)
+            setattr(module, name, _dynamic_to_static(m))
+        return module
+
+    @property
+    def static_op_factory(self):
+        return TransformerEncoderLayer
+
+    def forward(self, x):
+        x = x + self.attn(self.norm1(x)) * self.scale
+        x = x + self.ffn(self.norm2(x), identity=None) * self.scale
+        return x
+
+    def __repr__(self):
+        return TransformerEncoderLayer.__repr__(self)
+
+
 # mutator ####################################################################################
 
 
@@ -268,9 +337,6 @@ class DeitAnalyzer:
         config['res'] = self.parse_res_structure(self.model)
 
         config = self.post_process(config)
-
-        import json
-        print(json.dumps(config, indent=4))
         return config
 
     @classmethod
@@ -302,6 +368,55 @@ class DeitMutator(DTPAMutator):
 
 
 class DeitDms(DmsGeneralAlgorithm):
+
+    def __init__(self,
+                 model: nn.Module,
+                 mutator_kwargs={},
+                 scheduler_kargs={}) -> None:
+        model.backbone.layers = DeitLayers.convert_from(model.backbone.layers)
+        default_mutator_kwargs = dict(
+            prune_qkv=True,
+            prune_block=True,
+            dtp_mutator_cfg=dict(
+                type='DeitMutator',
+                channel_unit_cfg=dict(
+                    type='DTPTUnit',
+                    default_args=dict(extra_mapping={
+                        MMCVLinear: ImpLinear,
+                    })),
+                parse_cfg=dict(
+                    _scope_='mmrazor',
+                    type='ChannelAnalyzer',
+                    demo_input=dict(
+                        type='DefaultDemoInput',
+                        input_shape=(1, 3, 224, 224),
+                    ),
+                    tracer_type='FxTracer'),
+            ),
+            extra_module_mapping={
+                MultiheadAttention: DynamicAttention,
+            },
+            block_initilizer_kwargs=dict(
+                stage_mixin_layers=[DeitLayers],
+                dynamic_block_mapping={
+                    TransformerEncoderLayer: DyTransformerEncoderLayer
+                }),
+        )
+        default_scheduler_kargs = dict(
+            flops_target=0.8,
+            decay_ratio=0.8,
+            refine_ratio=0.2,
+            flop_loss_weight=100,
+            structure_log_interval=1000,
+            by_epoch=True,
+            target_scheduler='cos',
+        )
+        default_mutator_kwargs.update(mutator_kwargs)
+        default_scheduler_kargs.update(scheduler_kargs)
+        super().__init__(
+            model,
+            mutator_kwargs=default_mutator_kwargs,
+            scheduler_kargs=default_scheduler_kargs)
 
     def to_static_model(self):
         model = super().to_static_model()
@@ -339,31 +454,8 @@ if __name__ == '__main__':
         ]),
     )
     model = CLS_MODELS.build(model_dict)
-    print(model)
 
-    algo = DeitDms(
-        model,
-        mutator_kwargs=dict(
-            prune_qkv=False,
-            prune_block=False,
-            dtp_mutator_cfg=dict(
-                type='DeitMutator',
-                channel_unit_cfg=dict(
-                    type='DTPTUnit',
-                    default_args=dict(extra_mapping={
-                        MMCVLinear: ImpLinear,
-                    })),
-                parse_cfg=dict(
-                    _scope_='mmrazor',
-                    type='ChannelAnalyzer',
-                    demo_input=dict(
-                        type='DefaultDemoInput',
-                        input_shape=(1, 3, 224, 224),
-                    ),
-                    tracer_type='FxTracer'),
-            ),
-            extra_module_mapping={MultiheadAttention: DynamicAttention}),
-    )
+    algo = DeitDms(model, )
     print(algo.mutator.info())
 
     def rand_mask(mask):
@@ -385,5 +477,4 @@ if __name__ == '__main__':
 
     model = algo.to_static_model()
     x = torch.rand([1, 3, 224, 224])
-    print(model)
     model(x)
