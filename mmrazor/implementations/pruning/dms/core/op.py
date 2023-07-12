@@ -12,6 +12,7 @@ from mmrazor.models.architectures.dynamic_ops import (DynamicChannelMixin,
                                                       DynamicMixin)
 from ...chip.collect.ops import CollectMixin
 from .mutable import BlockThreshold, ImpMutableChannelContainer, MutableBlocks
+import copy
 
 
 def ste_forward(x, mask):
@@ -401,6 +402,20 @@ class DynamicStage(nn.Sequential, DynamicMixin):
 
     def register_mutable_attr(self, attr: str, mutable):
         self.mutable_attrs[attr] = mutable
+
+    def expand_module(self, ratio=1.0):
+        if ratio>1:
+            num = len(list(self.removable_block))
+            new_num = int((ratio - 1) * num)
+            new_num=max(1,new_num)
+            last_module = self._modules[list(self._modules.keys())[-1]]
+            for _ in range(new_num):
+                self.append(copy.deepcopy(last_module))
+            mask = self.mutable_blocks.mask
+            self.mutable_blocks.mask = torch.cat([
+                self.mutable_blocks.mask,
+                torch.ones([new_num], dtype=mask.dtype, device=mask.device)
+            ])
 
 
 class MutableAttn:

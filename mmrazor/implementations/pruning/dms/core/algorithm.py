@@ -15,6 +15,29 @@ from .mutator import DMSMutator
 from .scheduler import DMSScheduler
 import copy
 from mmrazor.models.utils.expandable_utils import expand_expandable_dynamic_model
+from .op import DynamicStage
+from mmrazor.structures.subnet.fix_subnet import (export_fix_subnet,
+                                                  load_fix_subnet)
+
+
+def to_static_model_x(
+    model,
+    reset_params=False,
+    **kargs,
+):
+
+    # to static model
+    fix_mutable = export_fix_subnet(model)[0]
+    load_fix_subnet(model, fix_mutable)
+    model = model
+
+    if reset_params:
+        print_log('reset parameters')
+        for module in model.modules():
+            if hasattr(module, 'reset_parameters'):
+                module.reset_parameters()
+
+    return model
 
 
 def convert_float_to_tenosr(res: dict, device):
@@ -94,7 +117,10 @@ class DmsAlgorithmMixin():
         return to_static_model(self)
 
     @classmethod
-    def expand_model(cls, model: nn.Module, ratio: float):
+    def expand_model(cls,
+                     model: nn.Module,
+                     channel_ratio: float = 2.0,
+                     block_ratio=2.0):
         mutator_kargs = copy.deepcopy(cls.default_mutator_kwargs)
         mutator_kargs['dtp_mutator_cfg'][
             'channel_unit_cfg'] = cls.expand_unit_config
@@ -103,17 +129,21 @@ class DmsAlgorithmMixin():
         structure = mutator.dtp_mutator.choice_template
         for key, num in structure.items():
             unit = mutator.dtp_mutator._name2unit[key]
-            unit.expand_to(int(num * ratio))
+            unit.expand_to(int(num * channel_ratio))
         model = expand_expandable_dynamic_model(model, zero=False)
-        return model
+
+        algo = cls(model)
+        for module in algo.architecture.modules():
+            if isinstance(module, DynamicStage):
+                module.expand_module(block_ratio)
+        return to_static_model_x(algo.architecture)
 
     @classmethod
     def show_structure(cls, model: nn.Module):
         model = copy.deepcopy(model)
-        mutator = DMSMutator(**cls.default_mutator_kwargs)
-        mutator.prepare_from_supernet(model)
-        mutator.init_quick_flop(model)
-        print(mutator.info())
+        algo = cls(model)
+
+        print(algo.mutator.info())
 
 
 @MODELS.register_module()

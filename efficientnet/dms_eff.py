@@ -8,9 +8,11 @@ from mmrazor.implementations.pruning.dms.core.op import DynamicBlockMixin
 from mmrazor.models.architectures.dynamic_ops import (DynamicChannelMixin,
                                                       DynamicBatchNormMixin,
                                                       DynamicLinear)
+from mmrazor.models.utils.expandable_utils.ops import ExpandableMixin
 import torch.nn as nn
 import torch.nn.functional as F
 from timm.layers import DropPath
+
 # OPS ####################################################################################
 
 
@@ -148,6 +150,42 @@ class ImpBatchNormAct2d(DynamicBatchNormAct2d):
         return y
 
 
+class ExpandableBatchNormAct2d(DynamicBatchNormAct2d, ExpandableMixin):
+
+    @property
+    def _original_in_channel(self):
+        return self.num_features
+
+    @property
+    def _original_out_channel(self):
+        return self.num_features
+
+    def get_expand_op(self, in_c, out_c, zero=False):
+        assert in_c == out_c
+        module = BatchNormAct2d(
+            in_c,
+            eps=self.eps,
+            momentum=self.momentum,
+            affine=self.affine,
+            track_running_stats=self.track_running_stats,
+        )
+        module.drop = self.drop
+        module.act = self.act
+        if zero:
+            ExpandableMixin.zero_weight_(module)
+
+        if module.running_mean is not None:
+            module.running_mean.data = self.expand_bias(
+                module.running_mean, self.running_mean)
+
+        if module.running_var is not None:
+            module.running_var.data = self.expand_bias(module.running_var,
+                                                       self.running_var)
+        module.weight.data = self.expand_bias(module.weight, self.weight)
+        module.bias.data = self.expand_bias(module.bias, self.bias)
+        return module
+
+
 # blocks ####################################################################################
 
 
@@ -240,6 +278,44 @@ class EffStage(nn.Sequential):
 
 
 class EffDmsAlgorithm(DmsGeneralAlgorithm):
+    default_mutator_kwargs = dict(
+        prune_qkv=False,
+        prune_block=True,
+        dtp_mutator_cfg=dict(
+            type='DTPAMutator',
+            channel_unit_cfg=dict(
+                type='DTPTUnit',
+                default_args=dict(
+                    extra_mapping={BatchNormAct2d: ImpBatchNormAct2d})),
+            parse_cfg=dict(
+                _scope_='mmrazor',
+                type='ChannelAnalyzer',
+                demo_input=dict(
+                    type='DefaultDemoInput',
+                    input_shape=(1, 3, 224, 224),
+                ),
+                tracer_type='FxTracer',
+                extra_mapping={BatchNormAct2d: DynamicBatchNormAct2d},
+            )),
+        extra_module_mapping={},
+        block_initilizer_kwargs=dict(
+            stage_mixin_layers=[EffStage],
+            dynamic_block_mapping={InvertedResidual: DynamicInvertedResidual}),
+    )
+    default_scheduler_kargs = dict(
+        flops_target=0.8,
+        decay_ratio=0.8,
+        refine_ratio=0.2,
+        flop_loss_weight=1000,
+        structure_log_interval=1000,
+        by_epoch=True,
+        target_scheduler='cos',
+    )
+
+    expand_unit_config = dict(
+        type='ExpandableUnit',
+        default_args=dict(
+            extra_mapping={BatchNormAct2d: ExpandableBatchNormAct2d}))
 
     def __init__(self,
                  model: EfficientNet,
@@ -262,45 +338,10 @@ class EffDmsAlgorithm(DmsGeneralAlgorithm):
                     config1[key] = config2[key]
             return config1
 
-        default_mutator_kwargs = dict(
-            prune_qkv=False,
-            prune_block=True,
-            dtp_mutator_cfg=dict(
-                type='DTPAMutator',
-                channel_unit_cfg=dict(
-                    type='DTPTUnit',
-                    default_args=dict(
-                        extra_mapping={BatchNormAct2d: ImpBatchNormAct2d})),
-                parse_cfg=dict(
-                    _scope_='mmrazor',
-                    type='ChannelAnalyzer',
-                    demo_input=dict(
-                        type='DefaultDemoInput',
-                        input_shape=(1, 3, 224, 224),
-                    ),
-                    tracer_type='FxTracer',
-                    extra_mapping={BatchNormAct2d: DynamicBatchNormAct2d},
-                )),
-            extra_module_mapping={},
-            block_initilizer_kwargs=dict(
-                stage_mixin_layers=[EffStage],
-                dynamic_block_mapping={
-                    InvertedResidual: DynamicInvertedResidual
-                }),
-        )
-        default_scheduler_kargs = dict(
-            flops_target=0.8,
-            decay_ratio=0.8,
-            refine_ratio=0.2,
-            flop_loss_weight=1000,
-            structure_log_interval=1000,
-            by_epoch=True,
-            target_scheduler='cos',
-        )
-        default_mutator_kwargs = update_dict_reverse(default_mutator_kwargs,
-                                                     mutator_kwargs)
-        default_scheduler_kargs = update_dict_reverse(default_scheduler_kargs,
-                                                      scheduler_kargs)
+        default_mutator_kwargs = update_dict_reverse(
+            self.default_mutator_kwargs, mutator_kwargs)
+        default_scheduler_kargs = update_dict_reverse(
+            self.default_scheduler_kargs, scheduler_kargs)
         super().__init__(
             model,
             mutator_kwargs=default_mutator_kwargs,
@@ -338,11 +379,8 @@ if __name__ == '__main__':
                     demo_input=dict(input_shape=(1, 3, 240, 240), ), )), ))
     print(algo.mutator.info())
 
-    config = algo.mutator.dtp_mutator.config_template(with_channels=True)
-    print(config)
-    import json
-    print(json.dumps(config['channel_unit_cfg']['units'], indent=4))
-    print(algo.mutator.info())
-    print(algo)
-
-    print(algo.to_static_model(drop_path=0.5, drop=0.4))
+    model = algo.to_static_model(drop_path=0.5, drop=0.4)
+    EffDmsAlgorithm.show_structure(model)
+    model = algo.expand_model(model, channel_ratio=1.5, block_ratio=2.0)
+    print(model)
+    EffDmsAlgorithm.show_structure(model)
