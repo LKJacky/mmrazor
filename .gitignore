@@ -128,3 +128,5 @@ run*.sh
 
 output
 tmp
+**/work_dirs
+**/data

@@ -1,5 +1,7 @@
+from typing import Dict, Optional, Union
+from mmengine.model import BaseModel
 import torch
-from mmrazor.implementations.pruning.dms.core.algorithm import DmsGeneralAlgorithm
+from mmrazor.implementations.pruning.dms.core.algorithm import BaseDTPAlgorithm, BaseAlgorithm, DmsAlgorithmMixin, update_dict_reverse
 from mmrazor.implementations.pruning.dms.core.op import ImpLinear
 from mmrazor.implementations.pruning.dms.core.dtp import DTPAMutator
 from mmrazor.implementations.pruning.dms.core.models.opt.opt_analyzer import OutChannel, InChannel
@@ -366,14 +368,19 @@ class DeitMutator(DTPAMutator):
         for unit in self.mutable_units:
             unit.requires_grad_(True)
 
-
-class DeitDms(DmsGeneralAlgorithm):
+@MODELS.register_module()
+class DeitDms(BaseDTPAlgorithm):
 
     def __init__(self,
-                 model: nn.Module,
-                 mutator_kwargs={},
-                 scheduler_kargs={}) -> None:
+                 architecture: BaseModel,
+                 mutator_cfg={},
+                 scheduler={},
+                 data_preprocessor=None,
+                 init_cfg=None) -> None:
+        BaseAlgorithm.__init__(self, architecture, data_preprocessor, init_cfg)
+        model = self.architecture
         model.backbone.layers = DeitLayers.convert_from(model.backbone.layers)
+
         default_mutator_kwargs = dict(
             prune_qkv=True,
             prune_block=True,
@@ -411,10 +418,13 @@ class DeitDms(DmsGeneralAlgorithm):
             by_epoch=True,
             target_scheduler='cos',
         )
-        default_mutator_kwargs.update(mutator_kwargs)
-        default_scheduler_kargs.update(scheduler_kargs)
-        super().__init__(
-            model,
+        default_mutator_kwargs = update_dict_reverse(default_mutator_kwargs,
+                                                     mutator_cfg)
+        default_scheduler_kargs = update_dict_reverse(default_scheduler_kargs,
+                                                      scheduler)
+        DmsAlgorithmMixin.__init__(
+            self,
+            self.architecture,
             mutator_kwargs=default_mutator_kwargs,
             scheduler_kargs=default_scheduler_kargs)
 

@@ -22,61 +22,17 @@ def convert_float_to_tenosr(res: dict, device):
     return res
 
 
-@MODELS.register_module()
-class BaseDTPAlgorithm(BaseAlgorithm):
-
-    def __init__(
-            self,
-            architecture: Union[BaseModel, Dict],
-            mutator_cfg=dict(
-                type='DMSMutator',
-                channel_unit_cfg=dict(type='ImpUnit', default_args=dict()),
-                parse_cfg=dict(
-                    _scope_='mmrazor',
-                    type='ChannelAnalyzer',
-                    demo_input=dict(
-                        type='DefaultDemoInput',
-                        input_shape=[1, 3, 224, 224],
-                    ),
-                    tracer_type='FxTracer'),
-            ),
-            scheduler=dict(
-                type='',
-                flops_target=0.5,
-                decay_ratio=0.6,
-                refine_ratio=0.2,
-                flop_loss_weight=1,
-            ),
-            #
-            data_preprocessor: Optional[Union[Dict, nn.Module]] = None,
-            init_cfg: Optional[Dict] = None) -> None:
-        super().__init__(architecture, data_preprocessor, init_cfg)
-
-        self.mutator: DMSMutator = MODELS.build(mutator_cfg)
-        scheduler.update(dict(mutator=self.mutator, model=self.architecture))
-        self.scheduler: DMSScheduler = TASK_UTILS.build(scheduler)
-
-    def forward(self,
-                inputs: torch.Tensor,
-                data_samples: Optional[List[BaseDataElement]] = None,
-                mode: str = 'tensor'):
-        if self.training and mode == 'loss':
-            self.scheduler.before_train_forward(RuntimeInfo.iter(),
-                                                RuntimeInfo.epoch(),
-                                                RuntimeInfo().max_iters(),
-                                                RuntimeInfo().max_epochs())
-        res: dict = super().forward(inputs, data_samples, mode)  # type: ignore
-        if self.training and mode == 'loss':
-            extra_dict = self.scheduler.after_train_forward(
-                RuntimeInfo.iter(), RuntimeInfo.epoch(),
-                RuntimeInfo().max_iters(),
-                RuntimeInfo().max_epochs())
-            extra_dict = convert_float_to_tenosr(extra_dict, inputs.device)
-            res.update(extra_dict)
-        return res
+def update_dict_reverse(config1: dict, config2: dict):
+    for key in config2:
+        if key in config1 and isinstance(config2[key], dict) and isinstance(
+                config1[key], dict):
+            update_dict_reverse(config1[key], config2[key])
+        else:
+            config1[key] = config2[key]
+    return config1
 
 
-class DmsGeneralAlgorithm(nn.Module):
+class DmsAlgorithmMixin():
 
     def __init__(
         self,
@@ -108,7 +64,6 @@ class DmsGeneralAlgorithm(nn.Module):
             target_scheduler='cos',
         )
     ) -> None:
-        super().__init__()
         import copy
         origin_model = copy.deepcopy(model)
         self.architecture = model
@@ -127,6 +82,102 @@ class DmsGeneralAlgorithm(nn.Module):
 
         self.extra_out = None
 
+    def to_static_model(self):
+        self.model = self.architecture
+        return to_static_model(self)
+
+
+@MODELS.register_module()
+class BaseDTPAlgorithm(BaseAlgorithm, DmsAlgorithmMixin):
+
+    def __init__(
+            self,
+            architecture: Union[BaseModel, Dict],
+            mutator_cfg=dict(
+                type='DMSMutator',
+                channel_unit_cfg=dict(type='ImpUnit', default_args=dict()),
+                parse_cfg=dict(
+                    _scope_='mmrazor',
+                    type='ChannelAnalyzer',
+                    demo_input=dict(
+                        type='DefaultDemoInput',
+                        input_shape=[1, 3, 224, 224],
+                    ),
+                    tracer_type='FxTracer'),
+            ),
+            scheduler=dict(
+                type='',
+                flops_target=0.5,
+                decay_ratio=0.6,
+                refine_ratio=0.2,
+                flop_loss_weight=1,
+            ),
+            #
+            data_preprocessor: Optional[Union[Dict, nn.Module]] = None,
+            init_cfg: Optional[Dict] = None) -> None:
+        BaseAlgorithm.__init__(self, architecture, data_preprocessor, init_cfg)
+        DmsAlgorithmMixin.__init__(
+            self,
+            self.architecture,
+            mutator_kwargs=mutator_cfg,
+            scheduler_kargs=scheduler)
+
+    def forward(self,
+                inputs: torch.Tensor,
+                data_samples: Optional[List[BaseDataElement]] = None,
+                mode: str = 'tensor'):
+        if self.training and mode == 'loss':
+            self.scheduler.before_train_forward(RuntimeInfo.iter(),
+                                                RuntimeInfo.epoch(),
+                                                RuntimeInfo().max_iters(),
+                                                RuntimeInfo().max_epochs())
+        res: dict = super().forward(inputs, data_samples, mode)  # type: ignore
+        if self.training and mode == 'loss':
+            extra_dict = self.scheduler.after_train_forward(
+                RuntimeInfo.iter(), RuntimeInfo.epoch(),
+                RuntimeInfo().max_iters(),
+                RuntimeInfo().max_epochs())
+            extra_dict = convert_float_to_tenosr(extra_dict, inputs.device)
+            res.update(extra_dict)
+        return res
+
+
+class DmsGeneralAlgorithm(nn.Module, DmsAlgorithmMixin):
+
+    def __init__(
+        self,
+        model: nn.Module,
+        mutator_kwargs=dict(
+            prune_qkv=False,
+            prune_block=False,
+            dtp_mutator_cfg=dict(
+                type='DTPAMutator',
+                channel_unit_cfg=dict(
+                    type='DTPTUnit', default_args=dict(extra_mapping={})),
+                parse_cfg=dict(
+                    _scope_='mmrazor',
+                    type='ChannelAnalyzer',
+                    demo_input=dict(
+                        type='DefaultDemoInput',
+                        input_shape=(1, 3, 224, 224),
+                    ),
+                    tracer_type='FxTracer'),
+            ),
+            extra_module_mapping={}),
+        scheduler_kargs=dict(
+            flops_target=0.8,
+            decay_ratio=0.8,
+            refine_ratio=0.2,
+            flop_loss_weight=1000,
+            structure_log_interval=10,
+            by_epoch=False,
+            target_scheduler='cos',
+        )
+    ) -> None:
+        nn.Module.__init__(self)
+        DmsAlgorithmMixin.__init__(self, model, mutator_kwargs,
+                                   scheduler_kargs)
+
     def forward(self, x):
         if self.training:
             self.scheduler.before_train_forward(*self.runtime_info)
@@ -138,7 +189,3 @@ class DmsGeneralAlgorithm(nn.Module):
             return out, extra_dict['flops_loss']
         else:
             return out
-
-    def to_static_model(self):
-        self.model = self.architecture
-        return to_static_model(self)
