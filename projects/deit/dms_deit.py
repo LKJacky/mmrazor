@@ -155,7 +155,8 @@ class DynamicAttention(SplitAttention, DynamicChannelMixin, MutableAttn,
             self.proj, mutable_v, is_to_output_channel=False)
 
         self.attn_mutables = {'head': m_head, 'qk': m_qk, 'v': m_v}
-
+        self.q.use_out_imp = True
+        self.k.use_out_imp = True
         return m_head, m_qk, m_v
 
     def to_static_op(self):
