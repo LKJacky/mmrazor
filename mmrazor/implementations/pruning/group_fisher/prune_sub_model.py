@@ -72,12 +72,11 @@ def GroupFisherSubModel(
     Returns:
         nn.Module: a static model.
     """
-    # init algorithm
-    if hasattr(algorithm,'to_static_model'):
-        return algorithm.to_static_model()
-    
+    # # init algorithm
     if isinstance(algorithm, dict):
         algorithm = MODELS.build(algorithm)  # type: ignore
+    if hasattr(algorithm, 'to_static_model'):
+        return algorithm.to_static_model()
     assert isinstance(algorithm, BaseAlgorithm)
     algorithm.init_weights()
     clean_params_init_info(algorithm)

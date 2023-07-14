@@ -31,8 +31,8 @@ from mmrazor.implementations.pruning.dms.core.mutable import (
 
 class SplitAttention(MultiheadAttention):
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         qkv_bias = self.qkv.bias is not None
         self.q = nn.Linear(self.input_dims, self.embed_dims, bias=qkv_bias)
         self.k = nn.Linear(self.input_dims, self.embed_dims, bias=qkv_bias)
@@ -40,6 +40,7 @@ class SplitAttention(MultiheadAttention):
         delattr(self, 'qkv')
 
         self.init_kargs = kwargs
+        self.init_args = args
 
     def forward(self, x):
         B, N, _ = x.shape
@@ -73,6 +74,7 @@ class SplitAttention(MultiheadAttention):
             v_shortcut=attn.v_shortcut,
             use_layer_scale=not isinstance(attn.gamma1, nn.Identity),
         )
+        module.out_drop = attn.out_drop
         module.load_state_dict(attn.state_dict(), strict=False)
         return module
 
@@ -114,7 +116,8 @@ class DynamicAttention(SplitAttention, DynamicChannelMixin, MutableAttn,
     def convert_from(cls, module: SplitAttention):
         if isinstance(module, MultiheadAttention):
             module = SplitAttention.convert_from(module)
-        new_module = cls(**module.init_kargs)
+        new_module = cls(*module.init_args, **module.init_kargs)
+        new_module.out_drop = module.out_drop
         new_module.load_state_dict(module.state_dict(), strict=False)
         return new_module
 
@@ -175,6 +178,7 @@ class DynamicAttention(SplitAttention, DynamicChannelMixin, MutableAttn,
         module.num_heads = num_heads
         module.head_dims = module.q.out_features // num_heads
         module.embed_dims = module.v.out_features
+        module.out_drop = self.out_drop
         return module
 
     def soft_flop(self):
@@ -368,6 +372,7 @@ class DeitMutator(DTPAMutator):
 
         for unit in self.mutable_units:
             unit.requires_grad_(True)
+
 
 @MODELS.register_module()
 class DeitDms(BaseDTPAlgorithm):
