@@ -2,7 +2,7 @@
 import os
 
 _base_ = ['./prune_deit.py']
-pruned_path = f"work_dirs/prune_deit/epoch_30.pth"  # noqa
+pruned_path = f"workdirs/prune_deit/epoch_30.pth"  # noqa
 
 epoch = 300
 train_cfg = dict(by_epoch=True, max_epochs=epoch)

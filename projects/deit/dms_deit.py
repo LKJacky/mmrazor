@@ -388,7 +388,7 @@ class DeitDms(BaseDTPAlgorithm):
         model.backbone.layers = DeitLayers.convert_from(model.backbone.layers)
 
         default_mutator_kwargs = dict(
-            prune_qkv=True,
+            prune_qkv=False,
             prune_block=True,
             dtp_mutator_cfg=dict(
                 type='DeitMutator',
