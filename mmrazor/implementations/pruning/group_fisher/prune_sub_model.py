@@ -75,8 +75,6 @@ def GroupFisherSubModel(
     # # init algorithm
     if isinstance(algorithm, dict):
         algorithm = MODELS.build(algorithm)  # type: ignore
-    if hasattr(algorithm, 'to_static_model'):
-        return algorithm.to_static_model()
     assert isinstance(algorithm, BaseAlgorithm)
     algorithm.init_weights()
     clean_params_init_info(algorithm)
@@ -84,6 +82,9 @@ def GroupFisherSubModel(
     pruning_structure = algorithm.mutator.choice_template
     print_log('PruneSubModel get pruning structure:')
     print_log(json.dumps(pruning_structure, indent=4))
+
+    if hasattr(algorithm, 'to_static_model'):
+        return algorithm.to_static_model()
 
     # to static model
     fix_mutable = export_fix_subnet(algorithm.architecture)[0]

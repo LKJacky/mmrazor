@@ -441,6 +441,10 @@ class DeitDms(BaseDTPAlgorithm):
             -1].mutable_channel.mask.bool()
         backbone.cls_token = nn.Parameter(backbone.cls_token[:, :, mask])
         backbone.pos_embed = nn.Parameter(backbone.pos_embed[:, :, mask])
+        backbone.out_indices = [len(backbone.layers) - 1]
+        from mmrazor.utils import print_log
+        print_log('Staic model')
+        print_log(model)
         return model
 
 
