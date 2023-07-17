@@ -445,6 +445,9 @@ class DeitDms(BaseDTPAlgorithm):
         from mmrazor.utils import print_log
         print_log('Staic model')
         print_log(model)
+        
+        from mmengine.model.weight_init import initialize
+        initialize(model,model.init_cfg)
         return model
 
 
