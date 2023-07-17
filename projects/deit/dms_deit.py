@@ -434,20 +434,28 @@ class DeitDms(BaseDTPAlgorithm):
             mutator_kwargs=default_mutator_kwargs,
             scheduler_kargs=default_scheduler_kargs)
 
-    def to_static_model(self):
+    def to_static_model(self, reset=False):
         model = super().to_static_model()
         backbone: VisionTransformer = model.backbone
         mask = self.mutator.dtp_mutator.mutable_units[
             -1].mutable_channel.mask.bool()
         backbone.cls_token = nn.Parameter(backbone.cls_token[:, :, mask])
         backbone.pos_embed = nn.Parameter(backbone.pos_embed[:, :, mask])
+
         backbone.out_indices = [len(backbone.layers) - 1]
         from mmrazor.utils import print_log
         print_log('Staic model')
         print_log(model)
-        
-        from mmengine.model.weight_init import initialize
-        initialize(model,model.init_cfg)
+
+        if reset:
+            from mmengine.model.weight_init import initialize, trunc_normal_
+
+            backbone.cls_token.data.fill_(0)
+            backbone.pos_embed.data.fill_(0)
+
+            initialize(model, model.init_cfg)
+            trunc_normal_(backbone.pos_embed, std=0.02)
+
         return model
 
 
