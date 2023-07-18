@@ -416,7 +416,7 @@ def DeitSubModel(
     print_log('PruneSubModel get pruning structure:')
     print_log(json.dumps(pruning_structure, indent=4))
 
-    assert hasattr(algorithm, 'to_static_model'):
+    assert hasattr(algorithm, 'to_static_model')
     return algorithm.to_static_model()
 
 @MODELS.register_module()
