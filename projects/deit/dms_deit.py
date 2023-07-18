@@ -37,6 +37,8 @@ class SplitAttention(MultiheadAttention):
         self.q = nn.Linear(self.input_dims, self.embed_dims, bias=qkv_bias)
         self.k = nn.Linear(self.input_dims, self.embed_dims, bias=qkv_bias)
         self.v = nn.Linear(self.input_dims, self.embed_dims, bias=qkv_bias)
+        self.proj = nn.Linear(
+            self.embed_dims, self.input_dims, bias=self.proj.bias is not None)
         delattr(self, 'qkv')
 
         self.init_kargs = kwargs
@@ -114,7 +116,7 @@ class DynamicAttention(SplitAttention, DynamicChannelMixin, MutableAttn,
 
     @classmethod
     def convert_from(cls, module: SplitAttention):
-        if isinstance(module, MultiheadAttention):
+        if not isinstance(module, SplitAttention):
             module = SplitAttention.convert_from(module)
         new_module = cls(*module.init_args, **module.init_kargs)
         new_module.out_drop = module.out_drop
@@ -179,6 +181,13 @@ class DynamicAttention(SplitAttention, DynamicChannelMixin, MutableAttn,
         module.head_dims = module.q.out_features // num_heads
         module.embed_dims = module.v.out_features
         module.out_drop = self.out_drop
+
+        module.init_kargs.update({
+            'embed_dims': module.q.out_features,
+            'num_heads': num_heads,
+            'input_dims': module.q.in_features,
+        })
+
         return module
 
     def soft_flop(self):
@@ -408,6 +417,7 @@ class DeitDms(BaseDTPAlgorithm):
             ),
             extra_module_mapping={
                 MultiheadAttention: DynamicAttention,
+                SplitAttention: DynamicAttention,
             },
             block_initilizer_kwargs=dict(
                 stage_mixin_layers=[DeitLayers],
@@ -434,7 +444,7 @@ class DeitDms(BaseDTPAlgorithm):
             mutator_kwargs=default_mutator_kwargs,
             scheduler_kargs=default_scheduler_kargs)
 
-    def to_static_model(self, reset=False):
+    def to_static_model(self, reset=True):
         model = super().to_static_model()
         backbone: VisionTransformer = model.backbone
         mask = self.mutator.dtp_mutator.mutable_units[
@@ -448,6 +458,7 @@ class DeitDms(BaseDTPAlgorithm):
         print_log(model)
 
         if reset:
+            print_log("reset parameters")
             from mmengine.model.weight_init import initialize, trunc_normal_
 
             backbone.cls_token.data.fill_(0)
