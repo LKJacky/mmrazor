@@ -50,6 +50,12 @@ class SplitAttention(MultiheadAttention):
 
         q, k, v = self.q(x), self.k(x), self.v(x)
 
+        def reshape(x: torch.Tensor):
+            return x.reshape([B, N, self.num_heads,
+                              self.head_dims]).permute(0, 2, 1, 3)
+
+        q, k, v = reshape(q), reshape(k), reshape(v)
+
         attn = (q @ k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1)
         attn = self.attn_drop(attn)
@@ -419,6 +425,7 @@ def DeitSubModel(
     assert hasattr(algorithm, 'to_static_model')
     return algorithm.to_static_model()
 
+
 @MODELS.register_module()
 class DeitDms(BaseDTPAlgorithm):
 
@@ -496,7 +503,7 @@ class DeitDms(BaseDTPAlgorithm):
         if reset:
 
             backbone.cls_token.data.fill_(0)
-            backbone.pos_embed.data.fill_(0)
+            backbone.cls_tokenbackbone.cls_token.data.fill_(0)
 
         return model
 
