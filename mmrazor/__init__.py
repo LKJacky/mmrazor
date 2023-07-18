@@ -49,7 +49,7 @@ def digit_version(version_str: str, length: int = 4):
 
 
 mmcv_minimum_version = '2.0.0rc1'
-mmcv_maximum_version = '2.0.0'
+mmcv_maximum_version = '2.0.1'
 mmcv_version = digit_version(mmcv.__version__)
 
 mmengine_minimum_version = '0.1.0'

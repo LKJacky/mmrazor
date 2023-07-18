@@ -9,7 +9,8 @@ from mmrazor.models.mutables import SequentialMutableChannelUnit
 from mmcls.models.backbones.vision_transformer import TransformerEncoderLayer, VisionTransformer, MultiheadAttention
 from mmcls.models.heads.vision_transformer_head import VisionTransformerClsHead
 from mmrazor.models.architectures.dynamic_ops import DynamicChannelMixin
-
+from mmrazor.utils import print_log
+import json
 from mmcls.registry import MODELS as CLS_MODELS
 from mmrazor.registry import MODELS
 import torch.nn as nn
@@ -384,6 +385,41 @@ class DeitMutator(DTPAMutator):
 
 
 @MODELS.register_module()
+def DeitSubModel(
+    algorithm: dict,
+    divisor=1,
+    reset_params=False,
+    **kargs,
+):
+    """Convert a algorithm(with an architecture) to a static pruned
+    architecture.
+
+    Args:
+        algorithm (Union[BaseAlgorithm, dict]): The pruning algorithm to
+            finetune.
+        divisor (int): The divisor to make the channel number
+            divisible. Defaults to 1.
+
+    Returns:
+        nn.Module: a static model.
+    """
+    # # init algorithm
+    algorithm_dict = algorithm
+    pruned = algorithm_dict.pop('pruned')
+    if isinstance(algorithm, dict):
+        algorithm = MODELS.build(algorithm)  # type: ignore
+    assert isinstance(algorithm, BaseAlgorithm)
+    state = torch.load(pruned, map_location='cpu')['state_dict']
+    algorithm.load_state_dict(state)
+
+    pruning_structure = algorithm.mutator.choice_template
+    print_log('PruneSubModel get pruning structure:')
+    print_log(json.dumps(pruning_structure, indent=4))
+
+    assert hasattr(algorithm, 'to_static_model'):
+    return algorithm.to_static_model()
+
+@MODELS.register_module()
 class DeitDms(BaseDTPAlgorithm):
 
     def __init__(self,
@@ -458,14 +494,9 @@ class DeitDms(BaseDTPAlgorithm):
         print_log(model)
 
         if reset:
-            print_log("reset parameters")
-            from mmengine.model.weight_init import initialize, trunc_normal_
 
             backbone.cls_token.data.fill_(0)
             backbone.pos_embed.data.fill_(0)
-
-            initialize(model, model.init_cfg)
-            trunc_normal_(backbone.pos_embed, std=0.02)
 
         return model
 

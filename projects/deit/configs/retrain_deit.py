@@ -28,12 +28,12 @@ find_unused_parameters = False
 ##############################################################################
 
 algorithm = _base_.model
-algorithm.init_cfg = dict(type='Pretrained', checkpoint=pruned_path)
+algorithm['pruned'] = pruned_path
 
 model = dict(
     _delete_=True,
     _scope_='mmrazor',
-    type='GroupFisherSubModel',
+    type='DeitSubModel',
     algorithm=algorithm,
 )
 custom_hooks = _base_.custom_hooks[:-2]
