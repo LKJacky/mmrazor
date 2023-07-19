@@ -22,6 +22,7 @@ from .mutable import (BlockThreshold, DMSMutableMixIn, MutableBlocks,
                       MutableHead)
 from .op import DynamicStage, MutableAttn
 import math
+from mmrazor.utils import print_log
 
 
 def replace_modules(model: nn.Module, module_map={}):
@@ -264,9 +265,11 @@ class DMSMutator(BaseMutator):
 
         current_flop = self.get_soft_flop(model)
         while not (target * 0.99 <= current_flop <= target * 1.01):
+            print_log(f"target:{target/1e6},current: {current_flop/1e6}")
             scale = target / current_flop
             scale_model(scale)
             current_flop = self.get_soft_flop(model)
+        print_log(f'last {current_flop/1e6}')
 
     def fix_qkv(self):
         for mutables in self.attn_mutables:
