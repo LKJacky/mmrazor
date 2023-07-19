@@ -85,7 +85,7 @@ class DrivedDTPMutableChannelImp(DerivedMutable):
 class DMSMutableMixIn():
 
     def _dms_mutable_mixin_init(self, num_elem):
-
+        self.mask: torch.Tensor
         self.use_tayler = True
 
         self.e = nn.parameter.Parameter(
@@ -134,6 +134,18 @@ class DMSMutableMixIn():
             if new_taylor.max() != new_taylor.min():
                 self.taylor = self.taylor * self.decay + (
                     1 - self.decay) * new_taylor
+
+    @torch.no_grad()
+    def sync_mask(self):
+        if self.taylor.max() == self.taylor.min():
+            e_imp = torch.ones_like(self.taylor, requires_grad=True)
+        else:
+            e_imp = dtp_get_importance(self.taylor, self.e, lamda=self.lda)
+        idx = torch.topk(
+            e_imp, k=int(self.e.item() * self.mask.numel()), largest=True)[1]
+        self.mask.fill_(0)
+        self.mask.data.scatter_(-1, idx, 1.0)
+        self.mask.data = (e_imp >= MaskThreshold).float()
 
     def dump_chosen(self):
         pass

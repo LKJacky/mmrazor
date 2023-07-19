@@ -54,6 +54,7 @@ class DTPAUnit(BaseDTPUnit):
         self.mutable_channel: DTPAMutableChannelImp = DTPAMutableChannelImp(
             self.num_channels)
         self.requires_grad_(False)
+        raise NotImplementedError()
 
     @torch.no_grad()
     def info(self) -> str:

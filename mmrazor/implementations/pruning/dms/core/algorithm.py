@@ -112,7 +112,13 @@ class DmsAlgorithmMixin():
 
         self.extra_out = None
 
-    def to_static_model(self):
+    @torch.no_grad()
+    def to_static_model(self, scale=False):
+        if scale:
+            self.mutator.scale_flop_to(
+                self.architecture,
+                target=self.scheduler.init_flop * self.scheduler.flops_target)
+
         self.model = self.architecture
         return to_static_model(self)
 

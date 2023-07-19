@@ -21,6 +21,7 @@ from .models.swin import ImpShiftedWindowAttention, SwinSequential
 from .mutable import (BlockThreshold, DMSMutableMixIn, MutableBlocks,
                       MutableHead)
 from .op import DynamicStage, MutableAttn
+import math
 
 
 def replace_modules(model: nn.Module, module_map={}):
@@ -166,6 +167,7 @@ class DMSMutator(BaseMutator):
             self.block_mutables = nn.ModuleList()
         self.attn_mutables = self.attn_initialzer.prepare_from_supernet(
             supernet)
+        # {'head': None, 'qk': None, 'v': None}
         if not self.prune_qkv:
             self.fix_qkv()
 
@@ -237,6 +239,34 @@ class DMSMutator(BaseMutator):
 
     def get_soft_flop(self, model):
         return QuickFlopMixin.get_flop(model)
+
+    @torch.no_grad()
+    def scale_flop_to(self, model, target):
+
+        def scale_mutable(mutable: DMSMutableMixIn, scale):
+            mutable.e.data = mutable.e * scale
+            mutable.limit_value()
+            mutable.sync_mask()
+
+        def scale_model(scale):
+            scale = math.sqrt(scale)
+            for unit in self.dtp_mutator.mutable_units:
+                scale_mutable(unit.mutable_channel, scale)
+            for mutable_attn in self.attn_mutables:  # {'head': None, 'qk': None, 'v': None}:
+                m_head, m_qk, m_v = mutable_attn['head'], mutable_attn[
+                    'qk'], mutable_attn['v']
+                if self.prune_qkv:
+                    scale_mutable(m_qk, math.sqrt(scale))
+                    scale_mutable(m_v, math.sqrt(scale))
+                    scale_mutable(m_head, math.sqrt(scale))
+                else:
+                    scale_mutable(m_head, scale)
+
+        current_flop = self.get_soft_flop(model)
+        while not (target * 0.99 <= current_flop <= target * 1.01):
+            scale = target / current_flop
+            scale_model(scale)
+            current_flop = self.get_soft_flop(model)
 
     def fix_qkv(self):
         for mutables in self.attn_mutables:

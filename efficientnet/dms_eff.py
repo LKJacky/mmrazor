@@ -118,8 +118,8 @@ class DynamicBatchNormAct2d(BatchNormAct2d, DynamicBatchNormMixin):
         if self.training:
             bn_training = True
         else:
-            bn_training = (self.running_mean is None) and (self.running_var is
-                                                           None)
+            bn_training = (self.running_mean is None) and (self.running_var
+                                                           is None)
         r"""
         Buffers are only updated if they are to be tracked and we are in training mode. Thus they only need to be
         passed when the update should occur (i.e. in training mode when they are tracked), or when buffer stats are
@@ -348,9 +348,9 @@ class EffDmsAlgorithm(DmsGeneralAlgorithm):
             scheduler_kargs=default_scheduler_kargs,
         )
 
-    def to_static_model(self, drop_path=-1, drop=-1):
+    def to_static_model(self, drop_path=-1, drop=-1, scale=False):
 
-        model: EfficientNet = super().to_static_model()
+        model: EfficientNet = super().to_static_model(scale=scale)
         if drop_path != -1:
             num_blocks = sum([len(stage) for stage in model.blocks])
             i = 0

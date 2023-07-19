@@ -11,7 +11,8 @@ from mmrazor.models.mutators import ChannelMutator
 from mmrazor.models.task_modules.demo_inputs import DefaultDemoInput
 from mmrazor.registry import MODELS, TASK_UTILS
 from ...chip.collect.mutator import CollectMutatorMixin
-from ...dtp.modules.dtp_adaptive import DTPAUnit
+from .unit import DTPTUnit
+
 from .models.llama.analyzer import LLamaChannelAnalyer
 from .models.opt.opt_analyzer import OPTChannelAnalyer
 from .op import QuickFlopMixin
@@ -121,7 +122,7 @@ class DTPAMutator(BaseDTPMutator):
         )
     ) -> None:
         super().__init__(channel_unit_cfg, parse_cfg)
-        self.mutable_units: List[DTPAUnit]
+        self.mutable_units: List[DTPTUnit]
 
     @torch.no_grad()
     def limit_value(self):
