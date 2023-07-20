@@ -5,7 +5,7 @@ _base_ = './train_deit.py'
 
 decay_ratio = 0.8
 refine_ratio = 0.2
-target_flop_ratio = 0.068
+target_flop_ratio = 0.21
 flop_loss_weight = 100
 by_epoch = True
 target_scheduler = 'cos'
