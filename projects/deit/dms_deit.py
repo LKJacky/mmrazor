@@ -283,6 +283,74 @@ class DyTransformerEncoderLayer(TransformerEncoderLayer, DynamicBlockMixin):
 # mutator ####################################################################################
 
 
+@CLS_MODELS.register_module()
+class VisionTransformer2(VisionTransformer):
+    arch_zoo = {
+        **dict.fromkeys(
+            ['s', 'small'], {
+                'embed_dims': 768,
+                'num_layers': 8,
+                'num_heads': 8,
+                'feedforward_channels': 768 * 3,
+            }),
+        **dict.fromkeys(
+            ['b', 'base'], {
+                'embed_dims': 768,
+                'num_layers': 12,
+                'num_heads': 12,
+                'feedforward_channels': 3072
+            }),
+        **dict.fromkeys(
+            ['l', 'large'], {
+                'embed_dims': 1024,
+                'num_layers': 24,
+                'num_heads': 16,
+                'feedforward_channels': 4096
+            }),
+        **dict.fromkeys(
+            ['h', 'huge'],
+            {
+                # The same as the implementation in MAE
+                # <https://arxiv.org/abs/2111.06377>
+                'embed_dims': 1280,
+                'num_layers': 32,
+                'num_heads': 16,
+                'feedforward_channels': 5120
+            }),
+        **dict.fromkeys(
+            ['eva-g', 'eva-giant'],
+            {
+                # The implementation in EVA
+                # <https://arxiv.org/abs/2211.07636>
+                'embed_dims': 1408,
+                'num_layers': 40,
+                'num_heads': 16,
+                'feedforward_channels': 6144
+            }),
+        **dict.fromkeys(
+            ['deit-t', 'deit-tiny'], {
+                'embed_dims': 192,
+                'num_layers': 12,
+                'num_heads': 3,
+                'feedforward_channels': 192 * 4
+            }),
+        **dict.fromkeys(
+            ['deit-s', 'deit-small'], {
+                'embed_dims': 384,
+                'num_layers': 16,
+                'num_heads': 6,
+                'feedforward_channels': 384 * 4
+            }),
+        **dict.fromkeys(
+            ['deit-b', 'deit-base'], {
+                'embed_dims': 768,
+                'num_layers': 12,
+                'num_heads': 12,
+                'feedforward_channels': 768 * 4
+            }),
+    }
+
+
 class DeitAnalyzer:
 
     def __init__(self, model) -> None:
@@ -440,7 +508,7 @@ class DeitDms(BaseDTPAlgorithm):
         model.backbone.layers = DeitLayers.convert_from(model.backbone.layers)
 
         default_mutator_kwargs = dict(
-            prune_qkv=False,
+            prune_qkv=True,
             prune_block=True,
             dtp_mutator_cfg=dict(
                 type='DeitMutator',
