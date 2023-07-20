@@ -1036,7 +1036,7 @@ def main():
         model, (3, img_size, img_size),
         print_per_layer_stat=False,
         custom_modules_hooks={})
-    print_log("final flops: ", res)
+    print_log(f"final flops: {res}")
     #############################################################################################################
 
     # move model to GPU, enable channels last layout if set
