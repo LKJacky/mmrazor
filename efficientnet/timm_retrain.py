@@ -846,6 +846,7 @@ group = parser.add_argument_group('dms')
 group.add_argument('--pruned', type=str, default='')
 group.add_argument('--sub_space', type=str, default='')
 group.add_argument('--reset', type=str, default='false')
+group.add_argument('--target', type=float, default=-1)
 
 
 def _parse_args():
@@ -996,46 +997,46 @@ def main():
 
     #############################################################################################################
     # build algorithm
+    target = args.target
+    scale = target != -1
+    if target == -1:
+        target = 0.1
+    img_size = args.input_size[-1]
+    defautl_alg_args = dict(
+        mutator_kwargs=dict(
+            dtp_mutator_cfg=dict(
+                parse_cfg=dict(
+                    demo_input=dict(input_shape=(1, 3, img_size,
+                                                 img_size), ), )), ),
+        scheduler_kargs=dict(flops_target=args.target),
+    )
+
     from dms_eff import EffDmsAlgorithm
     if args.sub_space != '':
-        algorithm = EffDmsAlgorithm(
-            model,
-            scheduler_kargs=dict(
-                flops_target=1.0,
-                decay_ratio=0.8,
-                refine_ratio=0.2,
-                flop_loss_weight=1000,
-                structure_log_interval=1000,
-                by_epoch=True,
-                target_scheduler='cos',
-            ))
+        algorithm = EffDmsAlgorithm(model, **defautl_alg_args)
         subspace = torch.load(args.sub_space, map_location='cpu')['state_dict']
         algorithm.load_state_dict(subspace)
         model = algorithm.to_static_model(
             drop_path=args.drop_path, head_dropout=args.head_dropout)
         print_log('loaded sub space')
     if args.pruned != '':
-        algorithm = EffDmsAlgorithm(
-            model,
-            scheduler_kargs=dict(
-                flops_target=1.0,
-                decay_ratio=0.8,
-                refine_ratio=0.2,
-                flop_loss_weight=1000,
-                structure_log_interval=1000,
-                by_epoch=True,
-                target_scheduler='cos',
-            ))
+        algorithm = EffDmsAlgorithm(model, **defautl_alg_args)
         state_dict = torch.load(args.pruned, map_location='cpu')['state_dict']
         algorithm.load_state_dict(state_dict)
         print_log(algorithm.mutator.info())
         model = algorithm.to_static_model(
-            drop_path=args.drop_path, drop=args.drop)
+            drop_path=args.drop_path, drop=args.drop, scale=scale)
         if args.reset == 'true':
             for module in model.modules():
                 if hasattr(module, 'dms_reset_parameters'):
                     module.dms_reset_parameters()
             print_log('reset parameter')
+    import ptflops
+    res = ptflops.get_model_complexity_info(
+        model, (3, img_size, img_size),
+        print_per_layer_stat=False,
+        custom_modules_hooks={})
+    print_log("final flops: ", res)
     #############################################################################################################
 
     # move model to GPU, enable channels last layout if set

@@ -250,7 +250,8 @@ class DMSMutator(BaseMutator):
             mutable.sync_mask()
 
         def scale_model(scale):
-            scale = math.sqrt(scale)
+            scale_block = math.sqrt(scale)
+            scale = math.sqrt(math.sqrt(scale))
             for unit in self.dtp_mutator.mutable_units:
                 scale_mutable(unit.mutable_channel, scale)
             for mutable_attn in self.attn_mutables:  # {'head': None, 'qk': None, 'v': None}:
@@ -262,6 +263,8 @@ class DMSMutator(BaseMutator):
                     scale_mutable(m_head, math.sqrt(scale))
                 else:
                     scale_mutable(m_head, scale)
+            for mutable_block in self.block_mutables:
+                scale_mutable(mutable_block, scale=scale_block)
 
         current_flop = self.get_soft_flop(model)
         while not (target * 0.99 <= current_flop <= target * 1.01):
