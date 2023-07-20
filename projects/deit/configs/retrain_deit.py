@@ -1,8 +1,7 @@
 #############################################################################
-import os
 
 _base_ = ['./prune_deit.py']
-pruned_path = f"workdirs/prune_deit/epoch_30.pth"  # noqa
+pruned_path = f"./work_dirs/prune_deit/epoch_30.pth"  # noqa
 
 epoch = 300
 train_cfg = dict(by_epoch=True, max_epochs=epoch)
@@ -49,39 +48,4 @@ custom_hooks = _base_.custom_hooks[:-2]
 #         early_stop=False,
 #         save_ckpt_thr=[],
 #     ), )
-default_hooks = dict(
-    checkpoint=dict(
-        type='CheckpointHook',
-        interval=1,
-        save_best='auto',
-        max_keep_ckpts=5,
-    ), )
 
-# train_dataloader = _base_.train_dataloader
-# val_dataloader = _base_.val_dataloader
-# test_dataloader = _base_.test_dataloader
-
-# train_dataloader.batch_size = 128
-# val_dataloader.batch_size = 128
-
-# file_client_args = dict(
-#     backend='petrel',
-#     path_mapping=dict({
-#         './data/coco':
-#         's3://openmmlab/datasets/detection/coco',
-#         'data/coco':
-#         's3://openmmlab/datasets/detection/coco',
-#         './data/cityscapes':
-#         's3://openmmlab/datasets/segmentation/cityscapes',
-#         'data/cityscapes':
-#         's3://openmmlab/datasets/segmentation/cityscapes',
-#         './data/imagenet':
-#         's3://openmmlab/datasets/classification/imagenet',
-#         'data/imagenet':
-#         's3://openmmlab/datasets/classification/imagenet'
-#     }))
-# train_dataloader['dataset']['pipeline'][0][
-#     'file_client_args'] = file_client_args
-# val_dataloader['dataset']['pipeline'][0]['file_client_args'] = file_client_args
-# test_dataloader['dataset']['pipeline'][0][
-#     'file_client_args'] = file_client_args

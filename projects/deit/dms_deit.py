@@ -571,7 +571,8 @@ class DeitDms(BaseDTPAlgorithm):
         if reset:
 
             backbone.cls_token.data.fill_(0)
-            backbone.cls_tokenbackbone.cls_token.data.fill_(0)
+            backbone.pos_embed.data.fill_(0)
+            backbone.patch_embed.projection.reset_parameters()
 
         return model
 

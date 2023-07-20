@@ -41,11 +41,11 @@ def attention_hook(module: SplitAttention, inputs, output):
     head = module.num_heads
     B, N, C = inputs[0].shape
     out_c = output.shape[-1]
-    head_dim = module.embed_dims//head
+    head_dim = module.embed_dims // head
 
     flops = 0
 
-    flops += B * N* C * head * head_dim * 3  # qkv
+    flops += B * N * C * head * head_dim * 3  # qkv
     flops += B * head * N * N * head_dim * 2  # attn
     flops += B * N * head * head_dim * out_c  # outproj
 
@@ -62,7 +62,8 @@ def load_algo(model: nn.Module, algo_path: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--alg', type=str, default='workdirs/prune_deit_s/epoch_30.pth')
+    parser.add_argument(
+        '--alg', type=str, default='workdirs/prune_deit_s/epoch_30.pth')
     parser.add_argument('--sub_alg', type=str, default='')
     args = parser.parse_args()
 
