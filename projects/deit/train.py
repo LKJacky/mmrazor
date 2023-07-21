@@ -9,6 +9,7 @@ from mmengine.logging import print_log
 from mmengine.runner import Runner
 from mmrazor.utils import register_all_modules
 from dms_deit import DmsAlgorithmMixin
+from dms_swin import SwinTransformer2
 
 
 def parse_args():

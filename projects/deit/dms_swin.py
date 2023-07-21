@@ -32,6 +32,27 @@ from mmrazor.implementations.pruning.dms.core.mutable import DTPTMutableChannelI
 # ops ####################################################################################
 
 
+@CLSMODELS.register_module()
+class SwinTransformer2(SwinTransformer):
+    arch_zoo = {
+    **dict.fromkeys(['t', 'tiny'],
+                    {'embed_dims': 128,
+                     'depths':     [4, 4,  12,  4],
+                     'num_heads':  [4, 8, 16, 32]}),
+    **dict.fromkeys(['s', 'small'],
+                    {'embed_dims': 96,
+                     'depths':     [2, 2, 18,  2],
+                     'num_heads':  [3, 6, 12, 24]}),
+    **dict.fromkeys(['b', 'base'],
+                    {'embed_dims': 128,
+                     'depths':     [2, 2, 18,  2],
+                     'num_heads':  [4, 8, 16, 32]}),
+    **dict.fromkeys(['l', 'large'],
+                    {'embed_dims': 192,
+                     'depths':     [2,  2, 18,  2],
+                     'num_heads':  [6, 12, 24, 48]}),
+    }  # yapf: disable
+
 def swin_forward(self: SwinTransformer, x):
     x, hw_shape = self.patch_embed(x)
     if self.use_abs_pos_embed:
