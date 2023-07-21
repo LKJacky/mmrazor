@@ -51,8 +51,7 @@ class SplitAttention(MultiheadAttention):
         q, k, v = self.q(x), self.k(x), self.v(x)
 
         def reshape(x: torch.Tensor):
-            return x.reshape([B, N, self.num_heads,
-                              self.head_dims]).permute(0, 2, 1, 3)
+            return x.reshape([B, N, self.num_heads, -1]).permute(0, 2, 1, 3)
 
         q, k, v = reshape(q), reshape(k), reshape(v)
 
@@ -60,7 +59,7 @@ class SplitAttention(MultiheadAttention):
         attn = attn.softmax(dim=-1)
         attn = self.attn_drop(attn)
 
-        x = (attn @ v).transpose(1, 2).reshape(B, N, self.embed_dims)
+        x = (attn @ v).transpose(1, 2).reshape(B, N, -1)
         x = self.proj(x)
         x = self.out_drop(self.gamma1(self.proj_drop(x)))
 
@@ -195,6 +194,8 @@ class DynamicAttention(SplitAttention, DynamicChannelMixin, MutableAttn,
             'input_dims': module.q.in_features,
         })
 
+        module.scale = (self.q.out_features // num_heads)**-0.5
+
         return module
 
     def soft_flop(self):
@@ -205,10 +206,14 @@ class DynamicAttention(SplitAttention, DynamicChannelMixin, MutableAttn,
         flops = flops + QuickFlopMixin.get_flop(self.proj)
 
         mutable_head: MutableHead = self.attn_mutables['head']
+        mutable_qk: MutableChannelForHead = self.attn_mutables['qk']
+        mutable_v: MutableChannelForHead = self.attn_mutables['v']
         head = mutable_head.current_imp_flop.sum()
+        qk_dim = mutable_qk.current_imp_flop.sum() / head
+        v_dim = mutable_v.current_imp_flop.sum() / head
         B, N, _ = self.quick_flop_recorded_in_shape[0]
 
-        flops = flops + B * head * N * N * self.head_dims * 2
+        flops = flops + B * head * N * N * (qk_dim + v_dim)
         return flops
 
 

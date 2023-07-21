@@ -3,10 +3,13 @@ from timm import create_model
 import torch
 import ptflops
 import torch.nn as nn
-from dms_deit import DeitDms, SplitAttention
+from dms_deit import DeitDms, SplitAttention, MultiheadAttention
 from mmcls.registry import MODELS
+from mmcv.cnn.bricks import Linear as MmcvLinear
+from ptflops.pytorch_ops import linear_flops_counter_hook
+import copy
 
-model_dict = dict(
+model_small = dict(
     type='ImageClassifier',
     backbone=dict(
         type='VisionTransformer',
@@ -35,9 +38,35 @@ model_dict = dict(
         std=[58.395, 57.12, 57.375],
         to_rgb=True),
 )
+model_small_l = copy.deepcopy(model_small)
+model_small_l['backbone']['type'] = 'VisionTransformer2'
+
+model_tiny = copy.deepcopy(model_small)
+model_tiny['backbone']['arch'] = 'deit-tiny'
+model_tiny['head']['in_channels'] = 192
 
 
-def attention_hook(module: SplitAttention, inputs, output):
+def split_attention_hook(module: SplitAttention, inputs, output):
+    head = module.num_heads
+    B, N, C = inputs[0].shape
+    out_c = output.shape[-1]
+    qk_dim = module.q.out_features // head
+    v_dim = module.v.out_features // head
+
+    print(qk_dim, v_dim)
+
+    flops = 0
+
+    flops += B * N * C * head * qk_dim * 2  # qk
+    flops += B * N * C * head * v_dim * 1  # v
+
+    flops += B * head * N * N * (qk_dim + v_dim)  # attn
+    flops += B * N * head * v_dim * out_c  # outproj
+
+    module.__flops__ += flops
+
+
+def attention_hook(module: MultiheadAttention, inputs, output):
     head = module.num_heads
     B, N, C = inputs[0].shape
     out_c = output.shape[-1]
@@ -53,8 +82,8 @@ def attention_hook(module: SplitAttention, inputs, output):
 
 
 def load_algo(model: nn.Module, algo_path: str):
-    state = torch.load(algo_path, map_location='cpu')['state_dict']
     model = DeitDms(model)
+    state = torch.load(algo_path, map_location='cpu')['state_dict']
     model.load_state_dict(state)
     model = model.to_static_model()
     return model
@@ -62,12 +91,14 @@ def load_algo(model: nn.Module, algo_path: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--alg', type=str, default='workdirs/prune_deit_s/epoch_30.pth')
+    parser.add_argument('--model', type=str, default='tiny')
+    parser.add_argument('--alg', type=str, default='')
     parser.add_argument('--sub_alg', type=str, default='')
     args = parser.parse_args()
 
-    model = MODELS.build(model_dict)
+    cfg = {'small': model_small, 'small_l': model_small_l, 'tiny': model_tiny}
+
+    model = MODELS.build(cfg[args.model])
 
     if args.alg != '':
         model = load_algo(model, args.alg)
@@ -77,8 +108,13 @@ if __name__ == "__main__":
     res = ptflops.get_model_complexity_info(
         model, (3, 224, 224),
         print_per_layer_stat=False,
-        custom_modules_hooks={SplitAttention: attention_hook})
+        custom_modules_hooks={
+            SplitAttention: split_attention_hook,
+            MultiheadAttention: attention_hook,
+            MmcvLinear: linear_flops_counter_hook
+        },
+        verbose=False)
 
-    model = DeitDms(model)
-    print(model.mutator.info())
+    # model = DeitDms(model)
+    # print(model.mutator.info())
     print(res)
