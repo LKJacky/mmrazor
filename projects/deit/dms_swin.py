@@ -594,7 +594,7 @@ class SwinDms(BaseDTPAlgorithm):
             mutator_kwargs=default_mutator_kwargs,
             scheduler_kargs=default_scheduler_kargs)
 
-    def to_static_model(self, reset=True, drop_path=-1):
+    def to_static_model(self, reset=True, drop_path=0.2):
         model = super().to_static_model()
         backbone: SwinTransformer2 = model.backbone
 

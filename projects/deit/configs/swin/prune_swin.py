@@ -21,8 +21,6 @@ original_lr = _base_.optim_wrapper.optimizer.lr
 model_lr = original_lr
 mutator_lr = model_lr * 0.1
 
-# if hasattr(_base_, 'param_scheduler'):
-#     delattr(_base_, 'param_scheduler')
 find_unused_parameters = True
 
 ##############################################################################

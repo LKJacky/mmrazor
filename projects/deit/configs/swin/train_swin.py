@@ -4,7 +4,8 @@ _base_ = 'mmcls::swin_transformer/swin-base_16xb64_in1k.py'
 model = dict(
     type='ImageClassifier',
     backbone=dict(
-        type='SwinTransformer2', arch='tiny', img_size=224, drop_path_rate=0.2),
+        type='SwinTransformer2', arch='tiny', img_size=224,
+        drop_path_rate=0.2),
     neck=dict(type='GlobalAveragePooling'),
     head=dict(
         type='LinearClsHead',
@@ -23,7 +24,13 @@ model = dict(
         dict(type='CutMix', alpha=1.0)
     ]),
 )
-
+default_hooks = dict(
+    checkpoint=dict(
+        type='CheckpointHook',
+        interval=1,
+        save_best='auto',
+        max_keep_ckpts=5,
+    ), )
 
 # train_dataloader = dict(batch_size=4)
 # test_dataloader = dict(batch_size=4)
