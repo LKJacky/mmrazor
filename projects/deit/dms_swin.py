@@ -238,10 +238,8 @@ class DySplitWindowMSA(SplitWindowMSA, DynamicChannelMixin, MutableAttn,
         v_dim = mutable_v.current_imp_flop.sum() / head
         B, N, _ = self.quick_flop_recorded_in_shape[0]
 
-        N_window = N // self.window_size[0] // self.window_size[1]
-        N = self.window_size[0] // self.window_size[1]
-
-        flops = flops + N_window * B * head * N * N * (qk_dim + v_dim)
+        flops = flops + head * N * N * (qk_dim + v_dim)
+        flops = flops * B
         return flops
 
 
