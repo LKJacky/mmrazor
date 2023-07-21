@@ -8,7 +8,7 @@ from mmrazor.implementations.pruning.dms.core.models.opt.opt_analyzer import Out
 from mmrazor.models.mutables import SequentialMutableChannelUnit
 
 from mmcls.models.backbones.swin_transformer import SwinBlockSequence, SwinBlock, ShiftWindowMSA, SwinTransformer, PatchMerging
-from mmcls.models.heads.vision_transformer_head import VisionTransformerClsHead
+from mmcls.models.utils.attention import WindowMSA
 from mmrazor.models.architectures.dynamic_ops import DynamicChannelMixin
 from mmrazor.utils import print_log
 import json
@@ -29,6 +29,222 @@ from mmrazor.implementations.pruning.dms.core.mutable import (
     ImpMutableChannelContainer, MutableChannelForHead, MutableChannelWithHead,
     MutableHead)
 from dms_deit import MMCVLinear
+# ops ####################################################################################
+
+
+class SplitWindowMSA(WindowMSA):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        qkv_bias = self.qkv.bias is not None
+        self.q = nn.Linear(self.embed_dims, self.embed_dims, bias=qkv_bias)
+        self.k = nn.Linear(self.embed_dims, self.embed_dims, bias=qkv_bias)
+        self.v = nn.Linear(self.embed_dims, self.embed_dims, bias=qkv_bias)
+        self.proj = nn.Linear(
+            self.embed_dims, self.embed_dims, bias=self.proj.bias is not None)
+        delattr(self, 'qkv')
+
+        self.init_kargs = kwargs
+        self.init_args = args
+
+    def forward(self, x, mask=None):
+        """
+        Args:
+
+            x (tensor): input features with shape of (num_windows*B, N, C)
+            mask (tensor, Optional): mask with shape of (num_windows, Wh*Ww,
+                Wh*Ww), value should be between (-inf, 0].
+        """
+        B_, N, C = x.shape
+
+        ##########################################################################################
+        # qkv = self.qkv(x).reshape(B_, N, 3, self.num_heads,
+        #                           C // self.num_heads).permute(2, 0, 3, 1, 4)
+        # q, k, v = qkv[0], qkv[1], qkv[
+        #     2]  # make torchscript happy (cannot use tensor as tuple)
+
+        q, k, v = self.q(x), self.k(x), self.v(x)
+
+        def reshape(x: torch.Tensor):
+            return x.reshape([B_, N, self.num_heads, -1]).permute(0, 2, 1, 3)
+
+        q, k, v = map(reshape, [q, k, v])
+
+        ##########################################################################################
+        q = q * self.scale
+        attn = (q @ k.transpose(-2, -1))
+
+        relative_position_bias = self.relative_position_bias_table[
+            self.relative_position_index.view(-1)].view(
+                self.window_size[0] * self.window_size[1],
+                self.window_size[0] * self.window_size[1],
+                -1)  # Wh*Ww,Wh*Ww,nH
+        relative_position_bias = relative_position_bias.permute(
+            2, 0, 1).contiguous()  # nH, Wh*Ww, Wh*Ww
+        attn = attn + relative_position_bias.unsqueeze(0)
+
+        if mask is not None:
+            nW = mask.shape[0]
+            attn = attn.view(B_ // nW, nW, self.num_heads, N,
+                             N) + mask.unsqueeze(1).unsqueeze(0)
+            attn = attn.view(-1, self.num_heads, N, N)
+            attn = self.softmax(attn)
+        else:
+            attn = self.softmax(attn)
+
+        attn = self.attn_drop(attn)
+
+        x = (attn @ v).transpose(1, 2).reshape(B_, N, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
+
+    @classmethod
+    def convert_from(cls, attn: WindowMSA):
+        module = cls(
+            embed_dims=attn.embed_dims,
+            window_size=attn.window_size,
+            num_heads=attn.num_heads,
+            qkv_bias=attn.qkv.bias is not None,
+            qk_scale=attn.scale,
+            attn_drop=attn.attn_drop.p,
+            proj_drop=attn.proj_drop.p)
+        module.load_state_dict(attn.state_dict(), strict=False)
+        return module
+
+
+class DySplitWindowMSA(SplitWindowMSA, DynamicChannelMixin, MutableAttn,
+                       QuickFlopMixin):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        MutableAttn.__init__(self)
+        QuickFlopMixin.__init__(self)
+
+        self.init_args = args
+        self.init_kwargs = kwargs
+        self.mutable_attrs = nn.ModuleDict()
+
+        self.q = ImpLinear.convert_from(self.q)
+        self.k = ImpLinear.convert_from(self.k)
+        self.v = ImpLinear.convert_from(self.v)
+
+        self.proj = ImpLinear.convert_from(self.proj)
+
+        self.in_channels = self.q.in_features
+        self.out_channels = self.proj.out_features
+
+    def register_mutable_attr(self, attr: str, mutable):
+        if attr == 'in_channels':
+            self.q.register_mutable_attr(attr, mutable)
+            self.k.register_mutable_attr(attr, mutable)
+            self.v.register_mutable_attr(attr, mutable)
+            # self.qkv
+        elif attr == 'out_channels':
+            self.proj.register_mutable_attr(attr, mutable)
+        else:
+            raise NotImplementedError()
+        self.mutable_attrs[attr] = mutable
+
+    @classmethod
+    def convert_from(cls, module: SplitWindowMSA):
+        if not isinstance(module, SplitWindowMSA):
+            module = SplitWindowMSA.convert_from(module)
+        new_module = cls(*module.init_args, **module.init_kargs)
+        new_module.load_state_dict(module.state_dict(), strict=False)
+        return new_module
+
+    @property
+    def static_op_factory(self):
+        return SplitWindowMSA
+
+    def init_mutables(self):
+        m_head = MutableHead(self.num_heads)
+        m_qk = MutableChannelForHead(self.q.out_features, self.num_heads)
+        m_v = MutableChannelForHead(self.v.out_features, self.num_heads)
+        mutable_qk = MutableChannelWithHead(m_head, m_qk)
+        mutable_v = MutableChannelWithHead(m_head, m_v)
+
+        try:
+            self.q.register_mutable_attr(
+                'out_channels',
+                ImpMutableChannelContainer(self.q.out_features))
+            self.k.register_mutable_attr(
+                'out_channels',
+                ImpMutableChannelContainer(self.k.out_features))
+            self.v.register_mutable_attr(
+                'out_channels',
+                ImpMutableChannelContainer(self.v.out_features))
+            self.proj.register_mutable_attr(
+                'in_channels',
+                ImpMutableChannelContainer(self.proj.in_features))
+        except Exception:
+            pass
+        ImpMutableChannelContainer.register_mutable_channel_to_module(
+            self.q, mutable=mutable_qk, is_to_output_channel=True)
+        ImpMutableChannelContainer.register_mutable_channel_to_module(
+            self.k, mutable=mutable_qk, is_to_output_channel=True)
+        ImpMutableChannelContainer.register_mutable_channel_to_module(
+            self.v, mutable=mutable_v, is_to_output_channel=True)
+
+        ImpMutableChannelContainer.register_mutable_channel_to_module(
+            self.proj, mutable_v, is_to_output_channel=False)
+
+        self.attn_mutables = {'head': m_head, 'qk': m_qk, 'v': m_v}
+        self.q.use_out_imp = True
+        self.k.use_out_imp = True
+        return m_head, m_qk, m_v
+
+    def to_static_op(self):
+
+        if 'head' in self.attn_mutables:
+            num_heads = int(self.attn_mutables['head'].mask.sum().item())
+        else:
+            num_heads = self.num_heads
+
+        module: SplitWindowMSA = SplitWindowMSA(*self.init_args,
+                                                **self.init_kwargs)
+        module.q = self.q.to_static_op()
+        module.k = self.k.to_static_op()
+        module.v = self.v.to_static_op()
+        module.proj = self.proj.to_static_op()
+        module.num_heads = num_heads
+        module.head_dims = module.q.out_features // num_heads
+        module.embed_dims = module.v.out_features
+        module.out_drop = self.out_drop
+
+        module.init_kargs.update({
+            'embed_dims': module.q.out_features,
+            'num_heads': num_heads,
+            'input_dims': module.q.in_features,
+        })
+
+        module.scale = (self.q.out_features // num_heads)**-0.5
+
+        return module
+
+    def soft_flop(self):
+        flops = 0
+        flops = flops + QuickFlopMixin.get_flop(self.q)
+        flops = flops + QuickFlopMixin.get_flop(self.k)
+        flops = flops + QuickFlopMixin.get_flop(self.v)
+        flops = flops + QuickFlopMixin.get_flop(self.proj)
+
+        mutable_head: MutableHead = self.attn_mutables['head']
+        mutable_qk: MutableChannelForHead = self.attn_mutables['qk']
+        mutable_v: MutableChannelForHead = self.attn_mutables['v']
+        head = mutable_head.current_imp_flop.sum()
+        qk_dim = mutable_qk.current_imp_flop.sum() / head
+        v_dim = mutable_v.current_imp_flop.sum() / head
+        B, N, _ = self.quick_flop_recorded_in_shape[0]
+
+        N_window = N // self.window_size[0] // self.window_size[1]
+        N = self.window_size[0] // self.window_size[1]
+
+        flops = flops + N_window * B * head * N * N * (qk_dim + v_dim)
+        return flops
+
+
 # mutator ####################################################################################
 
 
@@ -57,7 +273,11 @@ class SwinAnalyzer:
         def parse_block(block: SwinBlock, prefix):
             unit.add_input_related(InChannel(prefix + 'norm1', block.norm1))
             unit.add_input_related(
-                InChannel(prefix + 'attn.w_msa.qkv', block.attn.w_msa.qkv))
+                InChannel(prefix + 'attn.w_msa.q', block.attn.w_msa.q))
+            unit.add_input_related(
+                InChannel(prefix + 'attn.w_msa.k', block.attn.w_msa.k))
+            unit.add_input_related(
+                InChannel(prefix + 'attn.w_msa.v', block.attn.w_msa.v))
             unit.add_input_related(InChannel(prefix + 'norm2', block.norm2))
             unit.add_input_related(
                 InChannel(prefix + 'attn.ffn.layers.0.0',
@@ -185,8 +405,8 @@ class SwinDms(BaseDTPAlgorithm):
                     tracer_type='FxTracer'),
             ),
             extra_module_mapping={
-                # MultiheadAttention: DynamicAttention,
-                # SplitAttention: DynamicAttention,
+                SplitWindowMSA: DySplitWindowMSA,
+                WindowMSA: DySplitWindowMSA,
             },
             block_initilizer_kwargs=dict(
                 stage_mixin_layers=[],
