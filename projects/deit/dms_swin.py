@@ -28,8 +28,87 @@ from mmrazor.implementations.pruning.dms.core.op import (ImpModuleMixin,
 from mmrazor.implementations.pruning.dms.core.mutable import (
     ImpMutableChannelContainer, MutableChannelForHead, MutableChannelWithHead,
     MutableHead)
+import torch.utils.checkpoint as cp
 from dms_deit import MMCVLinear
 # ops ####################################################################################
+
+
+class DySwinBlock(SwinBlock, DynamicBlockMixin):
+
+    def __init__(self, *args, **kwargs):
+        SwinBlock.__init__(self, *args, **kwargs)
+        DynamicBlockMixin.__init__(self)
+        self.init_args = args
+        self.init_kwargs = kwargs
+
+    @classmethod
+    def convert_from(cls, module: SwinBlock):
+        new_module = cls(
+            embed_dims=100,
+            num_heads=2,
+            window_size=7,
+            shift=False,
+            ffn_ratio=4.,
+            drop_path=0.,
+            pad_small_map=False,
+            attn_cfgs=dict(),
+            ffn_cfgs=dict(),
+            norm_cfg=dict(type='LN'),
+            with_cp=False,
+            init_cfg=None)
+
+        new_module.with_cp = module.with_cp
+
+        for name, child in module.named_children():
+            setattr(new_module, name, child)
+        new_module.load_state_dict(module.state_dict(), strict=False)
+        return new_module
+
+    def to_static_op(self):
+        from mmrazor.structures.subnet.fix_subnet import _dynamic_to_static
+
+        module = self.static_op_factory(*self.init_args, **self.init_kwargs)
+
+        module.with_cp = self.with_cp
+
+        for name, m in self.named_children():  # type: ignore
+            assert hasattr(module, name)
+            setattr(module, name, _dynamic_to_static(m))
+        module.ffn.add_identity = True
+        return module
+
+    @property
+    def static_op_factory(self):
+        return DySwinBlock
+
+    def forward(self, x, hw_shape):
+
+        def _inner_forward(x):
+            identity = x
+            x = self.norm1(x)
+            x = self.attn(x, hw_shape)
+            x = x * self.scale + identity
+
+            identity = x
+            x = self.norm2(x)
+            self.ffn.add_identity = False
+            x = identity + self.ffn(x, identity=identity) * self.scale
+
+            return x
+
+        if self.with_cp and x.requires_grad:
+            x = cp.checkpoint(_inner_forward, x)
+        else:
+            x = _inner_forward(x)
+
+        return x
+
+
+class SwinLayers(nn.Sequential):
+
+    @classmethod
+    def convert_from(cls, module):
+        return cls(module._modules)
 
 
 class SplitWindowMSA(WindowMSA):
@@ -382,6 +461,15 @@ class SwinDms(BaseDTPAlgorithm):
         BaseAlgorithm.__init__(self, architecture, data_preprocessor, init_cfg)
         model = self.architecture
         # model.backbone.layers = DeitLayers.convert_from(model.backbone.layers)
+        backbone: SwinTransformer = model.backbone
+        backbone.stages[0].blocks = SwinLayers.convert_from(
+            backbone.stages[0].blocks)
+        backbone.stages[1].blocks = SwinLayers.convert_from(
+            backbone.stages[1].blocks)
+        backbone.stages[2].blocks = SwinLayers.convert_from(
+            backbone.stages[2].blocks)
+        backbone.stages[3].blocks = SwinLayers.convert_from(
+            backbone.stages[3].blocks)
 
         default_mutator_kwargs = dict(
             prune_qkv=True,
@@ -407,10 +495,8 @@ class SwinDms(BaseDTPAlgorithm):
                 WindowMSA: DySplitWindowMSA,
             },
             block_initilizer_kwargs=dict(
-                stage_mixin_layers=[],
-                dynamic_block_mapping={
-                    # TransformerEncoderLayer: DyTransformerEncoderLayer
-                }),
+                stage_mixin_layers=[SwinLayers],
+                dynamic_block_mapping={SwinBlock: DySwinBlock}),
         )
         default_scheduler_kargs = dict(
             flops_target=0.8,
