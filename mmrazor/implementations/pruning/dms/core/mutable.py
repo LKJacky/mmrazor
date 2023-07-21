@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+from mmrazor.models.mutables.derived_mutable import DerivedMutable
 import torch
 import torch.nn as nn
 from mmengine.dist import all_reduce
@@ -189,6 +190,9 @@ class DTPTMutableChannelImp(SimpleMutableChannel, DMSMutableMixIn):
 
     def fix_chosen(self, chosen=None):
         return super().fix_chosen(chosen)
+
+    def expand_mutable_channel(self, expand_ratio) -> DerivedMutable:
+        return DMSMutableMixIn.expand_mutable_channel(self, expand_ratio)
 
 
 class ImpMutableChannelContainer(MutableChannelContainer):
