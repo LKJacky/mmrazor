@@ -1,25 +1,21 @@
 from typing import Dict, Optional, Union
 from mmengine.model import BaseModel
+from mmrazor.models.mutables.derived_mutable import DerivedMutable
 import torch
 from mmrazor.implementations.pruning.dms.core.algorithm import BaseDTPAlgorithm, BaseAlgorithm, DmsAlgorithmMixin, update_dict_reverse
 from mmrazor.implementations.pruning.dms.core.op import ImpLinear
 from mmrazor.implementations.pruning.dms.core.dtp import DTPAMutator
 from mmrazor.implementations.pruning.dms.core.models.opt.opt_analyzer import OutChannel, InChannel
-from mmrazor.models.mutables import SequentialMutableChannelUnit
+from mmrazor.models.mutables import DerivedMutable, SequentialMutableChannelUnit
 
 from mmcls.models.backbones.swin_transformer import SwinBlockSequence, SwinBlock, SwinTransformer, resize_pos_embed
 from mmcls.models.utils.attention import WindowMSA
 from mmrazor.models.architectures.dynamic_ops import DynamicChannelMixin
-from mmrazor.utils import print_log
-import json
 from mmcls.registry import MODELS as CLSMODELS
 from mmrazor.registry import MODELS
 import torch.nn as nn
 import copy
-import mmcv
 from mmcv.cnn.bricks.wrappers import Linear as MMCVLinear
-from mmrazor.models.architectures.dynamic_ops import DynamicLinear
-import numpy as np
 from mmrazor.implementations.pruning.dms.core.op import (ImpModuleMixin,
                                                          DynamicBlockMixin,
                                                          MutableAttn,
@@ -30,6 +26,9 @@ from mmrazor.implementations.pruning.dms.core.mutable import (
     MutableHead)
 import torch.utils.checkpoint as cp
 from dms_deit import MMCVLinear
+from mmrazor.implementations.pruning.dms.core.unit import DTPTUnit
+from mmrazor.implementations.pruning.dms.core.mutable import DTPTMutableChannelImp, DrivedDTPMutableChannelImp
+
 # ops ####################################################################################
 
 
@@ -357,6 +356,28 @@ class DySplitWindowMSA(SplitWindowMSA, DynamicChannelMixin, MutableAttn,
 # mutator ####################################################################################
 
 
+class SwinMutableChannel(DTPTMutableChannelImp):
+
+    def expand_mutable_channel(self, expand_ratio) -> DerivedMutable:
+
+        def _expand_mask():
+            mask = self.current_mask
+            mask = torch.unsqueeze(
+                mask, -2).expand([expand_ratio] + list(mask.shape)).flatten(-2)
+            return mask
+
+        return DrivedDTPMutableChannelImp(_expand_mask, _expand_mask,
+                                          expand_ratio, [self])
+
+
+@MODELS.register_module()
+class SwinUnit(DTPTUnit):
+
+    def __init__(self, num_channels: int, extra_mapping=...) -> None:
+        super().__init__(num_channels, extra_mapping)
+        self.mutable_channel = SwinMutableChannel(num_channels)
+
+
 class SwinAnalyzer:
 
     def __init__(self, model) -> None:
@@ -444,8 +465,6 @@ class SwinAnalyzer:
                 with_channels=True, with_init_args=True)
 
         config = self.post_process(config)
-        import json
-        print(json.dumps(config, indent=4))
         return config
 
     @classmethod
@@ -508,7 +527,7 @@ class SwinDms(BaseDTPAlgorithm):
             dtp_mutator_cfg=dict(
                 type='SwinMutator',
                 channel_unit_cfg=dict(
-                    type='DTPTUnit',
+                    type='SwinUnit',
                     default_args=dict(extra_mapping={
                         MMCVLinear: ImpLinear,
                     })),
