@@ -1,4 +1,3 @@
-from typing import Dict, Optional, Union
 from mmengine.model import BaseModel
 from mmrazor.models.mutables.derived_mutable import DerivedMutable
 import torch
@@ -21,6 +20,7 @@ from mmrazor.implementations.pruning.dms.core.op import (ImpModuleMixin,
                                                          MutableAttn,
                                                          QuickFlopMixin,
                                                          ImpLinear)
+from mmcv.cnn.bricks.drop import DropPath
 from mmrazor.implementations.pruning.dms.core.mutable import (
     ImpMutableChannelContainer, MutableChannelForHead, MutableChannelWithHead,
     MutableHead)
@@ -28,7 +28,7 @@ import torch.utils.checkpoint as cp
 from dms_deit import MMCVLinear
 from mmrazor.implementations.pruning.dms.core.unit import DTPTUnit
 from mmrazor.implementations.pruning.dms.core.mutable import DTPTMutableChannelImp, DrivedDTPMutableChannelImp
-
+from mmrazor.utils import print_log
 # ops ####################################################################################
 
 
@@ -374,6 +374,12 @@ class DySplitWindowMSA(SplitWindowMSA, DynamicChannelMixin, MutableAttn,
         return flops
 
 
+class MyDropPath(DropPath):
+
+    def extra_repr(self) -> str:
+        return str(self.drop_prob)
+
+
 # mutator ####################################################################################
 
 
@@ -543,7 +549,7 @@ class SwinDms(BaseDTPAlgorithm):
             backbone.stages[3].blocks)
 
         default_mutator_kwargs = dict(
-            prune_qkv=True,
+            prune_qkv=False,
             prune_block=True,
             dtp_mutator_cfg=dict(
                 type='SwinMutator',
@@ -587,6 +593,29 @@ class SwinDms(BaseDTPAlgorithm):
             self.architecture,
             mutator_kwargs=default_mutator_kwargs,
             scheduler_kargs=default_scheduler_kargs)
+
+    def to_static_model(self, reset=True, drop_path=-1):
+        model = super().to_static_model()
+        backbone: SwinTransformer2 = model.backbone
+
+        if drop_path != -1:
+            num_blocks = sum([len(stage.blocks) for stage in backbone.stages])
+            i = 0
+            for stage in backbone.stages:
+                for block in stage.blocks:
+                    block: SwinBlock
+                    drop_path_rate = drop_path * i / num_blocks
+                    block.attn.drop = MyDropPath(
+                        drop_path_rate
+                    ) if drop_path_rate != 0 else nn.Identity()
+                    block.ffn.dropout_layer = MyDropPath(
+                        drop_path_rate
+                    ) if drop_path_rate != 0 else nn.Identity()
+
+                    i += 1
+            assert i == num_blocks
+        print_log(model)
+        return model
 
 
 # test ####################################################################################
@@ -632,8 +661,8 @@ if __name__ == '__main__':
         return mask
 
     alg.mutator.init_random_tayler()
-    alg.mutator.scale_flop_to(model, alg.scheduler.init_flop * 0.3)
+    alg.mutator.scale_flop_to(model, alg.scheduler.init_flop * 0.8)
     print(alg.mutator.info())
-    model = alg.to_static_model()
+    model = alg.to_static_model(drop_path=0.2)
     x = torch.rand([2, 3, 224, 224])
     model(x)
