@@ -274,6 +274,11 @@ class DMSMutator(BaseMutator):
             current_flop = self.get_soft_flop(model)
         print_log(f'last {current_flop/1e6}')
 
+    @torch.no_grad()
+    def init_random_tayler(self):
+        for mutable in self.mutables():
+            mutable.taylor = torch.rand_like(mutable.taylor)
+
     def fix_qkv(self):
         for mutables in self.attn_mutables:
             mutables['qk'].requires_grad_(False)

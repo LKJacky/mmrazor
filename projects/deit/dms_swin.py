@@ -7,7 +7,7 @@ from mmrazor.implementations.pruning.dms.core.dtp import DTPAMutator
 from mmrazor.implementations.pruning.dms.core.models.opt.opt_analyzer import OutChannel, InChannel
 from mmrazor.models.mutables import SequentialMutableChannelUnit
 
-from mmcls.models.backbones.swin_transformer import SwinBlockSequence, SwinBlock, ShiftWindowMSA, SwinTransformer, PatchMerging
+from mmcls.models.backbones.swin_transformer import SwinBlockSequence, SwinBlock, SwinTransformer, resize_pos_embed
 from mmcls.models.utils.attention import WindowMSA
 from mmrazor.models.architectures.dynamic_ops import DynamicChannelMixin
 from mmrazor.utils import print_log
@@ -31,6 +31,33 @@ from mmrazor.implementations.pruning.dms.core.mutable import (
 import torch.utils.checkpoint as cp
 from dms_deit import MMCVLinear
 # ops ####################################################################################
+
+
+def swin_forward(self: SwinTransformer, x):
+    x, hw_shape = self.patch_embed(x)
+    if self.use_abs_pos_embed:
+        x = x + resize_pos_embed(self.absolute_pos_embed,
+                                 self.patch_resolution, hw_shape,
+                                 self.interpolate_mode, self.num_extra_tokens)
+    x = self.drop_after_pos(x)
+
+    outs = []
+    for i, stage in enumerate(self.stages):
+        x, hw_shape = stage(
+            x, hw_shape, do_downsample=self.out_after_downsample)
+        if i in self.out_indices:
+            norm_layer = getattr(self, f'norm{i}')
+            out = norm_layer(x)
+            out = out.view(out.shape[0], *hw_shape,
+                           -1).permute(0, 3, 1, 2).contiguous()
+            outs.append(out)
+        if stage.downsample is not None and not self.out_after_downsample:
+            x, hw_shape = stage.downsample(x, hw_shape)
+
+    return tuple(outs)
+
+
+SwinTransformer.forward = swin_forward
 
 
 class DySwinBlock(SwinBlock, DynamicBlockMixin):
@@ -173,7 +200,7 @@ class SplitWindowMSA(WindowMSA):
 
         attn = self.attn_drop(attn)
 
-        x = (attn @ v).transpose(1, 2).reshape(B_, N, C)
+        x = (attn @ v).transpose(1, 2).reshape(B_, N, -1)
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
@@ -287,10 +314,15 @@ class DySplitWindowMSA(SplitWindowMSA, DynamicChannelMixin, MutableAttn,
         module.k = self.k.to_static_op()
         module.v = self.v.to_static_op()
         module.proj = self.proj.to_static_op()
+
+        head_mask = self.attn_mutables['head'].mask.bool()
+
+        module.relative_position_bias_table.data = self.relative_position_bias_table[
+            ..., head_mask]
+
         module.num_heads = num_heads
         module.head_dims = module.q.out_features // num_heads
         module.embed_dims = module.v.out_features
-        module.out_drop = self.out_drop
 
         module.init_kargs.update({
             'embed_dims': module.q.out_features,
@@ -357,8 +389,7 @@ class SwinAnalyzer:
                 InChannel(prefix + 'attn.w_msa.v', block.attn.w_msa.v))
             unit.add_input_related(InChannel(prefix + 'norm2', block.norm2))
             unit.add_input_related(
-                InChannel(prefix + 'attn.ffn.layers.0.0',
-                          block.ffn.layers[0][0]))
+                InChannel(prefix + 'ffn.layers.0.0', block.ffn.layers[0][0]))
 
             unit.add_output_related(
                 OutChannel(prefix + 'attn.w_msa.proj', block.attn.w_msa.proj))
@@ -446,7 +477,7 @@ class SwinMutator(DTPAMutator):
         assert len(self.mutable_units) > 0
         for unit in self.units:
             for channel in unit.input_related + unit.output_related:
-                assert isinstance(channel, nn.Module)
+                assert isinstance(channel.module, nn.Module)
 
 
 @MODELS.register_module()
@@ -552,3 +583,17 @@ if __name__ == '__main__':
     alg = SwinDms(model)
     print(alg)
     print(alg.mutator.info())
+
+    def rand_mask(mask):
+        while True:
+            mask = (torch.rand_like(mask) < 0.5).float()
+            if mask.sum() != 0:
+                break
+        return mask
+
+    alg.mutator.init_random_tayler()
+    alg.mutator.scale_flop_to(model, alg.scheduler.init_flop * 0.3)
+    print(alg.mutator.info())
+    model = alg.to_static_model()
+    x = torch.rand([2, 3, 224, 224])
+    model(x)

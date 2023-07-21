@@ -143,7 +143,10 @@ class DMSMutableMixIn():
         else:
             e_imp = dtp_get_importance(self.taylor, self.e, lamda=self.lda)
         idx = torch.topk(
-            e_imp, k=int(self.e.item() * self.mask.numel()), largest=True)[1]
+            e_imp,
+            k=int(self.e.item() * self.mask.shape[-1]),
+            largest=True,
+            dim=-1)[1]
         self.mask.fill_(0)
         self.mask.data.scatter_(-1, idx, 1.0)
         self.mask.data = (e_imp >= MaskThreshold).float()
