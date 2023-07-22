@@ -126,6 +126,7 @@ class DMSScheduler():
             return t
         elif self.target_scheduler == 'root':
             t = self.flops_target**(ratio)
+            return t
         elif self.target_scheduler.startswith('loop_'):
             if ratio < 1:
                 T = int(self.target_scheduler[5:])
