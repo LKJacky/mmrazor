@@ -52,8 +52,7 @@ class DMSScheduler():
             self.by_epoch = True
         else:
             raise NotImplementedError()
-        self.train_model=train_model
-        
+        self.train_model = train_model
 
         self.step = step
 
@@ -125,6 +124,8 @@ class DMSScheduler():
         elif self.target_scheduler == 'cos':
             t = get_target(1 - 0.5 * (1 + np.cos(np.pi * ratio)))
             return t
+        elif self.target_scheduler == 'root':
+            t = self.flops_target**(ratio)
         elif self.target_scheduler.startswith('loop_'):
             if ratio < 1:
                 T = int(self.target_scheduler[5:])

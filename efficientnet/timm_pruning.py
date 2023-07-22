@@ -846,6 +846,7 @@ group.add_argument('--target', type=float, default=1.0)
 group.add_argument('--sub_space', type=str, default='')
 group.add_argument('--mutator_lr', type=float, default=4e-4)
 group.add_argument('--loss_weight', type=float, default=100)
+group.add_argument('--target_scheduler', type=str, default='cos')
 
 
 def _parse_args():
@@ -1030,7 +1031,7 @@ def main():
             flop_loss_weight=args.loss_weight,
             structure_log_interval=1000,
             by_epoch=True,
-            target_scheduler='cos',
+            target_scheduler=args.target_scheduler,
         ))
     model = algorithm
     #######################################################################################################
