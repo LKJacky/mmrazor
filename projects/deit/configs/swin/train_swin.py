@@ -1,4 +1,5 @@
 _base_ = 'mmcls::swin_transformer/swin-base_16xb64_in1k.py'
+custom_imports = dict(imports=['dms_deit','dms_swin'])
 
 # model settings
 model = dict(
@@ -32,6 +33,31 @@ default_hooks = dict(
         max_keep_ckpts=5,
     ), )
 
-# train_dataloader = dict(batch_size=4)
-# test_dataloader = dict(batch_size=4)
-# val_dataloader = dict(batch_size=4)
+# train_dataloader = _base_.train_dataloader
+# val_dataloader = _base_.val_dataloader
+# test_dataloader = _base_.test_dataloader
+
+# train_dataloader['pin_memory']=True
+# val_dataloader['pin_memory']=True
+
+# file_client_args = dict(
+#     backend='petrel',
+#     path_mapping=dict({
+#         './data/coco':
+#         's3://openmmlab/datasets/detection/coco',
+#         'data/coco':
+#         's3://openmmlab/datasets/detection/coco',
+#         './data/cityscapes':
+#         's3://openmmlab/datasets/segmentation/cityscapes',
+#         'data/cityscapes':
+#         's3://openmmlab/datasets/segmentation/cityscapes',
+#         './data/imagenet':
+#         's3://openmmlab/datasets/classification/imagenet',
+#         'data/imagenet':
+#         's3://openmmlab/datasets/classification/imagenet'
+#     }))
+# train_dataloader['dataset']['pipeline'][0][
+#     'file_client_args'] = file_client_args
+# val_dataloader['dataset']['pipeline'][0]['file_client_args'] = file_client_args
+# test_dataloader['dataset']['pipeline'][0][
+#     'file_client_args'] = file_client_args

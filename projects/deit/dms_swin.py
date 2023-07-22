@@ -11,7 +11,7 @@ from mmcls.models.backbones.swin_transformer import SwinBlockSequence, SwinBlock
 from mmcls.models.utils.attention import WindowMSA
 from mmrazor.models.architectures.dynamic_ops import DynamicChannelMixin
 from mmcls.registry import MODELS as CLSMODELS
-from mmrazor.registry import MODELS
+from mmrazor.registry import MODELS, TASK_UTILS
 import torch.nn as nn
 import copy
 from mmcv.cnn.bricks.wrappers import Linear as MMCVLinear
@@ -29,7 +29,29 @@ from dms_deit import MMCVLinear
 from mmrazor.implementations.pruning.dms.core.unit import DTPTUnit
 from mmrazor.implementations.pruning.dms.core.mutable import DTPTMutableChannelImp, DrivedDTPMutableChannelImp
 from mmrazor.utils import print_log
+from mmrazor.models.task_modules.estimators.counters import BaseCounter
+
+
 # ops ####################################################################################
+@TASK_UTILS.register_module()
+class WindowMSACounter(BaseCounter):
+
+    @staticmethod
+    def add_count_hook(module: WindowMSA, input, output):
+        """Calculate FLOPs and params based on the size of input & output."""
+        # Can have multiple inputs, getting the first one
+        head = module.num_heads
+        B, N, C = input[0].shape
+
+        qk_dim = module.qkv.out_features // 3 // head
+        v_dim = module.qkv.out_features // 3 // head
+
+        flops = 0
+
+        print(B,head,N,qk_dim,v_dim)
+        flops += B * head * N * N * (qk_dim + v_dim)  # attn
+
+        module.__flops__ += flops
 
 
 @CLSMODELS.register_module()

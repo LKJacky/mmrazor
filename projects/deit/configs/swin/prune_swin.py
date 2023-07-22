@@ -25,7 +25,6 @@ find_unused_parameters = True
 
 ##############################################################################
 
-custom_imports = dict(imports=['dms_deit','dms_swin'])
 
 architecture = _base_.model
 
