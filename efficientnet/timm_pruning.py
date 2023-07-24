@@ -1357,9 +1357,10 @@ def main():
             decay=0.28,
             cycle_epoch=5,
         )
-        for i in range(30):
-            lr_scheduler.step(i)
-            print_log(f"{i}, {optimizer.param_groups[0]['lr']}")
+        # for i in range(30):
+        #     lr_scheduler.step(i)
+        #     print_log(f"{i}, {optimizer.param_groups[0]['lr']}")
+        num_epochs=args.epochs
     ########################################################################################
     start_epoch = 0
     if args.start_epoch is not None:

@@ -408,9 +408,8 @@ class MyScheduler(Scheduler):
         else:
             t = t - self.warmup_t
             t = t % self.cycle_epoch
-            lrs = [
-                self.base_values[0] * (self.decay**t), *self.base_values[1:]
-            ]
+            lrs = [lr * (self.decay**t) for lr in self.base_values]
+            lrs[-1] = self.base_values[-1]
         return lrs
 
 
