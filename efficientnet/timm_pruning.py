@@ -847,6 +847,7 @@ group.add_argument('--sub_space', type=str, default='')
 group.add_argument('--mutator_lr', type=float, default=4e-4)
 group.add_argument('--loss_weight', type=float, default=100)
 group.add_argument('--target_scheduler', type=str, default='cos')
+group.add_argument('--cycle_lr', type=str, default='false')
 
 
 def _parse_args():
@@ -1337,13 +1338,29 @@ def main():
                 'Metrics not being logged to wandb, try `pip install wandb`')
 
     # setup learning rate schedule and starting epoch
-    updates_per_epoch = (len(loader_train) + args.grad_accum_steps -
-                         1) // args.grad_accum_steps
-    lr_scheduler, num_epochs = create_scheduler_v2(
-        optimizer,
-        **scheduler_kwargs(args),
-        updates_per_epoch=updates_per_epoch,
-    )
+    ########################################################################################
+    if args.cycle_lr != 'true':
+        updates_per_epoch = (len(loader_train) + args.grad_accum_steps -
+                             1) // args.grad_accum_steps
+        lr_scheduler, num_epochs = create_scheduler_v2(
+            optimizer,
+            **scheduler_kwargs(args),
+            updates_per_epoch=updates_per_epoch,
+        )
+    else:
+        from dms_eff import MyScheduler
+        lr_scheduler = MyScheduler(
+            optimizer,
+            warmup_t=5,
+            warmup_lr_init=1e-6,
+            num_epoch=30,
+            decay=0.28,
+            cycle_epoch=5,
+        )
+        for i in range(30):
+            lr_scheduler.step(i)
+            print_log(f"{i}, {optimizer.param_groups[0]['lr']}")
+    ########################################################################################
     start_epoch = 0
     if args.start_epoch is not None:
         # a specified start_epoch will always override the resume epoch

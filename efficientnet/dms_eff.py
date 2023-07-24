@@ -12,6 +12,7 @@ from mmrazor.models.utils.expandable_utils.ops import ExpandableMixin
 import torch.nn as nn
 import torch.nn.functional as F
 from timm.layers import DropPath
+from timm.scheduler.scheduler import Scheduler
 
 # OPS ####################################################################################
 
@@ -365,6 +366,52 @@ class EffDmsAlgorithm(DmsGeneralAlgorithm):
         if drop != -1:
             model.drop_rate = drop
         return model
+
+
+class MyScheduler(Scheduler):
+
+    def __init__(self,
+                 optimizer,
+                 num_epoch=10,
+                 cycle_epoch=5,
+                 decay=0.5,
+                 warmup_t=0,
+                 warmup_lr_init=0,
+                 t_in_epochs: bool = True,
+                 noise_range_t=None,
+                 noise_type='normal',
+                 noise_pct=0.67,
+                 noise_std=1,
+                 noise_seed=None,
+                 initialize: bool = True) -> None:
+        super().__init__(optimizer, 'lr', t_in_epochs, noise_range_t,
+                         noise_type, noise_pct, noise_std, noise_seed,
+                         initialize)
+
+        self.warmup_t = warmup_t
+        self.warmup_lr_init = warmup_lr_init
+
+        if self.warmup_t:
+            self.warmup_steps = [(v - warmup_lr_init) / self.warmup_t
+                                 for v in self.base_values]
+            super().update_groups(self.warmup_lr_init)
+        else:
+            self.warmup_steps = [1 for _ in self.base_values]
+
+        self.num_epoch = num_epoch
+        self.cycle_epoch = cycle_epoch
+        self.decay = decay
+
+    def _get_lr(self, t: int) -> float:
+        if t < self.warmup_t:
+            lrs = [self.warmup_lr_init + t * s for s in self.warmup_steps]
+        else:
+            t = t - self.warmup_t
+            t = t % self.cycle_epoch
+            lrs = [
+                self.base_values[0] * (self.decay**t), *self.base_values[1:]
+            ]
+        return lrs
 
 
 if __name__ == '__main__':
