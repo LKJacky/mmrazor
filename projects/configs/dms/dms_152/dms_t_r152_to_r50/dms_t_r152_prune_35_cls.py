@@ -72,10 +72,10 @@ architecture['_scope_'] = _base_.default_scope
 model = dict(
     _delete_=True,
     _scope_='mmrazor',
-    type='BaseDTPAlgorithm',
+    type='ResDmsAlgo',
     architecture=architecture,
     mutator_cfg=dict(
-        type='DMSMutator',
+        # type='DMSMutator',
         dtp_mutator_cfg=dict(
             type='DTPAMutator',
             channel_unit_cfg=dict(type='DTPTUnit', default_args=dict()),
@@ -90,7 +90,7 @@ model = dict(
         ),
     ),
     scheduler=dict(
-        type='DMSScheduler',
+        # type='DMSScheduler',
         flops_target=target_flop_ratio,
         decay_ratio=decay_ratio,
         refine_ratio=refine_ratio,
