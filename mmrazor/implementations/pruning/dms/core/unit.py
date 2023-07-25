@@ -12,6 +12,7 @@ from .models.opt.opt_ops import (ImpEmbedding, ImpOPTAttention,
                                  OPTAttention, OPTLearnedPositionalEmbedding)
 from .mutable import DTPTMutableChannelImp, ImpMutableChannelContainer
 from .op import ImpBatchnorm2d, ImpConv2d, ImpLinear
+from mmengine.model.utils import _BatchNormXd
 
 DTPMutableChannelImp = DTPTMutableChannelImp
 
@@ -34,6 +35,7 @@ class BaseDTPUnit(L1MutableChannelUnit, CollectUnitMixin):
         self.module_mapping = {
             nn.Conv2d: ImpConv2d,
             nn.BatchNorm2d: ImpBatchnorm2d,
+            _BatchNormXd: ImpBatchnorm2d,
             nn.Linear: ImpLinear,
             nn.SyncBatchNorm: dynamic_ops.DynamicSyncBatchNorm,
             BaseShiftedWindowAttention: ImpShiftedWindowAttention,

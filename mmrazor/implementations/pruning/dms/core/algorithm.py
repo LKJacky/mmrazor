@@ -157,6 +157,7 @@ class DmsAlgorithmMixin():
 
     @torch.no_grad()
     def to_static_model(self, scale=False, reset_params=False):
+        print_log(self.mutator.info())
         if scale:
             self.mutator.scale_flop_to(
                 self.architecture,
