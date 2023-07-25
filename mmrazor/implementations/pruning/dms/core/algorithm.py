@@ -6,8 +6,6 @@ import torch.nn as nn
 from mmengine.model import BaseModel
 from mmengine.structures import BaseDataElement
 
-from mmrazor.implementations.pruning.dms.core.models.opt.opt_wrapper import \
-    to_static_model
 from mmrazor.models import BaseAlgorithm
 from mmrazor.registry import MODELS, TASK_UTILS
 from mmrazor.utils import RuntimeInfo
@@ -18,6 +16,10 @@ from mmrazor.models.utils.expandable_utils import expand_expandable_dynamic_mode
 from .op import DynamicStage
 from mmrazor.structures.subnet.fix_subnet import (export_fix_subnet,
                                                   load_fix_subnet)
+from mmengine.model import revert_sync_batchnorm
+from mmrazor.utils import print_log
+import types
+from mmengine.model import BaseModel
 
 
 def to_static_model_x(
@@ -55,6 +57,42 @@ def update_dict_reverse(config1: dict, config2: dict):
         else:
             config1[key] = config2[key]
     return config1
+
+
+def to_static_model(algorithm, ):
+    fix_mutable = export_fix_subnet(algorithm.model)[0]
+    load_fix_subnet(algorithm.model, fix_mutable)
+    model = algorithm.model
+    return model
+
+
+def check_sync_bn(model: nn.Module):
+    for m in model.modules():
+        if isinstance(m, nn.SyncBatchNorm):
+            return True
+    return False
+
+
+def hacky_init_weights_wrapper():
+    """This init weight method is used to prevent the model init again after
+    build.
+
+    Besides, It also save fix_subnet.json after RuntimeInfo is ready.
+    """
+
+    def hacky_init_weights(model):
+        pass
+
+    return hacky_init_weights
+
+
+def clean_params_init_info(model: nn.Module):
+    """Clean param init info."""
+    if hasattr(model, '_params_init_info'):
+        delattr(model, '_params_init_info')
+    for module in model.modules():
+        if hasattr(module, '_params_init_info'):
+            delattr(module, '_params_init_info')
 
 
 class DmsAlgorithmMixin():
@@ -97,6 +135,11 @@ class DmsAlgorithmMixin():
 
         origin_model = copy.deepcopy(model)
         self.architecture = model
+
+        self.use_sync_bn = check_sync_bn(self.architecture)
+        if self.use_sync_bn:
+            revert_sync_batchnorm(self.architecture)
+
         self.mutator: DMSMutator = DMSMutator(**mutator_kwargs)
 
         self.scheduler = DMSScheduler(
@@ -113,14 +156,23 @@ class DmsAlgorithmMixin():
         self.extra_out = None
 
     @torch.no_grad()
-    def to_static_model(self, scale=False):
+    def to_static_model(self, scale=False, reset_params=False):
         if scale:
             self.mutator.scale_flop_to(
                 self.architecture,
                 target=self.scheduler.init_flop * self.scheduler.flops_target)
 
         self.model = self.architecture
-        return to_static_model(self)
+        model = to_static_model(self)
+        if reset_params:
+            print_log('reset parameters')
+            for module in model.modules():
+                if hasattr(module, 'reset_parameters'):
+                    module.reset_parameters()
+        if self.use_sync_bn:
+            print_log('convert sync bn')
+            nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        return model
 
     @classmethod
     def expand_model(cls,
@@ -206,6 +258,16 @@ class BaseDTPAlgorithm(BaseAlgorithm, DmsAlgorithmMixin):
             res.update(extra_dict)
         return res
 
+    def to_static_model(self, scale=False, reset_params=False):
+        model = super().to_static_model(scale, reset_params=False)
+        model.data_preprocessor = self.data_preprocessor
+        if reset_params is False:
+            if isinstance(model, BaseModel):
+                model.init_cfg = None
+                model.init_weights = types.MethodType(
+                    hacky_init_weights_wrapper(), model)
+        return model
+
 
 class DmsGeneralAlgorithm(nn.Module, DmsAlgorithmMixin):
 
@@ -254,3 +316,31 @@ class DmsGeneralAlgorithm(nn.Module, DmsAlgorithmMixin):
             return out, extra_dict['flops_loss']
         else:
             return out
+
+
+@MODELS.register_module()
+def DmsSubModel(
+    algorithm: BaseDTPAlgorithm,
+    reset_params=False,
+    **kargs,
+):
+    """Convert a algorithm(with an architecture) to a static pruned
+    architecture.
+
+    Args:
+        algorithm (Union[BaseAlgorithm, dict]): The pruning algorithm to
+            finetune.
+        divisor (int): The divisor to make the channel number
+            divisible. Defaults to 1.
+
+    Returns:
+        nn.Module: a static model.
+    """
+    # # init algorithm
+    if isinstance(algorithm, dict):
+        algorithm = MODELS.build(algorithm)  # type: ignore
+    assert isinstance(algorithm, BaseDTPAlgorithm)
+    algorithm.init_weights()
+    clean_params_init_info(algorithm)
+
+    return algorithm.to_static_model(reset_params=reset_params)

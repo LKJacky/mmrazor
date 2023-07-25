@@ -1,8 +1,11 @@
-from mmrazor.implementations.pruning.dms.core.algorithm import BaseDTPAlgorithm
+from mmrazor.implementations.pruning.dms.core.algorithm import BaseDTPAlgorithm, DmsSubModel
 
-from mmrazor.implementations.pruning.dms.core.models.resnet_img import ResLayer, BaseBottleneck, Bottleneck
-
+from mmrazor.implementations.pruning.dms.core.models.resnet_img import ResLayer, BaseBottleneck, Bottleneck, ResNetDMS
+from mmrazor.implementations.pruning.dms.core.utils import MyDropPath
 from mmrazor.registry import MODELS
+import torch
+import torch.nn as nn
+from mmrazor.utils import print_log
 
 
 @MODELS.register_module()
@@ -27,3 +30,35 @@ class ResDmsAlgo(BaseDTPAlgorithm):
             stage_mixin_layers=[ResLayer],
             dynamic_block_mapping={BaseBottleneck: Bottleneck}),
     )
+
+
+@MODELS.register_module()
+def ResNetDmsSubModel(
+    algorithm: BaseDTPAlgorithm,
+    reset_params=False,
+    drop_path_rate=-1,
+):
+    model = DmsSubModel(algorithm, reset_params=reset_params)
+    if drop_path_rate != -1:
+        backbone: ResNetDMS = model.backbone
+        total_depth = sum([
+            len(stage) for stage in [
+                backbone.layer1, backbone.layer2, backbone.layer3,
+                backbone.layer4
+            ]
+        ])
+
+        dpr = [
+            x.item() for x in torch.linspace(0, drop_path_rate, total_depth)
+        ]
+        i = 0
+        for stage in [
+                backbone.layer1, backbone.layer2, backbone.layer3,
+                backbone.layer4
+        ]:
+            for block in stage:
+                block.drop_path = MyDropPath(
+                    dpr[i]) if dpr[i] > 0 else nn.Identity()
+                i += 1
+        print_log(f'static model after reset drop path: {model}', )
+    return model
