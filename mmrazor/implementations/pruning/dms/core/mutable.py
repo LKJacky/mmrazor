@@ -105,10 +105,14 @@ class DMSMutableMixIn():
     @property
     def current_imp(self):
         if self.taylor.max() == self.taylor.min():
-            e_imp = torch.ones_like(self.taylor, requires_grad=True)
+            e_imp = torch.ones_like(self.taylor)
+            if self.e.requires_grad:
+                e_imp = e_imp + self.e * 0
+                e_imp.requires_grad_()
         else:
             e_imp = dtp_get_importance(self.taylor, self.e, lamda=self.lda)
-        if self.training and self.e.requires_grad and self.use_tayler:
+        if  self.training and self.e.requires_grad and self.use_tayler:
+            assert e_imp.requires_grad is True
             e_imp.register_hook(
                 taylor_backward_hook_wrapper(self, e_imp.detach()))
         if self.training:
