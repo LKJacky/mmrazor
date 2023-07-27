@@ -152,6 +152,8 @@ class DMSMutator(BaseMutator):
 
         self.train_model = train_model
 
+        self.last_soft_flop = -1
+
     def prepare_from_supernet(self, supernet) -> None:
 
         if isinstance(supernet, OPTModel):
@@ -239,7 +241,9 @@ class DMSMutator(BaseMutator):
                 mutables.limit_value()
 
     def get_soft_flop(self, model):
-        return QuickFlopMixin.get_flop(model)
+        res = QuickFlopMixin.get_flop(model)
+        self.last_soft_flop = res.detach()
+        return res
 
     @torch.no_grad()
     def scale_flop_to(self, model, target):

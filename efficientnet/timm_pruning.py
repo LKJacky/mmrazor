@@ -46,6 +46,7 @@ from torch.nn.parallel import DistributedDataParallel as NativeDDP
 from mmrazor.models.architectures.backbones.scalenet.timm_arch import \
     scale_net_timm
 from mmrazor.utils import print_log
+from dms_eff import EffDmsAlgorithm
 
 DEBUG = os.environ.get('DEBUG', 'false') == 'true'
 
@@ -1340,6 +1341,16 @@ def main():
     # setup learning rate schedule and starting epoch
     ########################################################################################
     if args.cycle_lr != 'true':
+
+        def get_lr_wrapper(scheduler, old_get_lr):
+
+            def _get_lr(t: int):
+                res = old_get_lr(t)
+                res[-1] = scheduler.base_values[-1]
+                return res
+
+            return _get_lr
+
         updates_per_epoch = (len(loader_train) + args.grad_accum_steps -
                              1) // args.grad_accum_steps
         lr_scheduler, num_epochs = create_scheduler_v2(
@@ -1347,7 +1358,11 @@ def main():
             **scheduler_kwargs(args),
             updates_per_epoch=updates_per_epoch,
         )
+        lr_scheduler._get_lr = get_lr_wrapper(lr_scheduler,
+                                              lr_scheduler._get_lr)
+        optimizer.param_groups[-1]['lr'] = lr_scheduler.base_values[-1]
     else:
+        print_log('use MySchoduler')
         from dms_eff import MyScheduler
         lr_scheduler = MyScheduler(
             optimizer,
@@ -1360,7 +1375,7 @@ def main():
         # for i in range(30):
         #     lr_scheduler.step(i)
         #     print_log(f"{i}, {optimizer.param_groups[0]['lr']}")
-        num_epochs=args.epochs
+        num_epochs = args.epochs
     ########################################################################################
     start_epoch = 0
     if args.start_epoch is not None:
@@ -1503,9 +1518,9 @@ def train_one_epoch(
     num_updates = epoch * updates_per_epoch
     #############################################################################################
     if isinstance(model, NativeDDP):
-        base_model = model.module
+        base_model: EffDmsAlgorithm = model.module
     else:
-        base_model = model
+        base_model: EffDmsAlgorithm = model
     #############################################################################################
 
     last_batch_idx = len(loader) - 1
@@ -1631,7 +1646,8 @@ def train_one_epoch(
                     f'Loss: {losses_m.val:#.3g} ({losses_m.avg:#.3g})  '
                     f'Time: {update_time_m.val:.3f}s, {update_sample_count / update_time_m.val:>7.2f}/s  '
                     f'({update_time_m.avg:.3f}s, {update_sample_count / update_time_m.avg:>7.2f}/s)  '
-                    f'LR: {lr:.3e}  '
+                    f'LR: {lrl}  '
+                    f'flop_loss: {base_model.mutator.last_soft_flop/1e6}   '
                     f'Data: {data_time_m.val:.3f} ({data_time_m.avg:.3f})')
 
                 if args.save_images and output_dir:

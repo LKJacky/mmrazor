@@ -394,7 +394,9 @@ class MyScheduler(Scheduler):
         if self.warmup_t:
             self.warmup_steps = [(v - warmup_lr_init) / self.warmup_t
                                  for v in self.base_values]
-            super().update_groups(self.warmup_lr_init)
+            init_lr=[self.warmup_lr_init]*len(self.base_values)
+            init_lr[-1]=self.base_values[-1]
+            super().update_groups(init_lr)
         else:
             self.warmup_steps = [1 for _ in self.base_values]
 
@@ -409,7 +411,7 @@ class MyScheduler(Scheduler):
             t = t - self.warmup_t
             t = t % self.cycle_epoch
             lrs = [lr * (self.decay**t) for lr in self.base_values]
-            lrs[-1] = self.base_values[-1]
+        lrs[-1] = self.base_values[-1]
         return lrs
 
 
