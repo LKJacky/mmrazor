@@ -21,8 +21,21 @@ original_lr = _base_.optim_wrapper.optimizer.lr
 model_lr = original_lr
 mutator_lr = model_lr * 0.1
 
-# if hasattr(_base_, 'param_scheduler'):
-#     delattr(_base_, 'param_scheduler')
+param_scheduler = [
+    dict(
+        type='MyLinearLR',
+        start_factor=0.001,
+        by_epoch=True,
+        end=20,
+        convert_to_iter_based=True,
+        _scope_='mmcls'),
+    dict(
+        type='MyCosineAnnealingLR',
+        eta_min=1e-05,
+        by_epoch=True,
+        begin=20,
+        _scope_='mmcls'),
+]
 find_unused_parameters = True
 
 ##############################################################################

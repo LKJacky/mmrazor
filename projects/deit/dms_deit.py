@@ -285,6 +285,37 @@ class DyTransformerEncoderLayer(TransformerEncoderLayer, DynamicBlockMixin):
         return TransformerEncoderLayer.__repr__(self)
 
 
+# schedulers ####################################################################################
+
+from mmengine.optim.scheduler import LinearLR, CosineAnnealingLR
+from mmengine.registry import PARAM_SCHEDULERS
+
+@PARAM_SCHEDULERS.register_module()
+class MyLinearLR(LinearLR):
+
+    def _get_value(self):
+        """Compute value using chainable form of the scheduler."""
+        res = super()._get_value()
+        mutator_lr = min(res)
+        for i in range(len(res)):
+            if res[i] == mutator_lr:
+                res[i] = self.base_values[-1]
+        return res
+
+
+@PARAM_SCHEDULERS.register_module()
+class MyCosineAnnealingLR(CosineAnnealingLR):
+
+    def _get_value(self):
+        res = super()._get_value()
+        res[-1] = self.base_values[-1]
+        mutator_lr = min(res)
+        for i in range(len(res)):
+            if res[i] == mutator_lr:
+                res[i] = self.base_values[-1]
+        return res
+
+
 # mutator ####################################################################################
 
 
