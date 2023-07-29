@@ -48,7 +48,26 @@ class WindowMSACounter(BaseCounter):
 
         flops = 0
 
-        print(B,head,N,qk_dim,v_dim)
+        flops += B * head * N * N * (qk_dim + v_dim)  # attn
+
+        module.__flops__ += flops
+
+
+@TASK_UTILS.register_module()
+class SplitWindowMSACounter(BaseCounter):
+
+    @staticmethod
+    def add_count_hook(module: 'SplitWindowMSA', input, output):
+        """Calculate FLOPs and params based on the size of input & output."""
+        # Can have multiple inputs, getting the first one
+        head = module.num_heads
+        B, N, C = input[0].shape
+
+        qk_dim = module.q.out_features // head
+        v_dim = module.v.out_features // head
+
+        flops = 0
+
         flops += B * head * N * N * (qk_dim + v_dim)  # attn
 
         module.__flops__ += flops
