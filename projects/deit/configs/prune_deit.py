@@ -9,6 +9,7 @@ target_flop_ratio = 0.195
 flop_loss_weight = 100
 by_epoch = True
 target_scheduler = 'root'
+loss_type = 'log'
 
 log_interval = 1000
 
@@ -18,8 +19,8 @@ epoch = 30
 train_cfg = dict(by_epoch=True, max_epochs=epoch)
 
 original_lr = _base_.optim_wrapper.optimizer.lr
-model_lr = original_lr
-mutator_lr = model_lr * 0.1
+model_lr = original_lr  # 1e-3
+mutator_lr = model_lr * 5e-3
 
 param_scheduler = [
     dict(
@@ -64,6 +65,7 @@ model = dict(
         structure_log_interval=log_interval,
         by_epoch=by_epoch,
         target_scheduler=target_scheduler,
+        loss_type=loss_type,
     ),
 )
 
