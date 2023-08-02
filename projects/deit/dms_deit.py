@@ -640,24 +640,23 @@ if __name__ == '__main__':
 
     algo = DeitDms(model, )
     print(algo.mutator.info())
+    from mmrazor.implementations.pruning.dms.core.mutable import DMSMutableMixIn
 
-    def rand_mask(mask):
-        while True:
-            mask = (torch.rand_like(mask) < 0.5).float()
-            if mask.sum() != 0:
-                break
-        return mask
+    def rand_mask(mutable: DMSMutableMixIn):
+        mutable.taylor.data = torch.rand_like(mutable.taylor)
+        mutable.e.data.fill_(0.5)
+        mutable.sync_mask()
 
     for unit in algo.mutator.dtp_mutator.mutable_units:
-        unit.mutable_channel.mask.data = rand_mask(unit.mutable_channel.mask)
+        rand_mask(unit.mutable_channel)
     for attn_mutables in algo.mutator.attn_mutables:
         head_mutable = attn_mutables['head']
         q_mutable = attn_mutables['qk']
         kv_mutable = attn_mutables['v']
-        head_mutable.mask = rand_mask(head_mutable.mask)
-        q_mutable.mask = rand_mask(q_mutable.mask)
-        kv_mutable.mask = rand_mask(kv_mutable.mask)
-
+        rand_mask(head_mutable)
+        rand_mask(q_mutable)
+        rand_mask(kv_mutable)
+    print(algo.mutator.info())
     model = algo.to_static_model()
     x = torch.rand([1, 3, 224, 224])
     model(x)
