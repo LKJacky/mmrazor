@@ -498,8 +498,7 @@ class DeitMutator(DTPAMutator):
 @MODELS.register_module()
 def DeitSubModel(
     algorithm: dict,
-    divisor=1,
-    reset_params=False,
+    reset_params=True,
     **kargs,
 ):
     """Convert a algorithm(with an architecture) to a static pruned
@@ -525,7 +524,7 @@ def DeitSubModel(
 
     print_log(f"{algorithm.mutator.info()}")
 
-    return algorithm.to_static_model()
+    return algorithm.to_static_model(reset=reset_params)
 
 
 @MODELS.register_module()
