@@ -194,7 +194,7 @@ class DynamicAttention(SplitAttention, DynamicChannelMixin, MutableAttn,
             'input_dims': module.q.in_features,
         })
 
-        module.scale = (self.q.out_features // num_heads)**-0.5
+        module.scale = (module.q.out_features // num_heads)**-0.5
 
         return module
 
@@ -519,15 +519,12 @@ def DeitSubModel(
     pruned = algorithm_dict.pop('pruned')
     if isinstance(algorithm, dict):
         algorithm = MODELS.build(algorithm)  # type: ignore
-    assert isinstance(algorithm, BaseAlgorithm)
+    assert isinstance(algorithm, DeitDms)
     state = torch.load(pruned, map_location='cpu')['state_dict']
     algorithm.load_state_dict(state)
 
-    pruning_structure = algorithm.mutator.choice_template
-    print_log('PruneSubModel get pruning structure:')
-    print_log(json.dumps(pruning_structure, indent=4))
+    print_log(f"{algorithm.mutator.info()}")
 
-    assert hasattr(algorithm, 'to_static_model')
     return algorithm.to_static_model()
 
 
@@ -592,21 +589,21 @@ class DeitDms(BaseDTPAlgorithm):
             mutator_kwargs=default_mutator_kwargs,
             scheduler_kargs=default_scheduler_kargs)
 
+    @torch.no_grad()
     def to_static_model(self, reset=True):
-        model = super().to_static_model()
+        model = super().to_static_model(reset_params=reset)
         backbone: VisionTransformer = model.backbone
         mask = self.mutator.dtp_mutator.mutable_units[
             -1].mutable_channel.mask.bool()
+        # necessary for static model
         backbone.cls_token = nn.Parameter(backbone.cls_token[:, :, mask])
         backbone.pos_embed = nn.Parameter(backbone.pos_embed[:, :, mask])
-
         backbone.out_indices = [len(backbone.layers) - 1]
-        from mmrazor.utils import print_log
+
         print_log('Staic model')
         print_log(model)
 
         if reset:
-
             backbone.cls_token.data.fill_(0)
             backbone.pos_embed.data.fill_(0)
             backbone.patch_embed.projection.reset_parameters()
