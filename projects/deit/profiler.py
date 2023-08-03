@@ -89,6 +89,30 @@ def load_algo(model: nn.Module, algo_path: str):
     return model
 
 
+def convert_state_dict(state: dict):
+    new_state = {}
+    for key in state:
+        key: str
+        if 'qkv' in key and 'weight' in key:
+            shape = state[key].shape
+            out = shape[-2]
+            new_state[key.replace('qkv', 'q')] = state[key][..., :out // 3, :]
+            new_state[key.replace('qkv',
+                                  'k')] = state[key][...,
+                                                     out // 3:out // 3 * 2, :]
+            new_state[key.replace('qkv', 'v')] = state[key][..., -out // 3:, :]
+        elif 'qkv' in key and 'bias' in key:
+            shape = state[key].shape
+            out = shape[-1]
+            new_state[key.replace('qkv', 'q')] = state[key][:out // 3]
+            new_state[key.replace('qkv',
+                                  'k')] = state[key][out // 3:out // 3 * 2]
+            new_state[key.replace('qkv', 'v')] = state[key][-out // 3:]
+        else:
+            new_state[key] = state[key]
+    return new_state
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default='tiny')
@@ -118,3 +142,10 @@ if __name__ == "__main__":
     # model = DeitDms(model)
     # print(model.mutator.info())
     print(res)
+
+    # tiny = MODELS.build(cfg["tiny"])
+    # model.load_state_dict(convert_state_dict(tiny.state_dict()), strict=True)
+    # x=torch.rand([1,3,224,224])
+    # y1=model(x)
+    # y2=tiny(x)
+    # print((y1-y2).abs().max())

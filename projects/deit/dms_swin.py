@@ -391,7 +391,7 @@ class DySplitWindowMSA(SplitWindowMSA, DynamicChannelMixin, MutableAttn,
             'input_dims': module.q.in_features,
         })
 
-        module.scale = (self.q.out_features // num_heads)**-0.5
+        module.scale = (module.q.out_features // num_heads)**-0.5
 
         return module
 
