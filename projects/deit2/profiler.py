@@ -3,7 +3,7 @@ from timm import create_model
 import torch
 import ptflops
 import torch.nn as nn
-from dms_deit import DeitDms, SplitAttention, MultiheadAttention
+from dms_deit import DeitDms, SplitAttention, MultiheadAttention, MyMultiheadAttention
 from mmcls.registry import MODELS
 from mmcv.cnn.bricks import Linear as MmcvLinear
 from ptflops.pytorch_ops import linear_flops_counter_hook
@@ -81,6 +81,22 @@ def attention_hook(module: MultiheadAttention, inputs, output):
     module.__flops__ += flops
 
 
+def my_attention_hook(module: MultiheadAttention, inputs, output):
+    head = module.num_heads
+    B, N, C = inputs[0].shape
+    out_c = output.shape[-1]
+    qk_dim = module.qk_dim // head
+    v_dim = module.v_dim // head
+
+    flops = 0
+
+    flops += B * N * C * head * (qk_dim * 2 + v_dim)  # qkv
+    flops += B * head * N * N * (qk_dim + v_dim)  # attn
+    flops += B * N * head * v_dim * out_c  # outproj
+
+    module.__flops__ += flops
+
+
 def load_algo(model: nn.Module, algo_path: str):
     model = DeitDms(model)
     state = torch.load(algo_path, map_location='cpu')['state_dict']
@@ -135,7 +151,8 @@ if __name__ == "__main__":
         custom_modules_hooks={
             SplitAttention: split_attention_hook,
             MultiheadAttention: attention_hook,
-            MmcvLinear: linear_flops_counter_hook
+            MmcvLinear: linear_flops_counter_hook,
+            MyMultiheadAttention: my_attention_hook
         },
         verbose=False)
 
