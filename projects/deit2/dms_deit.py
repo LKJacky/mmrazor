@@ -19,74 +19,15 @@ import mmcv
 from mmcv.cnn.bricks.wrappers import Linear as MMCVLinear
 from mmrazor.models.architectures.dynamic_ops import DynamicLinear
 import numpy as np
-from mmrazor.implementations.pruning.dms.core.op import (ImpModuleMixin,
-                                                         DynamicBlockMixin,
-                                                         MutableAttn,
-                                                         QuickFlopMixin,
-                                                         ImpLinear)
+from mmrazor.implementations.pruning.dms.core.op import (
+    ImpModuleMixin, DynamicBlockMixin, MutableAttn, QuickFlopMixin, ImpLinear,
+    DynamicStage)
 from mmrazor.implementations.pruning.dms.core.mutable import (
     ImpMutableChannelContainer, MutableChannelForHead, MutableChannelWithHead,
     MutableHead)
 from mmrazor.implementations.pruning.dms.core.mutable import DMSMutableMixIn
 
 # ops ####################################################################################
-
-
-class SplitAttention(MultiheadAttention):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        qkv_bias = self.qkv.bias is not None
-        self.q = nn.Linear(self.input_dims, self.embed_dims, bias=qkv_bias)
-        self.k = nn.Linear(self.input_dims, self.embed_dims, bias=qkv_bias)
-        self.v = nn.Linear(self.input_dims, self.embed_dims, bias=qkv_bias)
-        self.proj = nn.Linear(
-            self.embed_dims, self.input_dims, bias=self.proj.bias is not None)
-        delattr(self, 'qkv')
-
-        self.init_kargs = kwargs
-        self.init_args = args
-
-    def forward(self, x):
-        B, N, _ = x.shape
-
-        q, k, v = self.q(x), self.k(x), self.v(x)
-
-        def reshape(x: torch.Tensor):
-            return x.reshape([B, N, self.num_heads, -1]).permute(0, 2, 1, 3)
-
-        q, k, v = reshape(q), reshape(k), reshape(v)
-
-        attn = (q @ k.transpose(-2, -1)) * self.scale
-        attn = attn.softmax(dim=-1)
-        attn = self.attn_drop(attn)
-
-        x = (attn @ v).transpose(1, 2).reshape(B, N, -1)
-        x = self.proj(x)
-        x = self.out_drop(self.gamma1(self.proj_drop(x)))
-
-        if self.v_shortcut:
-            x = v.squeeze(1) + x
-        return x
-
-    @classmethod
-    def convert_from(cls, attn: MultiheadAttention):
-        module = SplitAttention(
-            embed_dims=attn.embed_dims,
-            num_heads=attn.num_heads,
-            input_dims=attn.input_dims,
-            attn_drop=attn.attn_drop.p,
-            proj_drop=attn.proj_drop.p,
-            dropout_layer=dict(type='Dropout', drop_prob=0.),
-            qkv_bias=attn.qkv.bias is not None,
-            qk_scale=attn.scale,
-            proj_bias=attn.proj.bias is not None,
-            v_shortcut=attn.v_shortcut,
-            use_layer_scale=not isinstance(attn.gamma1, nn.Identity),
-        )
-        module.out_drop = attn.out_drop
-        module.load_state_dict(attn.state_dict(), strict=False)
-        return module
 
 
 class MyMultiheadAttention(MultiheadAttention):
@@ -264,11 +205,25 @@ class DynamicAttention(MultiheadAttention, DynamicChannelMixin, MutableAttn,
         return flops
 
 
-class DeitLayers(nn.Sequential):
+class DeitLayers(nn.ModuleList):
 
     @classmethod
     def convert_from(cls, module):
-        return cls(module._modules)
+        new = cls()
+        for m in module:
+            new.append(m)
+        return new
+
+
+class DeitDynamicStage(DynamicStage):
+
+    def to_static_op(self):
+        op = super().to_static_op()
+        from mmengine.model.base_module import ModuleList
+        new = ModuleList()
+        for m in op:
+            new.append(m)
+        return new
 
 
 class DyTransformerEncoderLayer(TransformerEncoderLayer, DynamicBlockMixin):
@@ -604,9 +559,9 @@ class DeitDms(BaseDTPAlgorithm):
             ),
             extra_module_mapping={
                 MultiheadAttention: DynamicAttention,
-                SplitAttention: DynamicAttention,
             },
             block_initilizer_kwargs=dict(
+                dynamic_statge_module=DeitDynamicStage,
                 stage_mixin_layers=[DeitLayers],
                 dynamic_block_mapping={
                     TransformerEncoderLayer: DyTransformerEncoderLayer
