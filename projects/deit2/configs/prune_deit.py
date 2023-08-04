@@ -20,7 +20,7 @@ train_cfg = dict(by_epoch=True, max_epochs=epoch)
 
 original_lr = _base_.optim_wrapper.optimizer.lr
 model_lr = original_lr  # 1e-3
-mutator_lr = model_lr * 5e-3
+mutator_lr = model_lr * 2e-2
 
 param_scheduler = [
     dict(
