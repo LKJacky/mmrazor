@@ -111,7 +111,7 @@ class DMSMutableMixIn():
                 e_imp.requires_grad_()
         else:
             e_imp = dtp_get_importance(self.taylor, self.e, lamda=self.lda)
-        if  self.training and self.e.requires_grad and self.use_tayler:
+        if self.training and self.e.requires_grad and self.use_tayler:
             assert e_imp.requires_grad is True
             e_imp.register_hook(
                 taylor_backward_hook_wrapper(self, e_imp.detach()))
@@ -141,7 +141,7 @@ class DMSMutableMixIn():
                     1 - self.decay) * new_taylor
 
     @torch.no_grad()
-    def sync_mask(self):
+    def sync_mask(self, fix_bug=False):
         if self.taylor.max() == self.taylor.min():
             e_imp = torch.ones_like(self.taylor, requires_grad=True)
         else:
@@ -153,7 +153,8 @@ class DMSMutableMixIn():
             dim=-1)[1]
         self.mask.fill_(0)
         self.mask.data.scatter_(-1, idx, 1.0)
-        self.mask.data = (e_imp >= MaskThreshold).float()
+        if not fix_bug:
+            self.mask.data = (e_imp >= MaskThreshold).float()
 
     def dump_chosen(self):
         pass
