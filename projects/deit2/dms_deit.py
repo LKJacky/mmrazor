@@ -536,6 +536,9 @@ class DeitDms(BaseDTPAlgorithm):
                  init_cfg=None) -> None:
         BaseAlgorithm.__init__(self, architecture, data_preprocessor, init_cfg)
         model = self.architecture
+        old_arch = copy.deepcopy(self.architecture)
+        old_arch.init_weights()
+
         model.backbone.layers = DeitLayers.convert_from(model.backbone.layers)
 
         default_mutator_kwargs = dict(
@@ -585,6 +588,7 @@ class DeitDms(BaseDTPAlgorithm):
             self.architecture,
             mutator_kwargs=default_mutator_kwargs,
             scheduler_kargs=default_scheduler_kargs)
+        self.architecture.load_state_dict(old_arch.state_dict())
 
     @torch.no_grad()
     def to_static_model(self, reset=True):

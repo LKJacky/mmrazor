@@ -269,6 +269,9 @@ class BaseDTPAlgorithm(BaseAlgorithm, DmsAlgorithmMixin):
                     hacky_init_weights_wrapper(), model)
         return model
 
+    def init_weights(self):
+        pass
+
 
 class DmsGeneralAlgorithm(nn.Module, DmsAlgorithmMixin):
 
