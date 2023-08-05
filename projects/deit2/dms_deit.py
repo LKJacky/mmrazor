@@ -168,8 +168,11 @@ class DynamicAttention(MultiheadAttention, DynamicChannelMixin, MutableAttn,
             num_heads = int(self.attn_mutables['head'].mask.sum().item())
         else:
             num_heads = self.num_heads
-        qk_dim = int(self.attn_mutables['qk'].mask[0].sum().item())
-        v_dim = int(self.attn_mutables['v'].mask[0].sum().item())
+        head_mask = self.attn_mutables['head'].mask.bool()
+        qk_dim = int(self.attn_mutables['qk'].mask[head_mask].sum().item() //
+                     num_heads)
+        v_dim = int(self.attn_mutables['v'].mask[head_mask].sum().item() //
+                    num_heads)
 
         module: MyMultiheadAttention = MyMultiheadAttention(
             *self.init_args, **self.init_kwargs)
@@ -184,6 +187,7 @@ class DynamicAttention(MultiheadAttention, DynamicChannelMixin, MutableAttn,
         module.v_dim = v_dim * num_heads
 
         module.scale = (module.qk_dim // num_heads)**-0.5
+        assert module.qkv.out_features == (qk_dim * 2 + v_dim) * num_heads
 
         return module
 
@@ -496,7 +500,7 @@ class DeitMutator(DTPAMutator):
 @MODELS.register_module()
 def DeitSubModel(
     algorithm: dict,
-    reset_params=True,
+    reset_params=False,
     **kargs,
 ):
     """Convert a algorithm(with an architecture) to a static pruned
