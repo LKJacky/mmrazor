@@ -154,8 +154,8 @@ class DMSMutator(BaseMutator):
 
         self.last_soft_flop = -1
 
-        self.e_norm = None
-        self.e_flop_norm = None
+        self.e_norm = 0.
+        self.e_flop_norm = 0.
 
     def prepare_from_supernet(self, supernet) -> None:
 
@@ -350,7 +350,9 @@ class DMSMutator(BaseMutator):
                 m.e_flop.grad.copy_(sum_grad)
 
         e_grads = [m.e.grad.detach() for m in self.require_grad_mutables()]
-        e_flop_grads = [m.e_flop.grad.detach() for m in self.require_grad_mutables()]
+        e_flop_grads = [
+            m.e_flop.grad.detach() for m in self.require_grad_mutables()
+        ]
         e_grads = torch.cat(e_grads).detach()
         e_flop_grads = torch.cat(e_flop_grads).detach()
 
@@ -358,8 +360,8 @@ class DMSMutator(BaseMutator):
         e_norm = torch.norm(e_grads)
         if e_flop_norm != 0 and e_norm != 0:
             for m in self.require_grad_mutables():
-                m.e_flop.grad.data.copy_(m.e_flop.grad/e_flop_norm * scale)
-                m.e.grad.data.copy_(m.e.grad/e_norm)
+                m.e_flop.grad.data.copy_(m.e_flop.grad / e_flop_norm * scale)
+                m.e.grad.data.copy_(m.e.grad / e_norm)
         else:
             # print_log("e_flop_norm is zero, skip")
             pass

@@ -87,7 +87,11 @@ class DMSScheduler():
                 'soft_flop':
                 self.mutator.get_soft_flop(self.model).detach() / 1e6,
                 'target':
-                self.current_target(iter, epoch, max_iters, max_epochs)
+                self.current_target(iter, epoch, max_iters, max_epochs),
+                "e_norm":
+                self.mutator.e_norm,
+                "e_flop_norm":
+                self.mutator.e_flop_norm,
             }
             return res
         else:

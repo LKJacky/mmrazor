@@ -6,13 +6,13 @@ _base_ = './train_deit.py'
 decay_ratio = 0.8
 refine_ratio = 0.2
 target_flop_ratio = 0.21
-flop_loss_weight = 100
+flop_loss_weight = 1
 by_epoch = True
 target_scheduler = 'root'
 loss_type = 'log'
 grad_scale = 1.0
 
-log_interval = 1000
+log_interval = 500
 
 input_shape = (1, 3, 224, 224)
 
@@ -21,7 +21,7 @@ train_cfg = dict(by_epoch=True, max_epochs=epoch)
 
 original_lr = _base_.optim_wrapper.optimizer.lr
 model_lr = original_lr  # 1e-3
-mutator_lr = model_lr * 2e-2
+mutator_lr = model_lr * 2e-2 # to 5e-2
 
 param_scheduler = [
     dict(
@@ -69,6 +69,7 @@ model = dict(
         by_epoch=by_epoch,
         target_scheduler=target_scheduler,
         loss_type=loss_type,
+        grad_scale=grad_scale
     ),
 )
 
@@ -109,6 +110,11 @@ default_hooks = dict(
         max_keep_ckpts=5,
     ),
     logger=dict(type='LoggerHook', interval=100, _scope_='mmcls'),
+)
+
+model_wrapper_cfg = dict(
+    type='DmsDDPWrapper',
+    broadcast_buffers=True,
 )
 
 # train_dataloader = dict(batch_size=2)
