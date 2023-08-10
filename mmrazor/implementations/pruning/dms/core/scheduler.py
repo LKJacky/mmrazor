@@ -147,7 +147,7 @@ class DMSScheduler():
 
         loss_type = self.loss_type
         if loss_type == 'l2':
-            loss = (soft_flop - target)**2 if soft_flop > target else 0
+            loss = (soft_flop - target)**2 * (1 if soft_flop > target else 0)
         elif loss_type == 'l2+':
             loss = (soft_flop - target)**2 + (soft_flop - target) * (
                 1 if soft_flop > target else 0)
