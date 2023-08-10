@@ -342,26 +342,29 @@ class DMSMutator(BaseMutator):
     @torch.no_grad()
     def norm_gradient(self, scale=1.0):
 
+        @torch.no_grad()
         def sync_e_grad():
             for m in self.require_grad_mutables():
                 sum_grad = m.e.grad + m.e_flop.grad
-                m.e.grad = sum_grad
-                m.e_flop.grad = sum_grad
+                m.e.grad.copy_(sum_grad)
+                m.e_flop.grad.copy_(sum_grad)
 
-        e_grads = [m.e.grad for m in self.require_grad_mutables()]
-        e_flop_grads = [m.e_flop.grad for m in self.require_grad_mutables()]
-        e_grads = torch.cat(e_grads)
-        e_flop_grads = torch.cat(e_flop_grads)
+        e_grads = [m.e.grad.detach() for m in self.require_grad_mutables()]
+        e_flop_grads = [m.e_flop.grad.detach() for m in self.require_grad_mutables()]
+        e_grads = torch.cat(e_grads).detach()
+        e_flop_grads = torch.cat(e_flop_grads).detach()
 
         e_flop_norm = torch.norm(e_flop_grads)
         e_norm = torch.norm(e_grads)
         if e_flop_norm != 0 and e_norm != 0:
-            flop_grad_scale = e_norm.abs() / e_flop_norm.abs() * scale
+            flop_grad_scale = e_norm / e_flop_norm * scale
             for m in self.require_grad_mutables():
-                m.e_flop.grad = m.e_flop.grad * flop_grad_scale
+                m.e_flop.grad.data.copy_(m.e_flop.grad * flop_grad_scale)
         else:
             # print_log("e_flop_norm is zero, skip")
             pass
+        # print(e_norm,e_flop_norm)
+
         sync_e_grad()
 
         self.e_norm = e_norm.item()
