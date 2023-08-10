@@ -29,12 +29,14 @@ param_scheduler = [
         by_epoch=True,
         end=20,
         convert_to_iter_based=True,
+        mutator_lr=mutator_lr,
         _scope_='mmcls'),
     dict(
         type='MyCosineAnnealingLR',
         eta_min=1e-05,
         by_epoch=True,
         begin=20,
+        mutator_lr=mutator_lr,
         _scope_='mmcls'),
 ]
 find_unused_parameters = True
