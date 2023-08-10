@@ -323,7 +323,7 @@ class MutableHead(BaseMutable, DMSMutableMixIn):
         mask = torch.ones([num_heads])
         self.register_buffer('mask', mask)
         self.mask: torch.Tensor
-
+        self.lda = 4.0
         self.flop_scale_converter = None
 
     @property
