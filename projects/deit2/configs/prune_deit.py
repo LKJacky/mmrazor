@@ -5,11 +5,12 @@ _base_ = './train_deit.py'
 
 decay_ratio = 0.8
 refine_ratio = 0.2
-target_flop_ratio = 0.195
+target_flop_ratio = 0.21
 flop_loss_weight = 100
 by_epoch = True
 target_scheduler = 'root'
 loss_type = 'log'
+grad_scale = 1.0
 
 log_interval = 1000
 
@@ -94,7 +95,7 @@ paramwise_cfg = dict(custom_keys={
 optim_wrapper = _base_.optim_wrapper
 optim_wrapper.update({
     'paramwise_cfg': paramwise_cfg,
-    "type":"DmsOptimWrapper",
+    "type": "DmsOptimWrapper",
     'optimizer': {
         'lr': model_lr
     }
@@ -106,7 +107,9 @@ default_hooks = dict(
         interval=1,
         save_best='auto',
         max_keep_ckpts=5,
-    ), )
+    ),
+    logger=dict(type='LoggerHook', interval=100, _scope_='mmcls'),
+)
 
 # train_dataloader = dict(batch_size=2)
 # val_dataloader = dict(batch_size=2)
