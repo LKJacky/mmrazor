@@ -154,6 +154,9 @@ class DMSMutator(BaseMutator):
 
         self.last_soft_flop = -1
 
+        self.e_norm = None
+        self.e_flop_norm = None
+
     def prepare_from_supernet(self, supernet) -> None:
 
         if isinstance(supernet, OPTModel):
@@ -209,8 +212,10 @@ class DMSMutator(BaseMutator):
         for mutables in self.attn_mutables:
             attn_info += f"head: {mutables['head'].info()}\tqk: {mutables['qk'].info()}\tv: {mutables['v'].info()}\n"  # noqa
 
-        return self.dtp_mutator.info(
+        out = self.dtp_mutator.info(
         ) + '\n' + attn_info + '\n' + mutable_info + '\n' + flop_info
+        out += '\n' + f'E Gradient: {self.e_norm} / {self.e_flop_norm}'
+        return out
 
     @torch.no_grad()
     def init_quick_flop(self, model: nn.Module):
@@ -328,3 +333,36 @@ class DMSMutator(BaseMutator):
         for m in self.modules():
             if isinstance(m, DMSMutableMixIn):
                 yield m
+
+    def require_grad_mutables(self):
+        for m in self.modules():
+            if isinstance(m, DMSMutableMixIn) and m.e.requires_grad:
+                yield m
+
+    @torch.no_grad()
+    def norm_gradient(self, scale=1.0):
+
+        def sync_e_grad():
+            for m in self.require_grad_mutables():
+                sum_grad = m.e.grad + m.e_flop.grad
+                m.e.grad = sum_grad
+                m.e_flop.grad = sum_grad
+
+        e_grads = [m.e.grad for m in self.require_grad_mutables()]
+        e_flop_grads = [m.e_flop.grad for m in self.require_grad_mutables()]
+        e_grads = torch.cat(e_grads)
+        e_flop_grads = torch.cat(e_flop_grads)
+
+        e_flop_norm = torch.norm(e_flop_grads)
+        e_norm = torch.norm(e_grads)
+        if e_flop_norm != 0 and e_norm != 0:
+            flop_grad_scale = e_norm.abs() / e_flop_norm.abs() * scale
+            for m in self.require_grad_mutables():
+                m.e_flop.grad = m.e_flop.grad * flop_grad_scale
+        else:
+            # print_log("e_flop_norm is zero, skip")
+            pass
+        sync_e_grad()
+
+        self.e_norm = e_norm.item()
+        self.e_flop_norm = e_flop_norm.item()

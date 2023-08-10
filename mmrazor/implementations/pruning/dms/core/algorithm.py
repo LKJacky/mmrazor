@@ -1,6 +1,11 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from typing import Dict, List, Optional, Union
+from mmengine.optim import OptimWrapper
 
+from mmengine.optim.optimizer.optimizer_wrapper import OptimWrapper
+
+from mmengine.registry import OPTIM_WRAPPERS
+from torch import Tensor
 import torch
 import torch.nn as nn
 from mmengine.model import BaseModel
@@ -272,6 +277,10 @@ class BaseDTPAlgorithm(BaseAlgorithm, DmsAlgorithmMixin):
     def init_weights(self):
         pass
 
+    def train_step(self, data, optim_wrapper: OptimWrapper):
+        optim_wrapper.algo = [self]
+        return super().train_step(data, optim_wrapper)
+
 
 class DmsGeneralAlgorithm(nn.Module, DmsAlgorithmMixin):
 
@@ -348,3 +357,13 @@ def DmsSubModel(
     clean_params_init_info(algorithm)
 
     return algorithm.to_static_model(reset_params=reset_params)
+
+
+@OPTIM_WRAPPERS.register_module()
+class DmsOptimWrapper(OptimWrapper):
+
+    def backward(self, loss: Tensor, **kwargs) -> None:
+        res = super().backward(loss, **kwargs)
+        algo: BaseDTPAlgorithm = self.algo[0]
+        algo.scheduler.norm_grad()
+        return res

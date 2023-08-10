@@ -27,6 +27,7 @@ class DMSScheduler():
                  target_scheduler='linear',
                  loss_type='l2',
                  structure_log_interval=100,
+                 grad_scale=1.0,
                  train_model=True) -> None:
 
         self.model = model
@@ -55,6 +56,8 @@ class DMSScheduler():
         self.train_model = train_model
 
         self.step = step
+
+        self.grad_scale = grad_scale
 
     def _init(self):
         self.mutator.prepare_from_supernet(self.model)
@@ -163,3 +166,6 @@ class DMSScheduler():
         return (max(
             self.mutator.get_soft_flop(self.model) / self.init_flop, target) -
                 target)**2
+
+    def norm_grad(self):
+        self.mutator.norm_gradient(self.grad_scale)

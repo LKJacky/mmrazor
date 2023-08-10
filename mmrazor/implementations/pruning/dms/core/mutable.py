@@ -91,6 +91,8 @@ class DMSMutableMixIn():
 
         self.e = nn.parameter.Parameter(
             torch.tensor([1.0]), requires_grad=False)
+        self.e_flop = nn.parameter.Parameter(
+            torch.tensor([1.0]), requires_grad=False)
 
         taylor = torch.zeros([num_elem])
         self.register_buffer('taylor', taylor)
@@ -102,16 +104,15 @@ class DMSMutableMixIn():
 
         self.grad_scaler = 1
 
-    @property
-    def current_imp(self):
+    def _current_imp(self, e):
         if self.taylor.max() == self.taylor.min():
             e_imp = torch.ones_like(self.taylor)
-            if self.e.requires_grad:
-                e_imp = e_imp + self.e * 0
+            if e.requires_grad:
+                e_imp = e_imp + e * 0
                 e_imp.requires_grad_()
         else:
-            e_imp = dtp_get_importance(self.taylor, self.e, lamda=self.lda)
-        if self.training and self.e.requires_grad and self.use_tayler:
+            e_imp = dtp_get_importance(self.taylor, e, lamda=self.lda)
+        if self.training and e.requires_grad and self.use_tayler:
             assert e_imp.requires_grad is True
             e_imp.register_hook(
                 taylor_backward_hook_wrapper(self, e_imp.detach()))
@@ -121,13 +122,24 @@ class DMSMutableMixIn():
         return e_imp
 
     @property
+    def current_imp(self):
+        return self._current_imp(self.e)
+
+    @property
     def current_imp_flop(self):
-        e_imp = dtp_get_importance(self.taylor, self.e)
+        e_imp = dtp_get_importance(self.taylor, self.e_flop, lamda=self.lda)
         return e_imp
+
+    def _limit_value(self, min=0, max=1):
+        self.e.data = torch.clamp(self.e, min, max)
+        self.e_flop.data = torch.clamp(self.e_flop, min, max)
+        mean = (self.e.data + self.e_flop.data) / 2
+        self.e.data = mean
+        self.e_flop.data = mean
 
     @torch.no_grad()
     def limit_value(self):
-        self.e.data = torch.clamp(self.e, 1 / self.taylor.numel() / 2, 1.0)
+        self._limit_value(1 / self.taylor.numel() / 2, 1.0)
 
     @torch.no_grad()
     def update_taylor(self, input, grad):
@@ -277,7 +289,7 @@ class MutableBlocks(BaseMutable, DMSMutableMixIn):
     def block_flop_scale_fun_wrapper(self, i):
 
         def scale():
-            return self.current_imp[i]
+            return self.current_imp_flop[i]
 
         return scale
 
@@ -298,7 +310,7 @@ class MutableBlocks(BaseMutable, DMSMutableMixIn):
             f'mask:\t{get_mask_str()}\t')
 
     def limit_value(self):
-        self.e.data = torch.clamp(self.e, 0, 1.0)  # num of blocks can be zero
+        self._limit_value(0, 1)  # num of blocks can be zero
 
     # inherit from BaseMutable
 
