@@ -85,7 +85,7 @@ class DMSScheduler():
                 self.flop_loss(iter, epoch, max_iters, max_epochs) *
                 self.flop_loss_weight,
                 'soft_flop':
-                self.mutator.get_soft_flop(self.model).detach(),
+                self.mutator.get_soft_flop(self.model).detach() / 1e6,
                 'target':
                 self.current_target(iter, epoch, max_iters, max_epochs)
             }
